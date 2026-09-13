@@ -455,3 +455,114 @@ a {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* ─── Мелочи, вернувшиеся с учётом времени ───────────────────────────────── */
+
+.back {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* Поле в строке с кнопкой занимает всё свободное место. */
+.row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+/* Название-кнопка. Выглядит как название, ведёт себя как кнопка:
+   раскрывает строку, а не уводит на другой экран. */
+.plain-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.chip {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Стрелки порядка: квадрат 44 пикселя — палец не промахивается. */
+.icon-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ─── Категории ──────────────────────────────────────────────────────────── */
+
+.cat {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cat__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.cat__name {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
+
+.cat__presets {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.cat__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0 4px;
+}
+
+.cat__body .link-btn {
+  align-self: flex-start;
+}

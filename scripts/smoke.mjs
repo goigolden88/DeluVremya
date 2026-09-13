@@ -405,7 +405,62 @@ async function scenario() {
     `хеш ${timeHash}`,
   )
 
+  // ─ Категории (Этап 1, п. 1): стартовый набор заводится сам и правится.
+  await go('/time/categories')
+  const starter = await screen()
+  check(
+    'стартовые категории заведены сами, с кнопками',
+    has(starter, 'Чтение') && has(starter, 'Прочее') && has(starter, '+30'),
+    starter.replace(/\s+/g, ' ').slice(0, 160),
+  )
+
+  await act(`
+    set(document.querySelector('input[name=category]'), 'Покер');
+    byText('button', 'Добавить')?.click();
+  `)
+  await sleep(700)
+  const added = await screen()
+  check(
+    'новая категория встаёт в конец списка',
+    has(added, 'Покер') && added.indexOf('Покер') > added.indexOf('Прочее'),
+    line(added, 'Покер'),
+  )
+
+  await act(`
+    set(document.querySelector('input[name=category]'), ' покер ');
+    byText('button', 'Добавить')?.click();
+  `)
+  await sleep(500)
+  check('двойник названия не заводится', has(await screen(), 'Такая категория уже есть'))
+
+  await act(`byText('button', 'Покер')?.click()`)
+  await sleep(400)
+  await act(`
+    set(document.querySelector('input[name=minutes]'), '45');
+    byText('button', 'Добавить кнопку')?.click();
+  `)
+  await sleep(700)
+  await act(`document.querySelector('[aria-label="Покер — выше"]')?.click()`)
+  await sleep(700)
+  const moved = await screen()
+  check(
+    'у категории своя кнопка, сдвиг вверх меняет порядок',
+    has(moved, '+45') && moved.indexOf('Покер') < moved.indexOf('Прочее'),
+    line(moved, 'Покер'),
+  )
+
+  await act(`byText('button', 'В архив')?.click()`)
+  await sleep(700)
+  const archived = await screen()
+  check(
+    'категория уходит в архив, из списка пропадает',
+    !has(archived, 'Покер') && has(archived, 'Архив'),
+    line(archived, 'Архив'),
+  )
+
   // ─ Настройки: разделы свёрнуты оглавлением, у свёрнутой копии — итог.
+  // Шестерёнка живёт в шапке «Сегодня».
+  await go('/')
   await act(`document.querySelector('[aria-label="Настройки"]')?.click()`)
   await sleep(700)
   const settings = await screen()
@@ -581,7 +636,7 @@ async function dataScenario(file) {
   const loaded = /Загружено записей: (\d+)/.exec(restored.replace(/ /g, ' '))
   check('копия загрузилась через «Восстановить из копии»', loaded !== null, loaded?.[0] ?? restored.slice(0, 160))
 
-  const routes = ['/', '/inbox', '/settings']
+  const routes = ['/', '/inbox', '/time/categories', '/settings']
 
   for (const route of routes) {
     await go(route)
