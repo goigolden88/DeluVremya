@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { formatDateLong } from '../core/dates.ts'
 import { IosNote } from '../ui/Install.tsx'
 import { useToday } from '../ui/useToday.ts'
+import { useScreenNames } from '../ui/useScreenNames.ts'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
 import { useFirstRun } from './useFirstRun.ts'
 import { Welcome } from './Welcome.tsx'
@@ -14,12 +15,13 @@ import { Welcome } from './Welcome.tsx'
 export function Today() {
   const first = useFirstRun()
   const day = useToday()
+  const names = useScreenNames()
 
   return (
     <>
       <header className="screen-head">
         <div className="screen-head__row">
-          <h1>Сегодня</h1>
+          <h1>{names.today}</h1>
           <div className="screen-head__tools">
             <Link className="gear" to="/settings" aria-label="Настройки">
               <span aria-hidden="true">⚙</span>
@@ -42,8 +44,8 @@ export function Today() {
         </section>
       )}
 
-      {/* Учёт времени: кнопки и итог дня. Список блоков — на «Времени». */}
-      <h2>Время</h2>
+      {/* Учёт времени: кнопки и итог дня. Список блоков — на экране учёта. */}
+      <h2>{names.time}</h2>
       <TimeDay day={day} compact />
       <p>
         <Link to="/time">Все блоки дня →</Link>

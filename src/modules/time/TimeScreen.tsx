@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { addDays, formatDateLong, type DateStr } from '../../core/dates.ts'
 import { useToday } from '../../ui/useToday.ts'
+import { useScreenNames } from '../../ui/useScreenNames.ts'
 import { viewedDay } from './day.ts'
 import { windowNote } from './labels.ts'
 import { TimeDay } from './TimeDay.tsx'
@@ -15,6 +16,7 @@ import { TimeDay } from './TimeDay.tsx'
  */
 export function TimeScreen() {
   const today = useToday()
+  const names = useScreenNames()
   const [params, setParams] = useSearchParams()
   const day = viewedDay(params.get('day'), today)
   const isToday = day === today
@@ -26,7 +28,7 @@ export function TimeScreen() {
     <>
       <header className="screen-head">
         <div className="screen-head__row">
-          <h1>Время</h1>
+          <h1>{names.time}</h1>
           <div className="screen-head__tools">
             <Link className="gear" to="/time/categories" aria-label="Категории">
               <span aria-hidden="true">☰</span>

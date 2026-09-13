@@ -5,6 +5,7 @@ import { formatDateLoose, plural, today } from '../core/dates.ts'
 import type { Note } from '../core/model.ts'
 import { captureNote } from '../modules/notes/inbox.ts'
 import { useInbox } from '../modules/notes/useInbox.ts'
+import { useScreenNames } from '../ui/useScreenNames.ts'
 
 /**
  * Входящие — минимальный захват Этапа 0: одно поле, «Записать» и что уже
@@ -22,6 +23,7 @@ export function Inbox() {
   const [done, setDone] = useState('')
   const [error, setError] = useState('')
   const inbox = useInbox()
+  const names = useScreenNames()
 
   // Второе «Поделиться», пока экран открыт, приходит новым адресом.
   useEffect(() => {
@@ -50,7 +52,7 @@ export function Inbox() {
   return (
     <>
       <header className="screen-head">
-        <h1>Входящие</h1>
+        <h1>{names.inbox}</h1>
         <p className="muted">Мысль или дело — одной строкой. Разбор потом.</p>
       </header>
 

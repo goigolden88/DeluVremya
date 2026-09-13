@@ -20,6 +20,8 @@ import { backupNote, backupSummary } from '../ui/backup.ts'
 import { Fold } from '../ui/Fold.tsx'
 import { InstallNote } from '../ui/Install.tsx'
 import { useSyncStatus } from '../ui/useSync.ts'
+import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
+import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
 import { isEmptyBase } from './firstRun.ts'
 import { ImportRecords } from './ImportRecords.tsx'
 
@@ -84,6 +86,8 @@ export function Settings() {
       <DataTransfer onChanged={load} />
 
       <Reminders />
+
+      <ScreenNamesSection />
 
       <About state={state} />
     </>
@@ -343,6 +347,72 @@ function download(name: string, text: string, type: string): void {
   link.click()
   // Ссылка держит содержимое в памяти, пока её не отпустить.
   URL.revokeObjectURL(url)
+}
+
+// ─── Названия экранов (Р-26) ───────────────────────────────────────────────
+
+/**
+ * Свои названия вкладок. Пустое поле — название по умолчанию. Итог
+ * у свёрнутого — нынешние названия: видно, не разворачивая.
+ */
+function ScreenNamesSection() {
+  const names = useScreenNames()
+  const [draft, setDraft] = useState<Record<ScreenKey, string> | null>(null)
+  const [note, setNote] = useState('')
+  const value = draft ?? names
+
+  async function save(input: Partial<Record<ScreenKey, string>>) {
+    setNote('')
+    try {
+      await saveScreenNames(input)
+      setDraft(null)
+      setNote('Сохранено')
+    } catch (failure) {
+      setNote(describe(failure))
+    }
+  }
+
+  return (
+    <Fold
+      id="settings:names"
+      title="Названия экранов"
+      summary={SCREEN_KEYS.map((key) => names[key]).join(' · ')}
+      folded
+    >
+      <form
+        className="form"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void save(value)
+        }}
+      >
+        {SCREEN_KEYS.map((key) => (
+          <label key={key} className="field">
+            <span>Вкладка {quoted(DEFAULT_SCREEN_NAMES[key])}</span>
+            <input
+              name={`screen-${key}`}
+              maxLength={MAX_SCREEN_NAME}
+              value={value[key]}
+              onChange={(event) => setDraft({ ...value, [key]: event.target.value })}
+            />
+          </label>
+        ))}
+        <p className="muted">
+          Названия — этого устройства. Ярлыки по долгому тапу на иконке и название приложения остаются
+          прежними: они зашиты при установке.
+        </p>
+        {note && <p className="muted">{note}</p>}
+        <div className="form__actions">
+          <button type="button" className="btn" onClick={() => void save({})}>
+            Вернуть по умолчанию
+          </button>
+          <button type="submit" className="btn btn--primary">
+            Сохранить
+          </button>
+        </div>
+      </form>
+    </Fold>
+  )
 }
 
 // ─── Напоминания (Р-14, Р-24) — раздел из «Дневников» ─────────────────────

@@ -713,6 +713,31 @@ async function scenario() {
     line(reminders, 'Напомина'),
   )
 
+  // ─ Названия экранов (Р-26): по умолчанию «Учёт», своё — из настроек,
+  // сразу во вкладке и в заголовке, без перезапуска.
+  const tabs = () => run(`[...document.querySelectorAll('.tab')].map((el) => el.textContent.trim()).join(', ')`)
+  const defaults = await tabs()
+  check('вкладки по умолчанию — «Сегодня», «Учёт», «Входящие»', defaults === 'Сегодня, Учёт, Входящие', defaults)
+  await unfold('Названия экранов')
+  await act(`
+    set(document.querySelector('input[name=screen-time]'), 'Хронометраж');
+    byText('button', 'Сохранить')?.click();
+  `)
+  await sleep(700)
+  const renamed = await tabs()
+  await go('/time')
+  const renamedHead = await run(`document.querySelector('h1')?.textContent ?? ''`)
+  check(
+    'своё название — сразу во вкладке и в заголовке экрана',
+    renamed === 'Сегодня, Хронометраж, Входящие' && renamedHead === 'Хронометраж',
+    `${renamed}; заголовок «${renamedHead}»`,
+  )
+  await go('/settings')
+  await act(`byText('button', 'Вернуть по умолчанию')?.click()`)
+  await sleep(700)
+  const restored = await tabs()
+  check('«Вернуть по умолчанию» возвращает названия', restored === defaults, restored)
+
   // ─ Копия файлом: туда и обратно.
   await unfold('Экспорт и импорт')
   await act(`byText('button', 'Сохранить в файл')?.click()`)

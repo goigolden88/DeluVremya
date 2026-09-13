@@ -21,6 +21,7 @@
 import { db } from './core/db.ts'
 import { toDateStr } from './core/dates.ts'
 import { unfilledNotice } from './modules/time/remind.ts'
+import { readScreenNames } from './ui/screenNames.ts'
 
 /**
  * Имя фоновой проверки (Р-24). Общее на все напоминания приложения:
@@ -173,7 +174,9 @@ async function decide(
     loud = plan === 'loud'
   }
 
-  const unfilled = unfilledNotice(await db.getAll('time'), day)
+  // Экран в тексте — своим именем этого устройства (Р-26).
+  const names = await readScreenNames()
+  const unfilled = unfilledNotice(await db.getAll('time'), day, names.time)
 
   try {
     if (!unfilled) {

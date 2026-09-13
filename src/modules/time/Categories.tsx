@@ -24,6 +24,7 @@ import {
 import { deleteConfirm, KIND_LABELS, moveLine, NAME_PROBLEMS, PRESET_PROBLEMS, presetLabel } from './labels.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
+import { useScreenNames } from '../../ui/useScreenNames.ts'
 
 const KINDS: readonly CategoryKind[] = ['useful', 'neutral', 'idle']
 
@@ -53,6 +54,7 @@ async function writeRemoval(plan: RemovePlan): Promise<void> {
 export function Categories() {
   const catalog = useCatalog()
   const time = useBlocks()
+  const names = useScreenNames()
   const [open, setOpen] = useState<string | null>(null)
   const [error, setError] = useState('')
 
@@ -72,7 +74,7 @@ export function Categories() {
     <>
       <header className="screen-head">
         <Link className="back" to="/time">
-          ← Учёт времени
+          ← {names.time}
         </Link>
         <h1>Категории</h1>
         <p className="muted">

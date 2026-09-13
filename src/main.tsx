@@ -5,7 +5,15 @@ import { App } from './app.tsx'
 import { db } from './core/db.ts'
 import { applyLaunch } from './launch.ts'
 import { listenInstall } from './ui/install.ts'
+import { loadScreenNames } from './ui/useScreenNames.ts'
 import './styles.css'
+
+/**
+ * Сколько ждать своих названий вкладок до первого экрана (Р-26). Без
+ * ожидания вкладки мигают названиями по умолчанию; база медлит — экран
+ * открывается всё равно, с умолчаниями, и названия подъедут следом.
+ */
+const NAMES_WAIT_MS = 500
 
 // До первого экрана: «Поделиться» и ярлыки приходят адресом `?text=…`
 // и `?go=…`, и роутер должен увидеть уже готовый маршрут (Р-16).
@@ -16,12 +24,15 @@ listenInstall()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Не найден #root')
+const mount = root
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+void Promise.race([loadScreenNames(), new Promise((done) => setTimeout(done, NAMES_WAIT_MS))]).finally(() => {
+  createRoot(mount).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+})
 
 // Постоянное хранилище: без него браузер вправе стереть базу при
 // нехватке места. Отказ — не ошибка, работать можно и так.
