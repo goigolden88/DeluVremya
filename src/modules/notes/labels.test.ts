@@ -9,16 +9,65 @@ import {
   dayText,
   deleteConfirm,
   durationText,
+  estimateFactText,
+  mainFactText,
   monthHeading,
   offPlanMeta,
   overdueLead,
+  planFactText,
   plannedCountText,
   plannedLine,
   progressText,
   realismText,
+  recallTitle,
+  repeatText,
   shownText,
+  staleLead,
+  staleRest,
 } from './labels.ts'
+import type { PlanFact } from './period.ts'
 import type { Realism } from './plan.ts'
+
+describe('тексты обзора недели — Р-44, Р-46, Р-49', () => {
+  const fact = (over: Partial<PlanFact>): PlanFact => ({
+    planned: 0,
+    done: 0,
+    late: 0,
+    waiting: 0,
+    ahead: 0,
+    mainDays: 0,
+    mainDone: 0,
+    estimated: 0,
+    estPlanned: 0,
+    estDone: 0,
+    repeats: [],
+    ...over,
+  })
+
+  it('план против факта — с основанием и хвостом', () => {
+    expect(planFactText(fact({}))).toBe('В плане не было ни одного пункта')
+    expect(planFactText(fact({ planned: 12, done: 9, late: 2, waiting: 3 }))).toBe(
+      'Сделано 9 из 12, из них 2 позже своего дня; 3 ждут решения в «С прошлых дней»',
+    )
+    expect(planFactText(fact({ planned: 3, done: 1, ahead: 2 }))).toBe('Сделано 1 из 3; 2 ещё впереди')
+  })
+
+  it('главное — по дням, где выбрано; оценки — по скольким пунктам', () => {
+    expect(mainFactText(fact({}))).toBe('Главное дело не выбиралось')
+    expect(mainFactText(fact({ mainDays: 5, mainDone: 4 }))).toBe('Главное сделано в 4 из 5 дней, где было выбрано')
+    expect(estimateFactText(fact({ planned: 4 }))).toBeNull()
+    expect(estimateFactText(fact({ planned: 12, estimated: 10, estPlanned: 1800, estDone: 1320 }))).toBe(
+      'По оценкам намечено 30 ч по 10 пунктам из 12, сделано пунктов на 22 ч',
+    )
+  })
+
+  it('повтор, висяки, возврат', () => {
+    expect(repeatText({ text: 'Зарядка', days: 6, done: 4 })).toBe('Зарядка — 4 из 6 дней')
+    expect(staleLead(7, 30)).toBe('Висят 30 дней и дольше: 7 дел')
+    expect(staleRest(1)).toBe('Ещё 1 дело — в следующий раз')
+    expect(recallTitle(4, { from: '2026-08-10', to: '2026-08-16' })).toBe('4 недели назад · 10–16 августа 2026')
+  })
+})
 
 const TODAY = '2026-09-13'
 

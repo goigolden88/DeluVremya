@@ -18,6 +18,7 @@ import {
   reopen,
 } from '../modules/notes/inbox.ts'
 import {
+  ageText,
   doneLine,
   KIND_NAMES,
   KIND_PLURALS,
@@ -25,11 +26,14 @@ import {
   plannedCountText,
   plannedLine,
   savedLine,
+  shortText,
   shownText,
+  SOMEDAY_TITLE,
   UNSORTED_TITLE,
 } from '../modules/notes/labels.ts'
 import { NoteItem } from '../modules/notes/NoteItem.tsx'
 import { plannedCount, withPlan } from '../modules/notes/plan.ts'
+import { fromSomeday, somedayOf } from '../modules/notes/review.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../ui/Fold.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
@@ -161,7 +165,18 @@ export function Inbox() {
     }
   }
 
+  // «Когда-нибудь» — обратно в неразобранное (Р-46).
+  async function back(note: Note) {
+    setError('')
+    try {
+      await db.put('notes', fromSomeday(note))
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
   const all = read.notes ?? []
+  const someday = somedayOf(all)
   const words = queryWords(query)
   const goals = goalsOf(all)
   const shownGoals = goals.filter((goal) => matchesQuery(goal, words))
@@ -327,6 +342,30 @@ export function Inbox() {
               </p>
             )}
           </section>
+
+          {/* Отложенное из разбора висяков: без блока «когда-нибудь» значило бы «пропало» (Р-46). */}
+          {someday.length > 0 && (
+            <Fold id="notes:someday" title={SOMEDAY_TITLE} summary={someday.length} folded>
+              <ul className="plain">
+                {someday.map((note) => (
+                  <li key={note.id} className="plan-item">
+                    <div className="plan-item__row">
+                      <span className="plan-item__text">{note.text}</span>
+                      <span className="muted plan-item__est">{ageText(note, today)}</span>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        aria-label={`Вернуть в «${UNSORTED_TITLE}»: ${shortText(note.text)}`}
+                        onClick={() => void back(note)}
+                      >
+                        Вернуть
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Fold>
+          )}
         </>
       )}
     </>

@@ -3,10 +3,21 @@
  * (правило в CLAUDE.md).
  */
 
-import { days, daysBetween, formatDateLong, formatMonth, isDateStr, plural, type DateStr } from '../../core/dates.ts'
+import {
+  days,
+  daysBetween,
+  formatDateLong,
+  formatMonth,
+  formatPeriod,
+  isDateStr,
+  plural,
+  type DateStr,
+  type Period,
+} from '../../core/dates.ts'
 import type { Note, NoteKind } from '../../core/model.ts'
 import { quoted } from '../../ui/screenNames.ts'
 import { ageDays, type GoalProgress } from './inbox.ts'
+import type { PlanFact, Repeat } from './period.ts'
 import type { Realism } from './plan.ts'
 
 /** Вид записи на переключателе и в карточке (Р-13, Р-31). */
@@ -218,3 +229,73 @@ export function templateSavedLine(name: string, count: number): string {
 export function plannedCountText(count: number, screen: string): string {
   return `Ещё ${recordsText(count)} в плане — экран ${quoted(screen)}`
 }
+
+// ─── Обзор недели (Р-44, Р-46, Р-47, Р-49) ─────────────────────────────────
+
+/** Отложенное из разбора висяков — свой блок на экране заметок (Р-46). */
+export const SOMEDAY_TITLE = 'Когда-нибудь'
+
+function tasksText(count: number): string {
+  return counted(count, ['дело', 'дела', 'дел'])
+}
+
+/** План против факта главной строкой — с основанием и тем, что ждёт в хвосте. */
+export function planFactText(fact: PlanFact): string {
+  if (fact.planned === 0) return 'В плане не было ни одного пункта'
+  const parts = [`Сделано ${fact.done} из ${fact.planned}` + (fact.late > 0 ? `, из них ${fact.late} позже своего дня` : '')]
+  if (fact.waiting > 0) {
+    parts.push(`${fact.waiting} ${plural(fact.waiting, ['ждёт', 'ждут', 'ждут'])} решения в «${OVERDUE_TITLE}»`)
+  }
+  if (fact.ahead > 0) parts.push(`${fact.ahead} ещё впереди`)
+  return parts.join('; ')
+}
+
+/** Как считается план против факта (Р-44): число не врёт молча. */
+export const PLAN_FACT_BASIS = 'Пункт считается днём, на котором стоит сейчас; удалённые не считаются.'
+
+/** Главное дело по дням (Р-40). */
+export function mainFactText(fact: PlanFact): string {
+  if (fact.mainDays === 0) return 'Главное дело не выбиралось'
+  return `Главное сделано в ${fact.mainDone} из ${fact.mainDays} ${plural(fact.mainDays, ['дня', 'дней', 'дней'])}, где было выбрано`
+}
+
+/** Оценки против сделанного — по скольким пунктам. Null — оценок не было. */
+export function estimateFactText(fact: PlanFact): string | null {
+  if (fact.estimated === 0) return null
+  const basis =
+    `по ${fact.estimated} ${plural(fact.estimated, ['пункту', 'пунктам', 'пунктам'])}` +
+    (fact.estimated < fact.planned ? ` из ${fact.planned}` : '')
+  return `По оценкам намечено ${durationText(fact.estPlanned)} ${basis}, сделано пунктов на ${durationText(fact.estDone)}`
+}
+
+/** Повтор пункта — привычка: «Зарядка — 4 из 6 дней». */
+export function repeatText(repeat: Repeat): string {
+  return `${firstLine(repeat.text)} — ${repeat.done} из ${repeat.days} ${plural(repeat.days, ['дня', 'дней', 'дней'])}`
+}
+
+/** Над висяками: от какого порога и сколько всего (Р-46, Р-48). */
+export function staleLead(count: number, threshold: number): string {
+  return `Висят ${days(threshold)} и дольше: ${tasksText(count)}`
+}
+
+/** Остальные висяки — числом, а не молча (Р-46). */
+export function staleRest(count: number): string {
+  return `Ещё ${tasksText(count)} — в следующий раз`
+}
+
+/** Над замыслами без движения (Р-47, Р-48). */
+export function stuckLead(threshold: number): string {
+  return `Замыслы без движения ${days(threshold)} и дольше`
+}
+
+/** Когда замысел двигался последний раз. */
+export function stuckMeta(since: DateStr | null): string {
+  return since === null ? 'дат нет' : `последнее движение — ${formatDateLong(since)}`
+}
+
+/** Возврат мыслей (Р-49): «4 недели назад · 10–16 августа 2026». */
+export function recallTitle(weeksAgo: number, period: Period): string {
+  return `${counted(weeksAgo, ['неделю', 'недели', 'недель'])} назад · ${formatPeriod(period)}`
+}
+
+export const RECALL_EMPTY = 'Мыслей в ту неделю не записано'
