@@ -193,6 +193,24 @@ export function plannedLine(day: DateStr, today: DateStr): string {
   return `Поставлено на ${dayText(day, today)}`
 }
 
+// ─── Шаблоны дня (Р-39) ────────────────────────────────────────────────────
+
+export const TEMPLATES_TITLE = 'Шаблоны'
+
+/** «3 пункта». */
+export function itemsText(count: number): string {
+  return counted(count, ['пункт', 'пункта', 'пунктов'])
+}
+
+/** Отклик после применения шаблона — число с основанием: сколько встало и сколько уже было. */
+export function appliedText(name: string, added: number, present: number): string {
+  return `«${name}»: добавлено ${added} из ${added + present}` + (present > 0 ? `, уже было ${present}` : '')
+}
+
+export function templateSavedLine(name: string, count: number): string {
+  return `Шаблон «${name}» сохранён — ${itemsText(count)}`
+}
+
 /**
  * Под неразобранным: поставленное в план отсюда ушло — сказано числом
  * и где искать. `screen` — название главного экрана на этом устройстве (Р-26).

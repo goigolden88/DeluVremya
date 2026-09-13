@@ -5,6 +5,7 @@ import { Layout } from './ui/Layout.tsx'
 import { Today } from './screens/Today.tsx'
 import { Inbox } from './screens/Inbox.tsx'
 import { Settings } from './screens/Settings.tsx'
+import { Templates } from './modules/notes/Templates.tsx'
 import { Categories } from './modules/time/Categories.tsx'
 import { TimeScreen } from './modules/time/TimeScreen.tsx'
 import { watchCategoryMerges } from './modules/time/useCatalog.ts'
@@ -34,6 +35,7 @@ export function App() {
           {/* Цель ярлыка «Учесть время» (`?go=time`, Р-16): адрес не меняется. */}
           <Route path="time" element={<TimeScreen />} />
           <Route path="time/categories" element={<Categories />} />
+          <Route path="templates" element={<Templates />} />
           {/* Незнакомый адрес — на главный. Так и ярлык на экран, которого
               ещё нет, открывает приложение, а не пустоту. */}
           <Route path="*" element={<Navigate to="/" replace />} />

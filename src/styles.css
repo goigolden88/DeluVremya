@@ -905,6 +905,25 @@ span.plan-item__text {
   padding: 4px 0 10px;
 }
 
+/* ─── Шаблоны дня ────────────────────────────────────────────────────────── */
+
+.tpl-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Оценка рядом с названием пункта — узкая: в ней три-четыре цифры. */
+.row .tpl-item__est {
+  flex: 0 0 5.5em;
+}
+
+.tpl-item__tools {
+  justify-content: flex-end;
+}
+
 /* ─── Импорт записей ─────────────────────────────────────────────────────── */
 
 .import {

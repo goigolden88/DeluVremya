@@ -1362,6 +1362,99 @@ async function planScenario() {
       has(returned, 'Позавчерашний пункт'),
     `${line(fewer, 'ждут')}; в плане: ${has(plan, 'Ещё вчерашний пункт') ? 'да' : 'нет'}`,
   )
+
+  await templatesScenario()
+}
+
+/**
+ * Шаблоны дня (Р-39): завести из плана, применить к тому же дню без дублей,
+ * дописать пункт с главным на экране шаблонов, применить снова — встаёт
+ * только новый, главное — из шаблона, раз у дня его нет; «Отменить»;
+ * занятое название. На входе в плане три пункта: два вчерашних и звонок.
+ */
+async function templatesScenario() {
+  await go('/')
+  await unfold('Шаблоны')
+  await act(`
+    set(document.querySelector('input[name=template-new]'), 'Рабочий');
+    byText('button', 'Сохранить план как шаблон')?.click();
+  `)
+  await sleep(700)
+  const saved = await screen()
+  await act(`byText('.chips button', 'Рабочий')?.click()`)
+  await sleep(700)
+  const again = await screen()
+  const rows = await run(
+    `[...document.querySelectorAll('button.plan-item__text')].filter((el) => el.textContent.trim() === 'Вчерашний пункт').length`,
+  )
+  check(
+    'шаблон — из плана дня; к тому же дню второй раз не встаёт — Р-39',
+    has(saved, 'Шаблон «Рабочий» сохранён — 3 пункта') && has(again, '«Рабочий»: добавлено 0 из 3, уже было 3') && rows === 1,
+    `${line(saved, 'сохранён')}; ${line(again, 'добавлено')}; строк «Вчерашний пункт»: ${rows}`,
+  )
+
+  // ─ Экран шаблонов: новый пункт с оценкой и главным; кривая оценка — причиной.
+  await go('/templates')
+  await act(`startsWith('button.cat__name', 'Рабочий')?.click()`)
+  await sleep(400)
+  await act(`byText('button', '+ пункт')?.click()`)
+  await sleep(300)
+  const last = (name) => `[...document.querySelectorAll('input[name=${name}]')].at(-1)`
+  await act(`
+    set(${last('template-item')}, 'Зарядка');
+    set(${last('template-estimate')}, '0');
+    byText('button', 'Сохранить')?.click();
+  `)
+  await sleep(500)
+  const badEstimate = await screen()
+  // Звезда и «Сохранить» — разными шагами: после клика React перерисовывает
+  // в микрозадаче, и второй клик того же шага сохранил бы черновик до звезды.
+  // После ввода в поле — сразу, поэтому ввод и клик в одном шаге годятся.
+  await act(`
+    set(${last('template-estimate')}, '20');
+    [...document.querySelectorAll('.tpl-item .star-btn')].at(-1)?.click();
+  `)
+  await sleep(300)
+  await act(`byText('button', 'Сохранить')?.click()`)
+  await sleep(700)
+  const edited = await screen()
+  // Правка после сохранения собрана заново из шаблона: звезда — сохранённая.
+  const starred = await run(`[...document.querySelectorAll('.tpl-item .star-btn')].at(-1)?.getAttribute('aria-pressed') ?? ''`)
+  check(
+    'экран шаблонов: пункт с оценкой и главным; кривая оценка — причиной с названием пункта',
+    has(badEstimate, '«Зарядка»: оценка — целое число минут') &&
+      has(edited, '4 пункта · 50 мин') &&
+      has(edited, 'Сохранено') &&
+      starred === 'true',
+    `${line(badEstimate, 'Зарядка')}; ${line(edited, 'пункта')}; главное у «Зарядка»: ${starred}`,
+  )
+
+  // ─ Снова на «Сегодня»: встаёт только новое, главное — из шаблона.
+  await go('/')
+  await act(`byText('.chips button', 'Рабочий')?.click()`)
+  await sleep(700)
+  const more = await screen()
+  const main = await run(`document.querySelector('.plan__main')?.innerText ?? ''`)
+  check(
+    'применение ставит только новое; главное из шаблона — раз у дня его нет — Р-39',
+    has(more, '«Рабочий»: добавлено 1 из 4, уже было 3') && has(main, 'Зарядка'),
+    `${line(more, 'добавлено')}; ${main.replace(/\s+/g, ' ')}`,
+  )
+
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const undone = await run(`document.querySelector('.plan__main')?.innerText ?? ''`)
+  await act(`
+    set(document.querySelector('input[name=template-new]'), 'рабочий');
+    byText('button', 'Сохранить план как шаблон')?.click();
+  `)
+  await sleep(500)
+  const taken = await screen()
+  check(
+    '«Отменить» снимает поставленное шаблоном; занятое название — с причиной',
+    !has(undone, 'Зарядка') && has(undone, 'не выбрано') && has(taken, 'Шаблон с таким названием уже есть'),
+    `${undone.replace(/\s+/g, ' ')}; ${line(taken, 'Шаблон с')}`,
+  )
 }
 
 /** Месяц словом, как его ищут: «сентябрь». По часам этого компьютера — как `today()`. */
@@ -1783,7 +1876,7 @@ async function dataScenario(file) {
   const loaded = /Загружено записей: (\d+)/.exec(restored.replace(/ /g, ' '))
   check('копия загрузилась через «Восстановить из копии»', loaded !== null, loaded?.[0] ?? restored.slice(0, 160))
 
-  const routes = ['/', '/time', '/inbox', '/time/categories', '/settings']
+  const routes = ['/', '/time', '/inbox', '/time/categories', '/templates', '/settings']
 
   for (const route of routes) {
     await go(route)

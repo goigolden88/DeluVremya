@@ -22,6 +22,7 @@ import {
 } from './labels.ts'
 import { ahead, dayPlan, doneOffPlan, makeMain, overdue, planNote, realism, withoutMain, withPlan } from './plan.ts'
 import { PlanRow } from './PlanItem.tsx'
+import { PlanTemplates } from './PlanTemplates.tsx'
 import { useNotes } from './useNotes.ts'
 
 function describe(error: unknown): string {
@@ -198,6 +199,8 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
         )}
         {error && <p className="error">Не записалось: {error}</p>}
       </section>
+
+      <PlanTemplates notes={all} plan={plan} today={today} />
 
       {/* Дело в план одним тапом (План, Этап 4, п. 1). Список бывает длинным — свёрнут. */}
       {tasks.length > 0 && (
