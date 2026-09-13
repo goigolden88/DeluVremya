@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, TimeBlock } from '../../core/model.ts'
 import { createPreset } from './categories.ts'
-import { blockFromPreset, blocksOn, daySummary, DAY_WINDOW, viewedDay, windowElapsed } from './day.ts'
+import { blockFromPreset, blocksOn, daySummary, DAY_WINDOW, viewedDay, windowElapsed, windowLeft } from './day.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
 const DAY = '2026-09-13'
@@ -123,5 +123,12 @@ describe('прошедшая часть окна дня', () => {
   it('окно через параметр — для проверки правила, а не константы', () => {
     expect(windowElapsed(DAY, new Date(2026, 8, 13, 10, 0), { from: 9, to: 18 })).toBe(60)
     expect(windowElapsed(DAY, new Date(2026, 8, 13, 20, 0), { from: 9, to: 18 })).toBe(9 * 60)
+  })
+
+  it('остаток окна — до его конца: утром всё, в обед часть, прошедший день — ноль (Р-35)', () => {
+    expect(windowLeft(DAY, new Date(2026, 8, 13, DAY_WINDOW.from - 1, 0))).toBe(WINDOW)
+    expect(windowLeft(DAY, new Date(2026, 8, 13, 17, 0), { from: 9, to: 18 })).toBe(60)
+    expect(windowLeft('2026-09-12', new Date(2026, 8, 13, 12, 0))).toBe(0)
+    expect(windowLeft('2026-09-14', new Date(2026, 8, 13, 12, 0))).toBe(WINDOW)
   })
 })

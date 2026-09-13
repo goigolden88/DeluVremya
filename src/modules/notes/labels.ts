@@ -3,9 +3,11 @@
  * (правило в CLAUDE.md).
  */
 
-import { days, formatMonth, plural, type DateStr } from '../../core/dates.ts'
+import { days, daysBetween, formatDateLong, formatMonth, isDateStr, plural, type DateStr } from '../../core/dates.ts'
 import type { Note, NoteKind } from '../../core/model.ts'
+import { quoted } from '../../ui/screenNames.ts'
 import { ageDays, type GoalProgress } from './inbox.ts'
+import type { Realism } from './plan.ts'
 
 /** Вид записи на переключателе и в карточке (Р-13, Р-31). */
 export const KIND_NAMES: Record<NoteKind, string> = {
@@ -114,4 +116,77 @@ export function firstLine(text: string): string {
 /** Подпись дела со ссылкой на замысел. */
 export function goalLine(goal: Note): string {
   return `к замыслу «${firstLine(goal.text)}»`
+}
+
+// ─── План дня (Р-33) ───────────────────────────────────────────────────────
+
+/** Заголовки блоков плана на «Сегодня». */
+export const MAIN_TITLE = 'Главное'
+export const PLAN_TITLE = 'План'
+export const OVERDUE_TITLE = 'С прошлых дней'
+export const AHEAD_TITLE = 'Впереди'
+export const DONE_OFF_PLAN_TITLE = 'Сделано вне плана'
+export const FROM_UNSORTED_TITLE = `Из «${UNSORTED_TITLE}»`
+/** Кнопка возврата пункта из плана. */
+export const TO_UNSORTED = `В «${UNSORTED_TITLE}»`
+
+const MINUTES_PER_HOUR = 60
+
+/**
+ * Длительность: «45 мин», «2 ч», «1 ч 30 мин». Та же запись, что у учёта
+ * времени, — своя копия: модули друг о друге не знают.
+ */
+export function durationText(total: number): string {
+  const rounded = Math.max(0, Math.round(total))
+  const hours = Math.floor(rounded / MINUTES_PER_HOUR)
+  const minutes = rounded % MINUTES_PER_HOUR
+  if (hours === 0) return `${minutes} мин`
+  return minutes === 0 ? `${hours} ч` : `${hours} ч ${minutes} мин`
+}
+
+/**
+ * Влезает ли план в остаток дня (Р-35) — число с основанием: по скольким
+ * пунктам из скольких посчитано. Без оценок — так и сказано, а не ноль.
+ */
+export function realismText(realism: Realism): string {
+  if (realism.estimated === 0) {
+    return realism.total === 1
+      ? 'Влезает ли в день — не посчитать: у пункта нет оценки'
+      : `Влезает ли в день — не посчитать: оценки нет ни у одного из ${realism.total} ${plural(realism.total, ['пункта', 'пунктов', 'пунктов'])}`
+  }
+  const basis =
+    `по ${realism.estimated} ${plural(realism.estimated, ['пункту', 'пунктам', 'пунктам'])}` +
+    (realism.estimated < realism.total ? ` из ${realism.total}` : '')
+  const left = realism.left > 0 ? `до конца дня ${durationText(realism.left)}` : 'окно дня закончилось'
+  const spare = realism.left - realism.minutes
+  const verdict =
+    realism.over > 0
+      ? `не влезает на ${durationText(realism.over)}`
+      : spare === 0
+        ? 'влезает впритык'
+        : `влезает, в запасе ${durationText(spare)}`
+  return `Намечено ${durationText(realism.minutes)} ${basis} — ${left}: ${verdict}`
+}
+
+/** День плана словами: «вчера», «завтра», «20 сентября 2026». Кривой — как лежит. */
+export function dayText(day: string, today: DateStr): string {
+  if (!isDateStr(day)) return day
+  const diff = daysBetween(today, day)
+  if (diff === 0) return 'сегодня'
+  if (diff === -1) return 'вчера'
+  if (diff === 1) return 'завтра'
+  return formatDateLong(day)
+}
+
+/** Отклик после «В план»: куда поставлено. */
+export function plannedLine(day: DateStr, today: DateStr): string {
+  return `Поставлено на ${dayText(day, today)}`
+}
+
+/**
+ * Под неразобранным: поставленное в план отсюда ушло — сказано числом
+ * и где искать. `screen` — название главного экрана на этом устройстве (Р-26).
+ */
+export function plannedCountText(count: number, screen: string): string {
+  return `Ещё ${recordsText(count)} в плане — экран ${quoted(screen)}`
 }

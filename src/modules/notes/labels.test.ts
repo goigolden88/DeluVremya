@@ -6,11 +6,17 @@ import {
   AGE_WEEKS_FROM,
   AGE_YEARS_FROM,
   ageText,
+  dayText,
   deleteConfirm,
+  durationText,
   monthHeading,
+  plannedCountText,
+  plannedLine,
   progressText,
+  realismText,
   shownText,
 } from './labels.ts'
+import type { Realism } from './plan.ts'
 
 const TODAY = '2026-09-13'
 
@@ -71,5 +77,47 @@ describe('подписи', () => {
   it('удаление называет запись началом первой строки', () => {
     expect(deleteConfirm('Купить фильтр\nссылка')).toBe('Удалить запись «Купить фильтр»?')
     expect(deleteConfirm('а'.repeat(50))).toBe(`Удалить запись «${'а'.repeat(40)}…»?`)
+  })
+})
+
+describe('план дня', () => {
+  const load = (minutes: number, estimated: number, total: number, left: number): Realism => ({
+    minutes,
+    estimated,
+    total,
+    left,
+    over: Math.max(0, minutes - left),
+  })
+
+  it('длительность — часами и минутами', () => {
+    expect(durationText(45)).toBe('45 мин')
+    expect(durationText(120)).toBe('2 ч')
+    expect(durationText(90)).toBe('1 ч 30 мин')
+  })
+
+  it('реализм — число с основанием и вывод (Р-35)', () => {
+    expect(realismText(load(570, 6, 8, 420))).toBe(
+      'Намечено 9 ч 30 мин по 6 пунктам из 8 — до конца дня 7 ч: не влезает на 2 ч 30 мин',
+    )
+    expect(realismText(load(90, 1, 1, 600))).toBe('Намечено 1 ч 30 мин по 1 пункту — до конца дня 10 ч: влезает, в запасе 8 ч 30 мин')
+    expect(realismText(load(60, 1, 1, 60))).toBe('Намечено 1 ч по 1 пункту — до конца дня 1 ч: влезает впритык')
+  })
+
+  it('оценок нет — посчитать нечего, и это сказано', () => {
+    expect(realismText(load(0, 0, 5, 600))).toBe('Влезает ли в день — не посчитать: оценки нет ни у одного из 5 пунктов')
+    expect(realismText(load(0, 0, 1, 600))).toBe('Влезает ли в день — не посчитать: у пункта нет оценки')
+  })
+
+  it('день плана словами', () => {
+    expect(dayText('2026-09-13', TODAY)).toBe('сегодня')
+    expect(dayText('2026-09-12', TODAY)).toBe('вчера')
+    expect(dayText('2026-09-14', TODAY)).toBe('завтра')
+    expect(dayText('2026-09-20', TODAY)).toBe('20 сентября 2026')
+    expect(dayText('14.09', TODAY)).toBe('14.09')
+    expect(plannedLine('2026-09-14', TODAY)).toBe('Поставлено на завтра')
+  })
+
+  it('поставленное в план названо числом и экраном — своим именем устройства', () => {
+    expect(plannedCountText(3, 'День')).toBe('Ещё 3 записи в плане — экран «День»')
   })
 })

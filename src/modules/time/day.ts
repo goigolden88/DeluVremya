@@ -93,6 +93,14 @@ export function windowElapsed(date: DateStr, now: Date, window: { from: number; 
   return Math.min(length, Math.max(0, passed))
 }
 
+/**
+ * Сколько минут окна дня осталось до его конца: основание реализма плана
+ * (Р-35). Прошедший день — ноль, будущий — всё окно.
+ */
+export function windowLeft(date: DateStr, now: Date, window: { from: number; to: number } = DAY_WINDOW): number {
+  return (window.to - window.from) * MINUTES_PER_HOUR - windowElapsed(date, now, window)
+}
+
 export type DaySummary = {
   /** Минуты по основной категории. Фоновая сюда не входит. */
   total: number
