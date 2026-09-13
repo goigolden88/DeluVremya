@@ -1276,6 +1276,64 @@ async function notesScenario() {
     !has(removed, 'Думается лучше на ходу') && has(removed, 'Выучить испанский'),
     line(removed, 'Выучить'),
   )
+
+  await notesImportScenario()
+}
+
+/**
+ * Импорт заметок (Этап 3, п. 5): свой раздел формата, дата необязательна,
+ * месяц без числа — в отчёт, совпавшее с записанным — пропускается.
+ * Загруженное встаёт по дню записи, а не по id: у него id — момент импорта.
+ */
+async function notesImportScenario() {
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  await unfold('Импорт записей')
+  const file = JSON.stringify({
+    format: 'deluvremya-import',
+    version: 1,
+    notes: [
+      { text: 'Старая мысль из блокнота', kind: 'thought' },
+      { text: 'Починить полку', date: '2026-03-12' },
+      { text: 'Купить фильтр для воды', date: today },
+      { text: 'Только месяц', date: '2026-03' },
+    ],
+  })
+  await act(`
+    set(document.querySelector('.import__text'), ${JSON.stringify(file)});
+    byText('button', 'Разобрать')?.click();
+  `)
+  await sleep(700)
+  const planned = await screen()
+  check(
+    'импорт заметок: без даты принимается, совпавшее пропускается, месяц без числа — в отчёт — Р-08',
+    // Причина целиком: слова «только месяц» есть и в тексте самой записи.
+    has(planned, 'Добавится: 2 заметки') &&
+      has(planned, 'пропущено, не перезаписано: 1') &&
+      has(planned, 'только месяц; не пиши её'),
+    `${line(planned, 'Добавится')}; ${line(planned, 'Только месяц')}`,
+  )
+  await act(`startsWith('button', 'Загрузить')?.click()`)
+  await sleep(1000)
+  check('импорт заметок пишет по кнопке', has(await screen(), 'Загружено записей: 2'))
+
+  await go('/inbox')
+  const listed = await screen()
+  const at = (text) => listed.indexOf(text)
+  const order = ['Купить фильтр для воды', 'Март 2026', 'Починить полку', 'Без даты', 'Старая мысль из блокнота'].map(at)
+  check(
+    'загруженное — по дню записи, а не по id: март ниже сегодняшних, без даты — в конце',
+    order.every((place, index) => place !== -1 && (index === 0 || place > (order[index - 1] ?? -1))),
+    order.join(' < '),
+  )
+
+  // Проход синхронизации идёт через пять секунд после последней записи.
+  // Без паузы он срабатывает сразу после ввода токена в сценарии
+  // синхронизации и опережает кнопку «Синхронизировать», которую тот
+  // проверяет. Пусть отработает здесь, пока синхронизация выключена.
+  await sleep(6000)
 }
 
 /**

@@ -41,6 +41,7 @@ describe('импорт записей', () => {
 
   it('промпт называет разделы, формат, сегодняшнюю дату и приложение', () => {
     const prompt = importPrompt('2026-09-13')
+    expect(prompt).toContain('"notes"')
     expect(prompt).toContain('"time"')
     expect(prompt).toContain('"format": "deluvremya-import"')
     expect(prompt).toContain('13.09.2026')
@@ -51,6 +52,7 @@ describe('импорт записей', () => {
   it('пример из промпта проходит собственную проверку без единого замечания', () => {
     const plan = planImport(JSON.stringify(example()), empty(), ctx())
     expect(plan.issues).toEqual([])
+    expect(plan.writes.notes?.length ?? 0).toBeGreaterThan(0)
     expect(plan.writes.time?.length ?? 0).toBeGreaterThan(0)
   })
 

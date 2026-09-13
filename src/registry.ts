@@ -7,7 +7,8 @@
  * новый вид в модели не соберётся, пока здесь нет его строки.
  *
  * Растёт по этапам (Р-23): строки ленты и markdown добавятся в Этапе 6
- * вместе с `core/feed.ts`. Импорт заметок — Этап 3.
+ * вместе с `core/feed.ts`. Импортируются заметки и учёт времени; обзор
+ * недели — нет.
  *
  * Чего здесь нет намеренно: маршрутов, вкладок и блоков «Сегодня» —
  * это продуктовые решения, из списка они не выводятся.
@@ -27,6 +28,7 @@ import {
   type ImportSpec,
 } from './core/importing.ts'
 import type { RecordKind } from './core/model.ts'
+import { importNotes, notesImportSpec } from './modules/notes/import.ts'
 import { importTime, timeImportSpec } from './modules/time/import.ts'
 
 /**
@@ -45,7 +47,7 @@ type KindEntry = {
 }
 
 export const KINDS: { readonly [K in RecordKind]: KindEntry } = {
-  note: { label: 'Заметки и план' },
+  note: { label: 'Заметки и план', import: { spec: notesImportSpec, run: importNotes } },
   time: { label: 'Учёт времени', import: { spec: timeImportSpec, run: importTime } },
   review: { label: 'Обзоры недели' },
 }
