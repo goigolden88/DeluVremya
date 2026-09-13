@@ -3,9 +3,10 @@
  * (правило в CLAUDE.md).
  */
 
-import { plural } from '../../core/dates.ts'
+import { formatDateLong, plural, type DateStr } from '../../core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW } from './day.ts'
+import type { BlockProblem } from './retro.ts'
 
 /**
  * Признак категории. Нужен только обзору недели (Р-05): на экране дня
@@ -64,6 +65,40 @@ export function unaccountedLine(unaccounted: number, elapsed: number): string {
 /** Отклик на тап: что записано и сколько теперь по этой категории за день. */
 export function addedLine(name: string, minutes: number, categoryTotal: number): string {
   return `Записано: ${name}, ${formatMinutes(minutes)}. По категории за день — ${formatMinutes(categoryTotal)}`
+}
+
+export const BLOCK_PROBLEMS: Record<BlockProblem, string> = {
+  category: 'Не выбрана категория',
+  minutes: PRESET_PROBLEMS.range,
+  date: 'День не разобрался',
+  future: 'Учёт — про то, что было: день в будущем не записывается',
+}
+
+/** Идущий таймер: что и сколько. */
+export function runningLine(name: string, minutes: number): string {
+  return `Идёт: ${name} · ${formatMinutes(minutes)}`
+}
+
+function clock(moment: Date): string {
+  return `${String(moment.getHours()).padStart(2, '0')}:${String(moment.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * С какого времени идёт. Запущен вчера — сказано, что блок ляжет на тот
+ * день (Р-19): иначе запись после полуночи пропала бы из сегодняшнего
+ * итога молча.
+ */
+export function startedLine(start: Date, date: DateStr, today: DateStr): string {
+  return date === today
+    ? `С ${clock(start)}`
+    : `С ${clock(start)}, ${formatDateLong(date)} — блок ляжет на тот день`
+}
+
+/** Что записано. Не сегодня — с датой: блок не виден в итоге дня, и это сказано. */
+export function savedLine(name: string, minutes: number, date: DateStr, today: DateStr): string {
+  return date === today
+    ? `Записано: ${name}, ${formatMinutes(minutes)}`
+    : `Записано на ${formatDateLong(date)}: ${name}, ${formatMinutes(minutes)}`
 }
 
 /** Пояснение к «неучтено» под итогом дня. */

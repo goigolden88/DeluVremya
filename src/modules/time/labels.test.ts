@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { DAY_WINDOW } from './day.ts'
-import { addedLine, blocksWord, summaryLine, unaccountedLine, windowNote } from './labels.ts'
+import {
+  addedLine,
+  blocksWord,
+  runningLine,
+  savedLine,
+  startedLine,
+  summaryLine,
+  unaccountedLine,
+  windowNote,
+} from './labels.ts'
 
 describe('тексты итога дня', () => {
   it('сумма идёт с основанием, склонение по числу блоков', () => {
@@ -21,5 +30,25 @@ describe('тексты итога дня', () => {
 
   it('границы окна в пояснении — из константы', () => {
     expect(windowNote()).toContain(`с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}`)
+  })
+})
+
+describe('тексты таймера и ретро-ввода', () => {
+  const TODAY = '2026-09-13'
+
+  it('идущий таймер — что и сколько', () => {
+    expect(runningLine('Чтение', 65)).toBe('Идёт: Чтение · 1 ч 5 мин')
+  })
+
+  it('запущен вчера — сказано, куда ляжет блок (Р-19)', () => {
+    expect(startedLine(new Date(2026, 8, 13, 9, 5), TODAY, TODAY)).toBe('С 09:05')
+    expect(startedLine(new Date(2026, 8, 12, 23, 30), '2026-09-12', TODAY)).toBe(
+      'С 23:30, 12 сентября 2026 — блок ляжет на тот день',
+    )
+  })
+
+  it('записано не сегодня — с датой, а не молча', () => {
+    expect(savedLine('Чтение', 30, TODAY, TODAY)).toBe('Записано: Чтение, 30 мин')
+    expect(savedLine('Чтение', 30, '2026-09-12', TODAY)).toBe('Записано на 12 сентября 2026: Чтение, 30 мин')
   })
 })

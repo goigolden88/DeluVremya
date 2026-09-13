@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { db } from '../../core/db.ts'
-import type { Category, TimeBlock } from '../../core/model.ts'
+import type { Category, Preset, TimeBlock } from '../../core/model.ts'
 import { Fold } from '../../ui/Fold.tsx'
+import { BlockForm } from './BlockForm.tsx'
 import { presetRow, type PresetButton } from './categories.ts'
 import { blockFromPreset, blocksOn, categoryName, daySummary, type DaySummary } from './day.ts'
 import {
@@ -10,31 +11,39 @@ import {
   blocksWord,
   formatMinutes,
   presetLabel,
+  savedLine,
   summaryLine,
   UNKNOWN_CATEGORY,
   unaccountedLine,
 } from './labels.ts'
+import { TimerLine, TimerPanel } from './Timer.tsx'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
+import { useTimer } from './useTimer.ts'
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
 }
 
 /**
- * Учёт времени за день: кнопки, отклик, итог — и список блоков.
+ * Учёт времени за день: кнопки, отклик, итог — и на «Времени» таймер,
+ * ввод задним числом и список блоков.
  *
  * Отклик идёт сразу за вводом, а не отдельным экраном: привычка держится
  * только петлёй «записал → увидел» (03-План, логика порядка).
  *
- * `compact` — на «Сегодня»: кнопки и итог, без списка блоков.
+ * `compact` — на «Сегодня»: кнопки, идущий таймер и итог, без остального.
  */
 export function TimeDay({ day, compact = false }: { day: string; compact?: boolean }) {
   const catalog = useCatalog()
   const time = useBlocks()
+  const timer = useTimer()
   /** Последний тап — его снимает «Отменить» (Р-20). */
   const [last, setLast] = useState<{ block: TimeBlock; name: string } | null>(null)
   const [error, setError] = useState('')
+  /** Смена ключа сбрасывает форму «задним числом» после записи. */
+  const [retroKey, setRetroKey] = useState(0)
+  const [retroSaved, setRetroSaved] = useState('')
 
   if (catalog.status === 'failed') return <p className="error">Категории не прочитались: {catalog.error}</p>
   if (time.status === 'failed') return <p className="error">Блоки времени не прочитались: {time.error}</p>
@@ -46,6 +55,7 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
   const undoable = last !== null && time.blocks.some((each) => each.id === last.block.id)
   const categoryTotal =
     last === null ? 0 : (summary.byCategory.find((each) => each.categoryId === last.block.categoryId)?.minutes ?? 0)
+  const nameOf = (id: string) => categoryName(catalog.categories, id) ?? UNKNOWN_CATEGORY
 
   async function write(action: () => Promise<void>) {
     setError('')
@@ -62,15 +72,17 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
       setLast({ block, name: button.category.name })
     })
 
-  const undo = (block: TimeBlock) =>
+  const remove = (block: TimeBlock) =>
     write(async () => {
       await db.remove('time', block.id)
-      setLast(null)
+      if (last?.block.id === block.id) setLast(null)
     })
 
   return (
     <>
       <section className="block">
+        {compact && <TimerLine timer={timer} categories={catalog.categories} />}
+
         {buttons.length === 0 ? (
           <p className="stub">
             Кнопок нет — заведите их в <Link to="/time/categories">категориях</Link>.
@@ -88,7 +100,7 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
         {last && undoable && (
           <p className="added">
             <span>{addedLine(last.name, last.block.minutes, categoryTotal)}</span>
-            <button type="button" className="link-btn" onClick={() => void undo(last.block)}>
+            <button type="button" className="link-btn" onClick={() => void remove(last.block)}>
               Отменить
             </button>
           </p>
@@ -99,7 +111,36 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
       </section>
 
       {!compact && (
-        <DayBlocks blocks={blocksOn(time.blocks, day)} categories={catalog.categories} onRemove={(block) => void undo(block)} />
+        <>
+          <Fold id="time:timer" title="Таймер" summary={timer.timer ? 'идёт' : undefined}>
+            <TimerPanel timer={timer} categories={catalog.categories} today={day} />
+          </Fold>
+
+          <Fold id="time:retro" title="Задним числом" summary="если забыл включить таймер" folded>
+            <BlockForm
+              key={retroKey}
+              categories={catalog.categories}
+              presets={catalog.presets}
+              blocks={time.blocks}
+              today={day}
+              onDone={(saved) => {
+                if (!saved) return
+                setRetroSaved(savedLine(nameOf(saved.categoryId), saved.minutes, saved.date, day))
+                setRetroKey((key) => key + 1)
+              }}
+            />
+            {retroSaved && <p className="muted">{retroSaved}</p>}
+          </Fold>
+
+          <DayBlocks
+            blocks={blocksOn(time.blocks, day)}
+            all={time.blocks}
+            categories={catalog.categories}
+            presets={catalog.presets}
+            today={day}
+            onRemove={(block) => void remove(block)}
+          />
+        </>
       )}
     </>
   )
@@ -134,16 +175,26 @@ function Summary({ summary }: { summary: DaySummary }) {
   )
 }
 
-/** Блоки дня, свежие сверху. Отсюда снимается любой, не только последний (Р-20). */
+/**
+ * Блоки дня, свежие сверху. Тап по блоку открывает правку той же формой,
+ * что и ввод задним числом; снимается любой, не только последний (Р-20).
+ */
 function DayBlocks({
   blocks,
+  all,
   categories,
+  presets,
+  today,
   onRemove,
 }: {
   blocks: TimeBlock[]
+  all: TimeBlock[]
   categories: Category[]
+  presets: Preset[]
+  today: string
   onRemove: (block: TimeBlock) => void
 }) {
+  const [editing, setEditing] = useState<string | null>(null)
   if (blocks.length === 0) return null
 
   return (
@@ -152,20 +203,38 @@ function DayBlocks({
         {blocks.map((block) => {
           const name = categoryName(categories, block.categoryId) ?? UNKNOWN_CATEGORY
           const background = block.bgCategoryId ? (categoryName(categories, block.bgCategoryId) ?? UNKNOWN_CATEGORY) : null
+          const open = editing === block.id
           return (
-            <li key={block.id} className="tblock">
-              <span className="tblock__main">
-                {name} · {formatMinutes(block.minutes)}
-                {background && <span className="muted"> · фоном {background}</span>}
-              </span>
-              <button
-                type="button"
-                className="link-btn"
-                aria-label={`Убрать: ${name}, ${formatMinutes(block.minutes)}`}
-                onClick={() => onRemove(block)}
-              >
-                Убрать
-              </button>
+            <li key={block.id}>
+              <div className="tblock">
+                <button
+                  type="button"
+                  className="plain-btn tblock__main"
+                  aria-expanded={open}
+                  onClick={() => setEditing(open ? null : block.id)}
+                >
+                  {name} · {formatMinutes(block.minutes)}
+                  {background && <span className="muted"> · фоном {background}</span>}
+                </button>
+                <button
+                  type="button"
+                  className="link-btn"
+                  aria-label={`Убрать: ${name}, ${formatMinutes(block.minutes)}`}
+                  onClick={() => onRemove(block)}
+                >
+                  Убрать
+                </button>
+              </div>
+              {open && (
+                <BlockForm
+                  categories={categories}
+                  presets={presets}
+                  blocks={all}
+                  today={today}
+                  existing={block}
+                  onDone={() => setEditing(null)}
+                />
+              )}
             </li>
           )
         })}

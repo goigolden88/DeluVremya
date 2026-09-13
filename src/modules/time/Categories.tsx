@@ -244,8 +244,11 @@ function CategoryRow({
             </div>
           )}
 
+          {/* noValidate: пределы минут проверяет `presetProblem` и называет
+              причину; браузер перехватил бы её своей подсказкой. */}
           <form
             className="row"
+            noValidate
             onSubmit={(event) => {
               event.preventDefault()
               addPreset()

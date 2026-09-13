@@ -508,6 +508,66 @@ async function scenario() {
     line(today, 'Учтено'),
   )
 
+  // ─ Таймер (Этап 1, п. 3): настройка устройства, блок — днём начала (Р-18, Р-19).
+  await go('/time')
+  await act(`byText('button', 'Старт')?.click()`)
+  await sleep(700)
+  const started = await screen()
+  check('таймер запускается и виден идущим', has(started, 'Идёт: Зарядка'), line(started, 'Идёт'))
+
+  await go('/')
+  await send('Page.reload')
+  await sleep(2000)
+  check('идущий таймер виден на «Сегодня» и переживает перезапуск — Р-18', has(await screen(), 'Идёт: Зарядка'))
+
+  await go('/time')
+  await act(`byText('button', 'Стоп')?.click()`)
+  await sleep(500)
+  // Прогон идёт секунды: минут ноль, и запись отвергается с причиной.
+  await act(`byText('button', 'Записать')?.click()`)
+  await sleep(500)
+  check('меньше минуты не записывается, причина названа', has(await screen(), 'от одной до'))
+  await act(`
+    set(document.querySelector('input[name=timer-minutes]'), '25');
+    byText('button', 'Записать')?.click();
+  `)
+  await sleep(700)
+  const stopped = await screen()
+  check(
+    'остановленный таймер — блок с поправленными минутами',
+    has(stopped, 'Записано: Зарядка, 25 мин') && has(stopped, 'Учтено 55 мин · 2 блока') && !has(stopped, 'Идёт:'),
+    line(stopped, 'Учтено'),
+  )
+
+  // ─ Задним числом: минуты по своей истории, «вчера», дата названа.
+  await unfold('Задним числом')
+  const suggested = await run(`document.querySelector('input[name=block-minutes]')?.value ?? null`)
+  check('ввод задним числом подставляет минуты по своей истории', suggested === '25', `в поле «${suggested}»`)
+  await act(`byText('button', 'вчера')?.click()`)
+  await sleep(300)
+  await act(`
+    document.querySelector('input[name=block-minutes]').closest('form').querySelector('button[type=submit]').click();
+  `)
+  await sleep(700)
+  const retro = await screen()
+  check(
+    'блок на вчера записан, дата названа, в сегодняшний итог не лёг',
+    has(retro, 'Записано на') && has(retro, 'Учтено 55 мин · 2 блока'),
+    line(retro, 'Записано на'),
+  )
+
+  // ─ Правка блока из списка дня (Р-20).
+  await act(`startsWith('button', 'Прогулка ·')?.click()`)
+  await sleep(400)
+  await act(`
+    const input = [...document.querySelectorAll('input[name=block-minutes]')].find((el) => el.value === '30');
+    set(input, '40');
+    byText('button', 'Сохранить')?.click();
+  `)
+  await sleep(700)
+  const edited = await screen()
+  check('блок правится тапом по нему в списке дня', has(edited, 'Учтено 1 ч 5 мин · 2 блока'), line(edited, 'Учтено'))
+
   // ─ Настройки: разделы свёрнуты оглавлением, у свёрнутой копии — итог.
   // Шестерёнка живёт в шапке «Сегодня».
   await go('/')

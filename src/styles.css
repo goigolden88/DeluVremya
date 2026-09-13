@@ -627,5 +627,40 @@ a {
 
 .tblock__main {
   min-width: 0;
+  min-height: 44px;
+  font-weight: 400;
   overflow-wrap: anywhere;
+}
+
+/* Выбор в строке с кнопкой — как поле: во всё свободное место. */
+.row select {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+/* Выбранное — заливкой, а не галочкой: галочка требует прицеливания. */
+.chip--on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* «Сегодня» и «вчера» у поля даты: в строке с полем высотой 44 пикселя
+   и не мельче его — палец попадает в строку целиком. */
+.chip--today {
+  flex: none;
+  min-height: 44px;
+}
+
+.btn--danger {
+  border-color: var(--error);
+  color: var(--error);
 }
