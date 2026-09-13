@@ -45,31 +45,41 @@ export type BlockDraft = {
   categoryId: string
   minutes: number
   date: string
+  /** Фоновая активность: покер под ютуб. Нет — без фоновой. */
+  bgCategoryId?: string
 }
 
-export type BlockProblem = 'category' | 'minutes' | 'date' | 'future'
+export type BlockProblem = 'category' | 'minutes' | 'date' | 'future' | 'same-bg'
 
 /**
  * Годится ли черновик. Будущего нет: учёт — про то, что было, а план
- * на завтра — другой модуль.
+ * на завтра — другой модуль. Фоновая не может совпадать с основной:
+ * это был бы тот же час, записанный дважды.
  */
 export function blockProblem(draft: BlockDraft, today: DateStr): BlockProblem | null {
   if (!draft.categoryId) return 'category'
   if (!isMinutes(draft.minutes)) return 'minutes'
   if (!isDateStr(draft.date)) return 'date'
   if (draft.date > today) return 'future'
+  if (draft.bgCategoryId && draft.bgCategoryId === draft.categoryId) return 'same-bg'
   return null
 }
 
 /**
  * Блок из черновика. Правка сохраняет id и прочие поля блока — меняется
- * ровно то, что было в форме.
+ * ровно то, что есть в форме. Фоновая в форме есть всегда: убранная
+ * там — убирается и из блока.
  */
 export function blockFromDraft(draft: BlockDraft, existing?: TimeBlock): TimeBlock {
-  const fields = { date: draft.date, categoryId: draft.categoryId, minutes: draft.minutes }
-  return existing
-    ? { ...existing, ...fields }
-    : { id: ulid(), updatedAt: nowIso(), ...fields }
+  const block: TimeBlock = {
+    ...(existing ?? { id: ulid(), updatedAt: nowIso() }),
+    date: draft.date,
+    categoryId: draft.categoryId,
+    minutes: draft.minutes,
+  }
+  if (draft.bgCategoryId) block.bgCategoryId = draft.bgCategoryId
+  else delete block.bgCategoryId
+  return block
 }
 
 /** Кнопки у поля даты: «сегодня» и «вчера» (Р-19). */

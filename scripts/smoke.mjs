@@ -568,6 +568,32 @@ async function scenario() {
   const edited = await screen()
   check('блок правится тапом по нему в списке дня', has(edited, 'Учтено 1 ч 5 мин · 2 блока'), line(edited, 'Учтено'))
 
+  // ─ Фоновая активность (Этап 1, п. 4): поле блока, сумму не удваивает.
+  // Выбор в списке React слушает событием change, а не input.
+  const pick = (name, value) => `
+    const field = document.querySelector('select[name=${name}]');
+    set(field, ${JSON.stringify(value)});
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  `
+  await act(pick('block-category', 'cat:ютуб'))
+  await sleep(300)
+  await act(`
+    ${pick('block-bg', 'cat:шахматы')}
+    set(document.querySelector('input[name=block-minutes]'), '60');
+  `)
+  await sleep(300)
+  await act(`
+    document.querySelector('select[name=block-bg]').closest('form').querySelector('button[type=submit]').click();
+  `)
+  await sleep(700)
+  const background = await screen()
+  check(
+    'фоновая — отдельной строкой, в сумму дня не входит — п. 4',
+    has(background, 'Учтено 2 ч 5 мин · 3 блока') && has(background, 'Фоном, в сумму не входит: Шахматы 1 ч'),
+    line(background, 'Фоном, в сумму'),
+  )
+  check('в списке дня у блока видна фоновая', has(background, 'Ютуб · 1 ч · фоном Шахматы'), line(background, 'фоном Шахматы'))
+
   // ─ Настройки: разделы свёрнуты оглавлением, у свёрнутой копии — итог.
   // Шестерёнка живёт в шапке «Сегодня».
   await go('/')

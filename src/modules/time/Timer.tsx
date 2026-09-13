@@ -18,14 +18,19 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
 }
 
+function backgroundName(categories: Category[], id: string | undefined): string | null {
+  return id ? (categoryName(categories, id) ?? UNKNOWN_CATEGORY) : null
+}
+
 /** Строка идущего таймера на «Сегодня»: видно, что идёт, и где остановить. */
 export function TimerLine({ timer, categories }: { timer: Timer; categories: Category[] }) {
   const now = useNow(TICK_MS, timer.timer !== null)
   if (!timer.timer) return null
   const name = categoryName(categories, timer.timer.categoryId) ?? UNKNOWN_CATEGORY
+  const background = backgroundName(categories, timer.timer.bgCategoryId)
   return (
     <p className="added">
-      <span className="lead">{runningLine(name, runningMinutes(timer.timer, now))}</span>
+      <span className="lead">{runningLine(name, runningMinutes(timer.timer, now), background)}</span>
       <Link to="/time">Остановить →</Link>
     </p>
   )
@@ -41,6 +46,7 @@ export function TimerLine({ timer, categories }: { timer: Timer; categories: Cat
 export function TimerPanel({ timer, categories, today }: { timer: Timer; categories: Category[]; today: DateStr }) {
   const active = activeCategories(categories)
   const [choice, setChoice] = useState('')
+  const [backgroundChoice, setBackgroundChoice] = useState('')
   /** Минуты в поле остановки. Null — не останавливаем. */
   const [stopping, setStopping] = useState<string | null>(null)
   const [problem, setProblem] = useState('')
@@ -62,6 +68,8 @@ export function TimerPanel({ timer, categories, today }: { timer: Timer; categor
   const running = timer.timer
   if (running === null) {
     const categoryId = active.some((each) => each.id === choice) ? choice : (active[0]?.id ?? '')
+    const backgrounds = active.filter((each) => each.id !== categoryId)
+    const background = backgrounds.some((each) => each.id === backgroundChoice) ? backgroundChoice : ''
     return (
       <>
         <div className="row row--wrap">
@@ -84,13 +92,24 @@ export function TimerPanel({ timer, categories, today }: { timer: Timer; categor
             onClick={() =>
               void run(async () => {
                 setSaved('')
-                await timer.start(categoryId)
+                await timer.start(categoryId, background || undefined)
               })
             }
           >
             Старт
           </button>
         </div>
+        <label className="field">
+          <span>Фоном — необязательно</span>
+          <select name="timer-bg" value={background} onChange={(event) => setBackgroundChoice(event.target.value)}>
+            <option value="">нет</option>
+            {backgrounds.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
         {saved && <p className="muted">{saved}</p>}
         {problem && <p className="error">{problem}</p>}
       </>
@@ -103,7 +122,9 @@ export function TimerPanel({ timer, categories, today }: { timer: Timer; categor
   if (stopping === null) {
     return (
       <>
-        <p className="lead">{runningLine(name, runningMinutes(running, now))}</p>
+        <p className="lead">
+          {runningLine(name, runningMinutes(running, now), backgroundName(categories, running.bgCategoryId))}
+        </p>
         <p className="muted">{startedLine(new Date(running.startedAt), date, today)}</p>
         <div className="row">
           <button

@@ -72,11 +72,13 @@ export const BLOCK_PROBLEMS: Record<BlockProblem, string> = {
   minutes: PRESET_PROBLEMS.range,
   date: 'День не разобрался',
   future: 'Учёт — про то, что было: день в будущем не записывается',
+  'same-bg': 'Фоном — другая категория: та же самая была бы тем же часом, записанным дважды',
 }
 
-/** Идущий таймер: что и сколько. */
-export function runningLine(name: string, minutes: number): string {
-  return `Идёт: ${name} · ${formatMinutes(minutes)}`
+/** Идущий таймер: что, сколько и что фоном. */
+export function runningLine(name: string, minutes: number, background?: string | null): string {
+  const line = `Идёт: ${name} · ${formatMinutes(minutes)}`
+  return background ? `${line}, фоном ${background}` : line
 }
 
 function clock(moment: Date): string {

@@ -47,23 +47,40 @@ describe('проверка черновика', () => {
     expect(blockProblem({ ...good, date: '2026-02-30' }, TODAY)).toBe('date')
     expect(blockProblem({ ...good, date: '2026-09-14' }, TODAY)).toBe('future')
   })
+
+  it('фоновая — другая категория, не та же самая', () => {
+    expect(blockProblem({ ...good, bgCategoryId: 'p' }, TODAY)).toBeNull()
+    expect(blockProblem({ ...good, bgCategoryId: 'a' }, TODAY)).toBe('same-bg')
+  })
 })
 
 describe('блок из черновика', () => {
-  it('новый — свой id', () => {
+  it('новый — свой id; без фоновой — поля нет вовсе', () => {
     const made = blockFromDraft({ categoryId: 'a', minutes: 30, date: TODAY })
     expect(made).toMatchObject({ categoryId: 'a', minutes: 30, date: TODAY })
     expect(made.id).toBeTruthy()
+    expect('bgCategoryId' in made).toBe(false)
+    expect(blockFromDraft({ categoryId: 'a', minutes: 30, date: TODAY, bgCategoryId: 'p' }).bgCategoryId).toBe('p')
   })
 
-  it('правка — тот же id, прочие поля на месте', () => {
+  it('правка — тот же id, поля вне формы на месте', () => {
     const existing = block('X', 30, { bgCategoryId: 'p', note: 'под подкаст' })
-    expect(blockFromDraft({ categoryId: 'b', minutes: 45, date: '2026-09-12' }, existing)).toEqual({
+    expect(blockFromDraft({ categoryId: 'b', minutes: 45, date: '2026-09-12', bgCategoryId: 'q' }, existing)).toEqual({
       ...existing,
       categoryId: 'b',
       minutes: 45,
       date: '2026-09-12',
+      bgCategoryId: 'q',
     })
+  })
+
+  it('фоновую убрали в форме — уходит и из блока', () => {
+    const existing = block('X', 30, { bgCategoryId: 'p', note: 'под подкаст' })
+    const edited = blockFromDraft({ categoryId: 'a', minutes: 30, date: TODAY }, existing)
+    expect('bgCategoryId' in edited).toBe(false)
+    expect(edited.note).toBe('под подкаст')
+    // Исходный блок не тронут: правка — новая запись, а не порча старой.
+    expect(existing.bgCategoryId).toBe('p')
   })
 })
 

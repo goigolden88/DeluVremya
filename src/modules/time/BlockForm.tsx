@@ -48,8 +48,17 @@ export function BlockForm({
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? choices[0]?.id ?? '')
   const [minutes, setMinutes] = useState(String(existing?.minutes ?? (categoryId ? suggest(categoryId) : DEFAULT_MINUTES)))
   const [date, setDate] = useState(existing?.date ?? today)
+  const [background, setBackground] = useState(existing?.bgCategoryId ?? '')
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)
+
+  // Фоном — любая другая рабочая категория; архивная фоновая правимого
+  // блока остаётся в выборе по той же причине, что и основная.
+  const ownBackground =
+    existing?.bgCategoryId && !active.some((each) => each.id === existing.bgCategoryId)
+      ? categories.filter((each) => each.id === existing.bgCategoryId)
+      : []
+  const backgrounds = [...active, ...ownBackground].filter((each) => each.id !== categoryId)
 
   async function run(action: () => Promise<TimeBlock | null>) {
     setBusy(true)
@@ -64,7 +73,8 @@ export function BlockForm({
   }
 
   function save() {
-    const draft = { categoryId, minutes: Number(minutes), date }
+    const base = { categoryId, minutes: Number(minutes), date }
+    const draft = background ? { ...base, bgCategoryId: background } : base
     const found = blockProblem(draft, today)
     if (found) {
       setProblem(BLOCK_PROBLEMS[found])
@@ -91,12 +101,26 @@ export function BlockForm({
           value={categoryId}
           onChange={(event) => {
             setCategoryId(event.target.value)
+            // Основная стала той, что была фоном, — фоновая снимается.
+            if (event.target.value === background) setBackground('')
             // Новый блок подсказывает минуты своей категории; правка — нет:
             // там минуты уже записаны человеком.
             if (!existing) setMinutes(String(suggest(event.target.value)))
           }}
         >
           {choices.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="field">
+        <span>Фоном — если что-то шло параллельно; в сумму дня не входит</span>
+        <select name="block-bg" value={background} onChange={(event) => setBackground(event.target.value)}>
+          <option value="">нет</option>
+          {backgrounds.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
             </option>
