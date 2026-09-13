@@ -7,6 +7,7 @@ import { Inbox } from './screens/Inbox.tsx'
 import { Settings } from './screens/Settings.tsx'
 import { Categories } from './modules/time/Categories.tsx'
 import { TimeScreen } from './modules/time/TimeScreen.tsx'
+import { watchCategoryMerges } from './modules/time/useCatalog.ts'
 
 /**
  * Роутинг через хеш: на GitHub Pages обычные пути дают 404 при обновлении
@@ -15,9 +16,13 @@ import { TimeScreen } from './modules/time/TimeScreen.tsx'
  * Синхронизация запускается здесь, один раз на приложение: проход идёт
  * по таймеру и по событиям и не зависит от того, какой экран открыт.
  * Не настроена — проход ничего не делает и в сеть не ходит.
+ *
+ * Слияние одноимённых категорий (Р-29) — тоже здесь и тоже одно: оно
+ * пишет в базу, и каждый открытый экран писал бы то же самое.
  */
 export function App() {
   useEffect(() => startAutoSync(), [])
+  useEffect(() => watchCategoryMerges(), [])
 
   return (
     <HashRouter>

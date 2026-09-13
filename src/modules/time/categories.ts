@@ -167,6 +167,10 @@ function moveBlock(block: TimeBlock, from: string, to: string): TimeBlock {
  * ссылаются блоки, они сначала переходят в `moveTo` — без этого удалить
  * нельзя, и ответ null. Null и тогда, когда удалять нечего.
  *
+ * Надгробие помнит, куда перенесено, — `movedTo` (Р-29): блок, записанный
+ * в эту категорию на другом устройстве до обмена, приедет позже и перейдёт
+ * туда же сам (`reconcilePlan`).
+ *
  * Перенос — это и слияние двух категорий: отдельного механизма для него нет.
  */
 export function removeCategoryPlan(
@@ -179,21 +183,152 @@ export function removeCategoryPlan(
   const category = categories.find((each) => each.id === id && !each.deleted)
   if (!category) return null
 
+  const target = categories.find((each) => each.id === moveTo && !each.deleted && each.id !== id)
   const using = blocks.filter((block) => uses(block, id))
-  let moved: TimeBlock[] = []
-  if (using.length > 0) {
-    const target = categories.find((each) => each.id === moveTo && !each.deleted)
-    if (!target || target.id === id) return null
-    moved = using.map((block) => moveBlock(block, id, target.id))
-  }
+  if (using.length > 0 && !target) return null
+  const moved = target ? using.map((block) => moveBlock(block, id, target.id)) : []
 
   return {
-    categories: [{ ...category, deleted: true }],
+    categories: [{ ...category, deleted: true, ...(target ? { movedTo: target.id } : {}) }],
     presets: presets
       .filter((preset) => !preset.deleted && preset.categoryId === id)
       .map((preset) => ({ ...preset, deleted: true })),
     blocks: moved,
   }
+}
+
+// ─── Одноимённые и надгробия с переносом (Р-29) ───────────────────────────
+
+/** Что записать после прихода данных с сервера или из файла. */
+export type ReconcilePlan = RemovePlan
+
+/**
+ * Какая из одноимённых остаётся: чей id совпадает с названием, иначе
+ * с наименьшим id. По id, а не по времени правки: время два устройства
+ * могут видеть разным, id — одинаковым, и выбор на обоих выйдет один.
+ */
+function survivorOf(group: readonly Category[], key: string): Category {
+  const named = group.find((category) => category.id === `cat:${key}`)
+  if (named) return named
+  return group.reduce((best, each) => (each.id < best.id ? each : best))
+}
+
+/** Самая поздняя правка группы. Равные по времени — по id: ответ один. */
+function latestOf(group: readonly Category[]): Category {
+  return group.reduce((best, each) =>
+    each.updatedAt > best.updatedAt || (each.updatedAt === best.updatedAt && each.id < best.id) ? each : best,
+  )
+}
+
+/** Оставшаяся с содержимым поздней правки. Ничего не поменялось — null. */
+function withContent(survivor: Category, latest: Category): Category | null {
+  const next: Category = { ...survivor, name: latest.name, kind: latest.kind, order: latest.order }
+  if (latest.archived) next.archived = true
+  else delete next.archived
+  delete next.movedTo
+
+  const same =
+    next.name === survivor.name &&
+    next.kind === survivor.kind &&
+    next.order === survivor.order &&
+    Boolean(next.archived) === Boolean(survivor.archived) &&
+    survivor.movedTo === undefined
+  return same ? null : next
+}
+
+/**
+ * Слияние одноимённых категорий и перенос от надгробий (Р-29).
+ *
+ * Живые категории с одним названием — регистр и пробелы по краям не
+ * различаются — сливаются в одну: остаётся `survivorOf`, название, признак,
+ * порядок и архив берутся у поздней правки, остальные уходят надгробием
+ * с `movedTo`. Одноимённые заводятся только встречными правками на двух
+ * устройствах: форма занятое название не пропускает.
+ *
+ * Блоки и кнопки, чья категория — надгробие с `movedTo`, переходят по
+ * цепочке туда, куда оно указывает. Так доезжает блок, записанный на другом
+ * устройстве раньше, чем туда пришло слияние или удаление с переносом (Р-22).
+ * Кольцо в цепочке или конец не у живой категории — не трогаем: блок
+ * остаётся под именем надгробия, как до этого решения.
+ *
+ * Считается одинаково на всех устройствах: увидев одно и то же, два
+ * устройства пишут одно и то же. Делать нечего — план пуст.
+ */
+export function reconcilePlan(
+  categories: readonly Category[],
+  presets: readonly Preset[],
+  blocks: readonly TimeBlock[],
+): ReconcilePlan {
+  const plan: ReconcilePlan = { categories: [], presets: [], blocks: [] }
+
+  // Куда уходит категория: надгробие — по `movedTo`, слитая — в оставшуюся.
+  const next = new Map<string, string>()
+  for (const category of categories) {
+    if (category.deleted && category.movedTo) next.set(category.id, category.movedTo)
+  }
+
+  const groups = new Map<string, Category[]>()
+  for (const category of categories) {
+    const key = normName(category.name)
+    if (category.deleted || !key) continue
+    groups.set(key, [...(groups.get(key) ?? []), category])
+  }
+
+  for (const [key, group] of groups) {
+    if (group.length < 2) continue
+    const survivor = survivorOf(group, key)
+    const updated = withContent(survivor, latestOf(group))
+    if (updated) plan.categories.push(updated)
+    for (const each of group) {
+      if (each.id === survivor.id) continue
+      plan.categories.push({ ...each, deleted: true, movedTo: survivor.id })
+      next.set(each.id, survivor.id)
+    }
+  }
+
+  const live = new Set(categories.filter((each) => !each.deleted && !next.has(each.id)).map((each) => each.id))
+
+  /** Конец цепочки переносов, если он у живой категории. Иначе null. */
+  function destination(id: string): string | null {
+    const seen = new Set<string>()
+    let current = id
+    while (next.has(current)) {
+      if (seen.has(current)) return null
+      seen.add(current)
+      current = next.get(current) as string
+    }
+    return current !== id && live.has(current) ? current : null
+  }
+
+  for (const block of blocks) {
+    if (block.deleted) continue
+    const main = destination(block.categoryId) ?? block.categoryId
+    const bg = block.bgCategoryId === undefined ? undefined : (destination(block.bgCategoryId) ?? block.bgCategoryId)
+    if (main === block.categoryId && bg === block.bgCategoryId) continue
+
+    const moved: TimeBlock = { ...block, categoryId: main }
+    // Один и тот же час дважды не пишется — как при удалении с переносом.
+    if (bg === undefined || bg === main) delete moved.bgCategoryId
+    else moved.bgCategoryId = bg
+    plan.blocks.push(moved)
+  }
+
+  // Кнопка переезжает к оставшейся; такие минуты у неё уже есть — просто уходит.
+  const livePresets = new Set(presets.filter((each) => !each.deleted).map((each) => each.id))
+  for (const preset of presets) {
+    if (preset.deleted) continue
+    const to = destination(preset.categoryId)
+    if (to === null) continue
+
+    plan.presets.push({ ...preset, deleted: true })
+    livePresets.delete(preset.id)
+    const id = presetIdFor(to, preset.minutes)
+    if (livePresets.has(id)) continue
+    plan.presets.push({ ...createPreset(to, preset.minutes), order: preset.order })
+    livePresets.add(id)
+  }
+
+  return plan
 }
 
 // ─── Пресеты ───────────────────────────────────────────────────────────────

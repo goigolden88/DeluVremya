@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { db } from '../../core/db.ts'
 import type { Category, Preset } from '../../core/model.ts'
-import { initialCategories, initialPresets } from './categories.ts'
+import { initialCategories, initialPresets, reconcilePlan } from './categories.ts'
 import { STARTER } from './starter.ts'
 
 export type Catalog = {
@@ -70,4 +70,70 @@ export function useCatalog(): Catalog {
   }, [])
 
   return state
+}
+
+/**
+ * Сколько ждать тишины после прихода данных. Проход синхронизации вливает
+ * хранилища по очереди, а считать слияние надо по всем сразу.
+ */
+const MERGE_DELAY_MS = 1000
+
+/**
+ * Слияние одноимённых категорий и перенос от надгробий (Р-29) — после
+ * прихода данных с сервера или из файла-копии. Своя правка дубля не заведёт:
+ * занятое название форма не пропускает.
+ *
+ * Один на приложение, запускается из `app.tsx`, а не из экранов: иначе
+ * каждый открытый экран писал бы то же самое. Возвращает отписку.
+ */
+export function watchCategoryMerges(): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let running: Promise<void> | null = null
+
+  async function run(): Promise<void> {
+    const [categories, presets, blocks] = await Promise.all([
+      db.getAll('categories', { includeDeleted: true }),
+      db.getAll('presets', { includeDeleted: true }),
+      db.getAll('time'),
+    ])
+    const plan = reconcilePlan(categories, presets, blocks)
+    // Сначала блоки, категории последними: оборвись запись посередине —
+    // блоки уже у оставшейся, а слияние доделает следующий запуск.
+    await db.putMany('time', plan.blocks)
+    await db.putMany('presets', plan.presets)
+    await db.putMany('categories', plan.categories)
+  }
+
+  function schedule(): void {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      if (running) {
+        schedule()
+        return
+      }
+      // Ошибку сообщить некому: запуск фоновый. Следующий приход данных
+      // попробует снова.
+      running = run()
+        .catch(() => undefined)
+        .finally(() => {
+          running = null
+        })
+    }, MERGE_DELAY_MS)
+  }
+
+  const off = db.onChange((event) => {
+    // Своя запись — в том числе запись самого слияния — повода не даёт.
+    if (event.origin === 'local') return
+    if (event.store === 'categories' || event.store === 'presets' || event.store === 'time') schedule()
+  })
+
+  // Приехавшее до прошлого закрытия приложения.
+  schedule()
+
+  return () => {
+    off()
+    if (timer) clearTimeout(timer)
+    timer = null
+  }
 }
