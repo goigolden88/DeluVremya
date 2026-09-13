@@ -4,7 +4,11 @@
   --text: #16181d;
   --muted: #6b7280;
   --line: #e4e4e7;
-  --accent: #2f6fed;
+  /* Акцент тёплый, в тон иконке: у «Дневников» синий, и два приложения
+     на одном телефоне не должны путаться. Текст на акценте — своя
+     переменная: на янтаре в тёмной теме белый не читается. */
+  --accent: #b3620b;
+  --on-accent: #ffffff;
   --error: #c02626;
   --ok: #3f8f4a;
   --due: #b07708;
@@ -21,7 +25,8 @@
     --text: #ececee;
     --muted: #9497a1;
     --line: #33353a;
-    --accent: #6f9dff;
+    --accent: #f2b35b;
+    --on-accent: #1b1c1e;
     --error: #ff7b7b;
     --ok: #6fbf7c;
     --due: #e3a83a;
@@ -385,7 +390,7 @@ a {
 .btn--primary {
   border-color: var(--accent);
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
   font-weight: 600;
 }
 
