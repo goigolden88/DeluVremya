@@ -13,6 +13,7 @@ import {
   groupByMonth,
   inboxOf,
   kindCounts,
+  linksOf,
   markDone,
   matchesQuery,
   noteRef,
@@ -164,6 +165,20 @@ describe('поиск — слова в любом порядке', () => {
 
   it('дополнительный текст ищется, но в запись не пишется: название замысла у дела', () => {
     expect(found(filter, 'байкал', 'Съездить на Байкал')).toBe(true)
+  })
+})
+
+describe('ссылки в тексте — нажимаются в карточке', () => {
+  it('знак препинания в конце не входит, повтор — один раз', () => {
+    expect(linksOf('Статья https://example.com/a?b=1, и ещё https://x.ru/p. И снова https://x.ru/p')).toEqual([
+      'https://example.com/a?b=1',
+      'https://x.ru/p',
+    ])
+  })
+
+  it('без ссылок — пусто; ссылка в «ёлочках» — без них', () => {
+    expect(linksOf('купить фильтр')).toEqual([])
+    expect(linksOf('видео «https://youtu.be/abc»')).toEqual(['https://youtu.be/abc'])
   })
 })
 

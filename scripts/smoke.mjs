@@ -596,9 +596,9 @@ async function scenario() {
   await sleep(700)
   const typed = await screen()
   check(
-    'мысль записалась одним полем и кнопкой — Р-09',
-    has(typed, 'Записано во входящие') && has(typed, 'Купить фильтр для воды') && has(typed, '1 запись'),
-    line(typed, 'Во входящих'),
+    'запись одним полем и кнопкой, вид не тронут — дело — Р-09, Р-13',
+    has(typed, 'Записано: дело') && has(typed, 'Купить фильтр для воды') && has(typed, '1 запись'),
+    `${line(typed, 'Записано')}; ${line(typed, 'запис')}`,
   )
 
   // ─ «Поделиться» (Р-16): Android открывает корень с параметрами.
@@ -624,7 +624,7 @@ async function scenario() {
   check(
     'расшаренное записалось, ?shared из адреса ушёл',
     has(afterShare, 'example.com/son') && has(afterShare, '2 записи') && hashAfter === '#/inbox',
-    `${line(afterShare, 'Во входящих')}; хеш ${hashAfter}`,
+    `${line(afterShare, 'записи')}; хеш ${hashAfter}`,
   )
   await send('Page.reload')
   await sleep(2000)
@@ -954,8 +954,8 @@ async function scenario() {
   const about = await screen()
   check(
     'в «О приложении» — схема, сборка и что лежит в базе',
-    has(about, 'Версия схемы') && has(about, 'Сборка') && has(about, 'Входящие и план'),
-    line(about, 'Входящие и план'),
+    has(about, 'Версия схемы') && has(about, 'Сборка') && has(about, 'Заметки и план'),
+    line(about, 'Заметки и план'),
   )
   check(
     'в «О приложении» — как установить',
@@ -981,7 +981,7 @@ async function scenario() {
   // сразу во вкладке и в заголовке, без перезапуска.
   const tabs = () => run(`[...document.querySelectorAll('.tab')].map((el) => el.textContent.trim()).join(', ')`)
   const defaults = await tabs()
-  check('вкладки по умолчанию — «Сегодня», «Учёт», «Входящие»', defaults === 'Сегодня, Учёт, Входящие', defaults)
+  check('вкладки по умолчанию — «Сегодня», «Учёт», «Заметки» — Р-32', defaults === 'Сегодня, Учёт, Заметки', defaults)
   await unfold('Названия экранов')
   await act(`
     set(document.querySelector('input[name=screen-time]'), 'Хронометраж');
@@ -993,7 +993,7 @@ async function scenario() {
   const renamedHead = await run(`document.querySelector('h1')?.textContent ?? ''`)
   check(
     'своё название — сразу во вкладке и в заголовке экрана',
-    renamed === 'Сегодня, Хронометраж, Входящие' && renamedHead === 'Хронометраж',
+    renamed === 'Сегодня, Хронометраж, Заметки' && renamedHead === 'Хронометраж',
     `${renamed}; заголовок «${renamedHead}»`,
   )
   await go('/settings')
@@ -1100,10 +1100,12 @@ async function scenario() {
   await go('/inbox')
   const merged = await screen()
   check(
-    'восстановленная запись без даты видна во входящих — Р-08',
+    'восстановленная запись без даты видна в неразобранном — Р-08',
     has(merged, 'Мысль с другого устройства') && has(merged, 'без даты') && has(merged, '3 записи'),
-    line(merged, 'Во входящих'),
+    line(merged, 'записи'),
   )
+
+  await notesScenario()
 
   await syncScenario()
 
@@ -1122,7 +1124,7 @@ async function scenario() {
   const controlled = await run('navigator.serviceWorker.controller !== null')
   check(
     'без сети приложение открывается из кеша, записи на месте',
-    has(cached, 'Входящие') && has(cached, 'Купить фильтр для воды') && controlled === true,
+    has(cached, 'Заметки') && has(cached, 'Купить фильтр для воды') && controlled === true,
     `работник ${controlled ? 'управляет' : 'не управляет'} страницей`,
   )
 
@@ -1130,6 +1132,149 @@ async function scenario() {
   const offlineShare = await captureField()
   check('«Поделиться» без сети тоже доезжает — Р-16', offlineShare === 'без сети', `в поле «${offlineShare}»`)
   await offline(false)
+}
+
+/** Месяц словом, как его ищут: «сентябрь». По часам этого компьютера — как `today()`. */
+const MONTH_WORDS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь']
+
+/**
+ * Заметки (Этап 3): вид при записи, замысел и его дело (Р-31), поиск
+ * и отбор, карточка — «Сделано», «Отменить», смена вида, «Удалить» (Р-30).
+ * На входе в неразобранном три записи: фильтр, ссылка про сон и мысль
+ * без даты с другого устройства.
+ */
+async function notesScenario() {
+  await go('/inbox')
+  const field = `document.querySelector('textarea[name=text]')`
+  const pressed = () =>
+    run(`[...document.querySelectorAll('form [aria-pressed=true]')].map((el) => el.textContent.trim()).join(', ')`)
+  const openCard = (text) => act(`startsWith('.note__main', ${JSON.stringify(text)})?.click()`)
+  const search = (query) => act(`set(document.querySelector('input[name=search]'), ${JSON.stringify(query)})`)
+
+  // ─ Вид при записи — тапом и не обязателен; после записи снова «Дело» (Р-13).
+  await act(`byText('button', 'Мысль')?.click()`)
+  await sleep(300)
+  await act(`
+    set(${field}, 'Думается лучше на ходу');
+    byText('button', 'Записать')?.click();
+  `)
+  await sleep(700)
+  const thought = await screen()
+  const kindAfter = await pressed()
+  check(
+    'мысль записывается тапом по виду; после записи вид снова «Дело» — Р-13',
+    has(thought, 'Записано: мысль') && has(thought, 'мысль · сегодня') && kindAfter === 'Дело',
+    `${line(thought, 'Записано')}; выбран «${kindAfter}»`,
+  )
+
+  await act(`byText('button', 'Замысел')?.click()`)
+  await sleep(300)
+  await act(`
+    set(${field}, 'Выучить испанский');
+    byText('button', 'Записать')?.click();
+  `)
+  await sleep(700)
+  const goal = await screen()
+  check(
+    'замысел — своим блоком, в неразобранное не попадает — Р-31',
+    has(goal, 'Выучить испанский') && has(goal, 'дел пока нет') && has(goal, '4 записи'),
+    `${line(goal, 'дел пока')}; ${line(goal, 'записи')}`,
+  )
+
+  // ─ Дело относится к замыслу в своей карточке.
+  await openCard('Купить фильтр для воды')
+  await sleep(400)
+  await act(`
+    const select = document.querySelector('select[name=note-goal]');
+    const option = [...select.options].find((each) => each.textContent.trim() === 'Выучить испанский');
+    set(select, option.value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  `)
+  await sleep(700)
+  const linked = await screen()
+  check(
+    'дело относится к замыслу в своей карточке; у замысла — сколько дел — Р-31',
+    has(linked, 'к замыслу «Выучить испанский»') && has(linked, '1 дело, сделано 0'),
+    `${line(linked, 'к замыслу')}; ${line(linked, 'дело,')}`,
+  )
+
+  // ─ Поиск: слова в любом порядке, название замысла, месяц словом.
+  await search('воды фильтр')
+  await sleep(500)
+  const byWords = await screen()
+  check(
+    'поиск: слова в любом порядке; скрытое названо числом',
+    has(byWords, 'Показано 1 из 4') && has(byWords, 'Купить фильтр для воды') && !has(byWords, 'Думается'),
+    line(byWords, 'Показано'),
+  )
+  await search(`испанский ${MONTH_WORDS[new Date().getMonth()]}`)
+  await sleep(500)
+  const byGoal = await screen()
+  check(
+    'дело находится по названию своего замысла и по месяцу словом',
+    has(byGoal, 'Показано 1 из 4') && has(byGoal, 'Купить фильтр для воды'),
+    line(byGoal, 'Показано'),
+  )
+  await search('')
+  await sleep(300)
+
+  // ─ Отбор по виду.
+  await act(`startsWith('button', 'Мысли')?.click()`)
+  await sleep(500)
+  const thoughts = await screen()
+  check(
+    'чип «Мысли» — только мысли, остальное названо числом',
+    has(thoughts, 'Показано 2 из 4') && has(thoughts, 'Думается лучше на ходу') && !has(thoughts, 'example.com/son'),
+    line(thoughts, 'Показано'),
+  )
+  await act(`startsWith('button', 'Все')?.click()`)
+  await sleep(300)
+
+  // ─ «Сделано» и «Отменить»: карточка фильтра всё ещё открыта.
+  await act(`byText('button', 'Сделано')?.click()`)
+  await sleep(700)
+  const finished = await screen()
+  check(
+    '«Сделано» убирает дело из неразобранного и засчитывается замыслу — Р-30',
+    has(finished, 'Сделано — убрано из «Неразобранное»') && has(finished, '1 дело, сделано 1') && has(finished, '3 записи'),
+    `${line(finished, 'убрано')}; ${line(finished, 'дело,')}`,
+  )
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const undone = await screen()
+  check(
+    '«Отменить» возвращает дело на место',
+    has(undone, 'Купить фильтр для воды') && has(undone, '4 записи') && has(undone, '1 дело, сделано 0'),
+    `${line(undone, 'записи')}; ${line(undone, 'дело,')}`,
+  )
+
+  // ─ Вид меняется потом, в карточке; удаление — после подтверждения.
+  await openCard('Думается лучше на ходу')
+  await sleep(400)
+  // С «const», а не со скобки: строка «[…» склеилась бы с концом помощников.
+  await act(`
+    const chip = [...document.querySelectorAll('.note__card button[aria-pressed]')]
+      .find((el) => el.textContent.trim() === 'Замысел');
+    chip?.click();
+  `)
+  await sleep(700)
+  const goalsBlock = await run(
+    `[...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Замыслы')?.closest('section')?.innerText ?? ''`,
+  )
+  const regrouped = await screen()
+  check(
+    'вид меняется потом, в карточке: мысль стала замыслом и ушла в его блок',
+    has(goalsBlock, 'Думается лучше на ходу') && has(regrouped, '3 записи'),
+    `${line(regrouped, 'записи')}; в замыслах: ${goalsBlock.replace(/\s+/g, ' ').slice(0, 80)}`,
+  )
+  await act(`window.confirm = () => true; byText('button', 'Удалить')?.click()`)
+  await sleep(700)
+  const removed = await screen()
+  check(
+    '«Удалить» после подтверждения убирает запись',
+    !has(removed, 'Думается лучше на ходу') && has(removed, 'Выучить испанский'),
+    line(removed, 'Выучить'),
+  )
 }
 
 /**

@@ -8,8 +8,8 @@ import {
 } from './screenNames.ts'
 
 describe('названия вкладок — Р-26', () => {
-  it('по умолчанию экран учёта — «Учёт»', () => {
-    expect(DEFAULT_SCREEN_NAMES).toEqual({ today: 'Сегодня', time: 'Учёт', inbox: 'Входящие' })
+  it('по умолчанию экран учёта — «Учёт», входящих — «Заметки» (Р-32)', () => {
+    expect(DEFAULT_SCREEN_NAMES).toEqual({ today: 'Сегодня', time: 'Учёт', inbox: 'Заметки' })
   })
 
   it('из настроек: своё — своё, пустое, длинное и кривое — по умолчанию', () => {
@@ -57,8 +57,8 @@ function typedNames(source: string, names: readonly string[]): string[] {
 }
 
 describe('названия вкладок — только из одного места', () => {
-  // Прежнее название экрана учёта тоже: вернуть его руками — та же ошибка.
-  const names = [...Object.values(DEFAULT_SCREEN_NAMES), 'Время']
+  // Прежние названия тоже — учёта и входящих (Р-32): вернуть их руками — та же ошибка.
+  const names = [...Object.values(DEFAULT_SCREEN_NAMES), 'Время', 'Входящие']
 
   it('исходники нашлись — сторож смотрит не в пустоту', () => {
     expect(Object.keys(SOURCES).length).toBeGreaterThan(20)

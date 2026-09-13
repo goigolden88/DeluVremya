@@ -1,15 +1,48 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { db } from '../core/db.ts'
-import { formatDateLoose, plural, today } from '../core/dates.ts'
-import type { Note } from '../core/model.ts'
-import { captureNote } from '../modules/notes/inbox.ts'
-import { useInbox } from '../modules/notes/useInbox.ts'
+import type { Note, NoteKind } from '../core/model.ts'
+import {
+  captureNote,
+  DEFAULT_KIND,
+  goalOf,
+  goalsOf,
+  groupByMonth,
+  inboxOf,
+  kindCounts,
+  markDone,
+  matchesQuery,
+  NOTE_KINDS,
+  queryWords,
+  reopen,
+} from '../modules/notes/inbox.ts'
+import {
+  doneLine,
+  KIND_NAMES,
+  KIND_PLURALS,
+  monthHeading,
+  savedLine,
+  shownText,
+  UNSORTED_TITLE,
+} from '../modules/notes/labels.ts'
+import { NoteItem } from '../modules/notes/NoteItem.tsx'
+import { useNotes } from '../modules/notes/useNotes.ts'
+import { Fold } from '../ui/Fold.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
+import { useToday } from '../ui/useToday.ts'
+
+/** Чипы отбора неразобранного: замыслы живут своим блоком (Р-31). */
+const UNSORTED_KINDS = NOTE_KINDS.filter((kind) => kind !== 'goal')
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : 'Неизвестная ошибка'
+}
 
 /**
- * Входящие — минимальный захват Этапа 0: одно поле, «Записать» и что уже
- * лежит. Полноценный экран — вид записи, поиск, возраст — Этап 3.
+ * Заметки (Р-32) — адрес `/inbox`: одна точка захвата всего, что пришло
+ * в голову или прилетело ссылкой, — замена «Избранному» Телеграма.
+ * Здесь лежит неразобранное: дела отсюда уходят в план дня, мысли —
+ * в обзор недели. Замыслы — своим блоком (Р-31).
  *
  * Сюда же приходит то, чем поделились: `launch.ts` кладёт текст
  * в `?shared=` (Р-16). Поле подставляется, но записывается только по кнопке:
@@ -18,12 +51,20 @@ import { useScreenNames } from '../ui/useScreenNames.ts'
 export function Inbox() {
   const [params, setParams] = useSearchParams()
   const shared = params.get('shared') ?? ''
+  const field = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState(shared)
+  const [kind, setKind] = useState<NoteKind>(DEFAULT_KIND)
   const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState('')
+  const [saved, setSaved] = useState('')
   const [error, setError] = useState('')
-  const inbox = useInbox()
+  const [query, setQuery] = useState('')
+  const [only, setOnly] = useState<NoteKind | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+  /** Последнее «Сделано» — его снимает «Отменить». */
+  const [finished, setFinished] = useState<Note | null>(null)
+  const read = useNotes()
   const names = useScreenNames()
+  const today = useToday()
 
   // Второе «Поделиться», пока экран открыт, приходит новым адресом.
   useEffect(() => {
@@ -31,29 +72,78 @@ export function Inbox() {
   }, [shared])
 
   async function save() {
-    const draft = captureNote(text, today())
+    const draft = captureNote(text, today, kind)
     if (!draft) return
     setBusy(true)
-    setDone('')
+    setSaved('')
     setError('')
     try {
       await db.put('notes', draft)
       setText('')
-      setDone('Записано во входящие')
+      setSaved(savedLine(kind))
+      // Вид — на каждую запись свой: выбранная раз «Мысль» не должна
+      // молча лечь и на следующую (Р-13).
+      setKind(DEFAULT_KIND)
       // Иначе перезагрузка подставила бы уже записанное второй раз.
       if (shared) setParams({}, { replace: true })
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Неизвестная ошибка')
+      setError(describe(failure))
     } finally {
       setBusy(false)
     }
   }
 
+  async function finish(note: Note) {
+    setError('')
+    try {
+      setFinished(await db.put('notes', markDone(note, today)))
+      setOpenId(null)
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
+  async function undo() {
+    if (!finished) return
+    setError('')
+    try {
+      await db.put('notes', reopen(finished))
+      setFinished(null)
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
+  const all = read.notes ?? []
+  const words = queryWords(query)
+  const goals = goalsOf(all)
+  const shownGoals = goals.filter((goal) => matchesQuery(goal, words))
+  const unsorted = inboxOf(all)
+  const counts = kindCounts(unsorted)
+  // У дела ищется и название его замысла: «испанский» находит его дела.
+  const shown = unsorted.filter(
+    (note) => (only === null || note.kind === only) && matchesQuery(note, words, goalOf(note, all)?.text),
+  )
+
+  const item = (note: Note) => (
+    <NoteItem
+      key={note.id}
+      note={note}
+      notes={all}
+      goals={goals}
+      today={today}
+      open={openId === note.id}
+      onToggle={() => setOpenId(openId === note.id ? null : note.id)}
+      onDone={(done) => void finish(done)}
+      onError={setError}
+    />
+  )
+
   return (
     <>
       <header className="screen-head">
         <h1>{names.inbox}</h1>
-        <p className="muted">Мысль или дело — одной строкой. Разбор потом.</p>
+        <p className="muted">Мысль, дело или замысел — одной строкой. Разбор потом.</p>
       </header>
 
       <form
@@ -66,12 +156,27 @@ export function Inbox() {
         <label className="field">
           <span>{shared ? 'Пришло через «Поделиться»' : 'Что записать'}</span>
           <textarea
+            ref={field}
             name="text"
             className="inbox__field"
             value={text}
             onChange={(event) => setText(event.target.value)}
           />
         </label>
+        {/* Вид — не обязателен: не тронул — дело (Р-13). */}
+        <div className="chips" role="group" aria-label="Вид записи">
+          {NOTE_KINDS.map((each) => (
+            <button
+              key={each}
+              type="button"
+              className={each === kind ? 'chip chip--on' : 'chip'}
+              aria-pressed={each === kind}
+              onClick={() => setKind(each)}
+            >
+              {KIND_NAMES[each]}
+            </button>
+          ))}
+        </div>
         <div className="form__actions">
           <button type="submit" className="btn btn--primary" disabled={busy || !text.trim()}>
             Записать
@@ -79,32 +184,88 @@ export function Inbox() {
         </div>
       </form>
 
-      {done && <p className="muted">{done}</p>}
+      {saved && <p className="muted">{saved}</p>}
+      {finished && (
+        <p className="added">
+          <span>{doneLine(finished.kind)}</span>
+          <button type="button" className="link-btn" onClick={() => void undo()}>
+            Отменить
+          </button>
+        </p>
+      )}
       {error && <p className="error">Не записалось: {error}</p>}
-      {inbox.error && <p className="error">Входящие не прочитались: {inbox.error}</p>}
+      {read.error && <p className="error">Записи не прочитались: {read.error}</p>}
 
-      <InboxList notes={inbox.notes} />
+      {read.notes !== null && (
+        <>
+          {all.length > 0 && (
+            <input
+              type="search"
+              name="search"
+              className="search"
+              value={query}
+              placeholder="Поиск: слова в любом порядке, «март», 12.03.2026"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          )}
+
+          {goals.length > 0 && (
+            <Fold
+              id="notes:goals"
+              title={KIND_PLURALS.goal}
+              summary={words.length > 0 ? `${shownGoals.length} из ${goals.length}` : goals.length}
+            >
+              {shownGoals.length === 0 ? (
+                <p className="muted">Под поиск ни один замысел не подошёл.</p>
+              ) : (
+                <ul className="plain">{shownGoals.map(item)}</ul>
+              )}
+            </Fold>
+          )}
+
+          <section className="block">
+            <h2>{UNSORTED_TITLE}</h2>
+            {unsorted.length === 0 ? (
+              <p className="stub">Неразобранного нет.</p>
+            ) : (
+              <>
+                <div className="chips" role="group" aria-label="Отбор по виду">
+                  <button
+                    type="button"
+                    className={only === null ? 'chip chip--on' : 'chip'}
+                    aria-pressed={only === null}
+                    onClick={() => setOnly(null)}
+                  >
+                    Все {unsorted.length}
+                  </button>
+                  {UNSORTED_KINDS.map((each) => (
+                    <button
+                      key={each}
+                      type="button"
+                      className={only === each ? 'chip chip--on' : 'chip'}
+                      aria-pressed={only === each}
+                      onClick={() => setOnly(only === each ? null : each)}
+                    >
+                      {KIND_PLURALS[each]} {counts[each]}
+                    </button>
+                  ))}
+                </div>
+                <p className="muted">{shownText(shown.length, unsorted.length)}</p>
+                {shown.length === 0 ? (
+                  <p className="muted">Под поиск и отбор ничего не подошло.</p>
+                ) : (
+                  groupByMonth(shown).map((group) => (
+                    <div key={group.month ?? 'без даты'} className="month-group">
+                      <h3 className="unit__name">{monthHeading(group.month)}</h3>
+                      <ul className="plain">{group.notes.map(item)}</ul>
+                    </div>
+                  ))
+                )}
+              </>
+            )}
+          </section>
+        </>
+      )}
     </>
-  )
-}
-
-function InboxList({ notes }: { notes: Note[] | null }) {
-  if (notes === null) return null
-  if (notes.length === 0) return <p className="stub">Во входящих пусто.</p>
-
-  return (
-    <section className="block">
-      <h2>
-        Во входящих · {notes.length} {plural(notes.length, ['запись', 'записи', 'записей'])}
-      </h2>
-      <ul className="plain">
-        {notes.map((note) => (
-          <li key={note.id} className="inbox__item">
-            <span className="inbox__text">{note.text}</span>
-            <span className="muted">{note.capturedOn === null ? 'без даты' : formatDateLoose(note.capturedOn)}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
   )
 }

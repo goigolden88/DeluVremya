@@ -45,7 +45,7 @@ type KindEntry = {
 }
 
 export const KINDS: { readonly [K in RecordKind]: KindEntry } = {
-  note: { label: 'Входящие и план' },
+  note: { label: 'Заметки и план' },
   time: { label: 'Учёт времени', import: { spec: timeImportSpec, run: importTime } },
   review: { label: 'Обзоры недели' },
 }

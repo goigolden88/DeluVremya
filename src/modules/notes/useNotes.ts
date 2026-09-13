@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { db } from '../../core/db.ts'
 import type { Note } from '../../core/model.ts'
-import { inboxOf } from './inbox.ts'
 
 /**
- * Входящие из базы. Перечитываются на любую запись в `notes` — своей рукой
+ * Все живые заметки. Перечитываются на любую запись в `notes` — своей рукой
  * или приехавшую синхронизацией. Null — ещё не прочитано.
+ *
+ * Все, а не только неразобранное: у замысла считаются его дела, в том
+ * числе сделанные (Р-31).
  */
-export function useInbox(): { notes: Note[] | null; error: string } {
+export function useNotes(): { notes: Note[] | null; error: string } {
   const [notes, setNotes] = useState<Note[] | null>(null)
   const [error, setError] = useState('')
 
@@ -17,7 +19,7 @@ export function useInbox(): { notes: Note[] | null; error: string } {
     async function load() {
       try {
         const all = await db.getAll('notes')
-        if (alive) setNotes(inboxOf(all))
+        if (alive) setNotes(all)
       } catch (failure) {
         if (alive) setError(failure instanceof Error ? failure.message : 'Неизвестная ошибка')
       }

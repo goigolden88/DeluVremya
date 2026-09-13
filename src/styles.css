@@ -462,7 +462,7 @@ a {
   margin-top: 16px;
 }
 
-/* ─── Входящие ───────────────────────────────────────────────────────────── */
+/* ─── Заметки ────────────────────────────────────────────────────────────── */
 
 /* Поле захвата — в несколько строк: из «Поделиться» приходят заголовок
    и ссылка на отдельных строках. */
@@ -472,20 +472,58 @@ a {
   resize: vertical;
 }
 
-.inbox__item {
+/* Поиск над списками — во всю ширину, как поле формы. Из «Дневников»;
+   шрифт 16px: на меньшем Safari зумит страницу при фокусе. */
+.search {
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 12px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.note {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
-  font-size: 13px;
+}
+
+/* Текст записи — кнопка карточки: палец попадает в строку целиком. */
+.note__main {
+  min-height: 44px;
+  font-weight: 400;
 }
 
 /* Ссылки длинные и без пробелов: без переноса они раздвигают экран вбок. */
-.inbox__text {
+.note__text {
   font-size: 15px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.note__meta {
+  font-size: 13px;
+}
+
+.note__card {
+  margin-top: 8px;
+}
+
+.note__links {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.month-group + .month-group {
+  margin-top: 16px;
 }
 
 /* ─── Мелочи, вернувшиеся с учётом времени ───────────────────────────────── */

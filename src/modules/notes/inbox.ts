@@ -130,6 +130,16 @@ export function matchesQuery(note: Note, words: readonly string[], extra = ''): 
   return words.every((word) => haystack.includes(word))
 }
 
+/**
+ * Ссылки в тексте — в карточке они нажимаются: текст записи сам кнопка,
+ * и ссылка внутри неё не нажалась бы. Знак препинания в конце ссылке
+ * не принадлежит; повтор — один раз.
+ */
+export function linksOf(text: string): string[] {
+  const found = text.match(/https?:\/\/[^\s<>«»"]+/g) ?? []
+  return [...new Set(found.map((link) => link.replace(/[.,;:!?)\]]+$/, '')))]
+}
+
 // ─── Возраст ───────────────────────────────────────────────────────────────
 
 /**

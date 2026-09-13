@@ -30,7 +30,7 @@ const LABELS: Record<SyncedStore, string> = {
   categories: 'Категории',
   presets: 'Пресеты',
   templates: 'Шаблоны дня',
-  notes: 'Входящие и план',
+  notes: 'Заметки и план',
   time: 'Блоки времени',
   reviews: 'Обзоры недели',
 }

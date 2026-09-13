@@ -92,17 +92,26 @@ export function doneLine(kind: NoteKind): string {
   return kind === 'goal' ? 'Замысел достигнут — убран из замыслов' : `Сделано — убрано из «${UNSORTED_TITLE}»`
 }
 
-/** Сколько знаков текста показывать в вопросе об удалении. */
-const CONFIRM_TEXT = 40
+/** Сколько знаков текста называют запись в вопросе и в отчёте. */
+const SHORT_TEXT = 40
+
+/** Запись одной короткой строкой: начало первой строки текста. */
+export function shortText(text: string): string {
+  const first = text.split('\n')[0] ?? ''
+  return first.length > SHORT_TEXT ? `${first.slice(0, SHORT_TEXT)}…` : first
+}
 
 /** Вопрос перед удалением: запись названа началом её текста. */
 export function deleteConfirm(text: string): string {
-  const first = text.split('\n')[0] ?? ''
-  const short = first.length > CONFIRM_TEXT ? `${first.slice(0, CONFIRM_TEXT)}…` : first
-  return `Удалить запись «${short}»?`
+  return `Удалить запись «${shortText(text)}»?`
+}
+
+/** Первая строка текста: в выборе замысла и в списке его дел. */
+export function firstLine(text: string): string {
+  return text.split('\n')[0] ?? ''
 }
 
 /** Подпись дела со ссылкой на замысел. */
 export function goalLine(goal: Note): string {
-  return `к замыслу «${goal.text.split('\n')[0] ?? ''}»`
+  return `к замыслу «${firstLine(goal.text)}»`
 }

@@ -20,10 +20,11 @@ export type ScreenNames = Record<ScreenKey, string>
 /** Порядок — порядок вкладок. */
 export const SCREEN_KEYS: readonly ScreenKey[] = ['today', 'time', 'inbox']
 
+/** Ключ `inbox` и адрес `/inbox` — прежние: имена в базе и в ярлыке не меняются (Р-32). */
 export const DEFAULT_SCREEN_NAMES: ScreenNames = {
   today: 'Сегодня',
   time: 'Учёт',
-  inbox: 'Входящие',
+  inbox: 'Заметки',
 }
 
 /** Ключ в `settings`: названия у каждого устройства свои. */
