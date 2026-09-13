@@ -9,6 +9,7 @@ import { NavLink, Outlet } from 'react-router-dom'
  */
 const TABS = [
   { to: '/', label: 'Сегодня', end: true },
+  { to: '/time', label: 'Время', end: false },
   { to: '/inbox', label: 'Входящие', end: false },
 ]
 

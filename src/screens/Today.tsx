@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { formatDateLong } from '../core/dates.ts'
 import { IosNote } from '../ui/Install.tsx'
 import { useToday } from '../ui/useToday.ts'
+import { TimeDay } from '../modules/time/TimeDay.tsx'
 import { useFirstRun } from './useFirstRun.ts'
 import { Welcome } from './Welcome.tsx'
 
@@ -41,8 +42,15 @@ export function Today() {
         </section>
       )}
 
+      {/* Учёт времени: кнопки и итог дня. Список блоков — на «Времени». */}
+      <h2>Время</h2>
+      <TimeDay day={day} compact />
+      <p>
+        <Link to="/time">Все блоки дня →</Link>
+      </p>
+
       {first.counted && !first.welcome && (
-        <p className="stub">План дня и учёт времени появятся здесь следующими обновлениями.</p>
+        <p className="stub">План дня появится здесь следующими обновлениями.</p>
       )}
     </>
   )

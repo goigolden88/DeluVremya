@@ -566,3 +566,66 @@ a {
 .cat__body .link-btn {
   align-self: flex-start;
 }
+
+/* ─── Учёт времени ───────────────────────────────────────────────────────── */
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Кнопка «Чтение +30» — главный путь записи: пилюля в акцент, не меньше
+   44 пикселей. Нажатие видно заливкой: тап должен читаться как действие. */
+.preset {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.preset:active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Отклик на тап и «Отменить» — одной строкой, переносится на узком. */
+.added {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+/* Главная строка итога — сумма дня. Крупнее соседей: за ней и смотрят. */
+.lead {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 4px 0 8px;
+}
+
+.day-sum .stats {
+  margin-bottom: 8px;
+}
+
+.tblock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tblock__main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

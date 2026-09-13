@@ -4,6 +4,7 @@ import { Today } from './screens/Today.tsx'
 import { Inbox } from './screens/Inbox.tsx'
 import { Settings } from './screens/Settings.tsx'
 import { Categories } from './modules/time/Categories.tsx'
+import { TimeScreen } from './modules/time/TimeScreen.tsx'
 
 /**
  * Роутинг через хеш: на GitHub Pages обычные пути дают 404 при обновлении
@@ -20,6 +21,8 @@ export function App() {
           <Route index element={<Today />} />
           <Route path="inbox" element={<Inbox />} />
           <Route path="settings" element={<Settings />} />
+          {/* Цель ярлыка «Учесть время» (`?go=time`, Р-16): адрес не меняется. */}
+          <Route path="time" element={<TimeScreen />} />
           <Route path="time/categories" element={<Categories />} />
           {/* Незнакомый адрес — на главный. Так и ярлык на экран, которого
               ещё нет, открывает приложение, а не пустоту. */}

@@ -400,9 +400,16 @@ async function scenario() {
   await open(`${APP}?go=time`)
   const timeHash = await run('location.hash')
   check(
-    'ярлык на экран, которого ещё нет, открывает главный, а не пустоту',
-    timeHash === '#/' && has(await screen(), 'Сегодня'),
+    'ярлык «Учесть время» открывает экран времени — Р-16',
+    timeHash === '#/time' && has(await screen(), 'Окно дня'),
     `хеш ${timeHash}`,
+  )
+  await open(`${APP}?go=nowhere`)
+  const unknownHash = await run('location.hash')
+  check(
+    'ярлык на незнакомый экран открывает главный, а не пустоту',
+    unknownHash === '#/' && has(await screen(), 'Сегодня'),
+    `хеш ${unknownHash}`,
   )
 
   // ─ Категории (Этап 1, п. 1): стартовый набор заводится сам и правится.
@@ -456,6 +463,49 @@ async function scenario() {
     'категория уходит в архив, из списка пропадает',
     !has(archived, 'Покер') && has(archived, 'Архив'),
     line(archived, 'Архив'),
+  )
+
+  // ─ Учёт времени (Этап 1, пп. 2 и 5): тап — блок, итог сразу, «Отменить».
+  await go('/time')
+  await act(`byText('button', 'Чтение +30')?.click()`)
+  await sleep(700)
+  await act(`byText('button', 'Чтение +30')?.click()`)
+  await sleep(700)
+  const tapped = await screen()
+  check(
+    'два тапа по «Чтение +30» — час чтения, итог сразу — Р-20',
+    has(tapped, 'Учтено 1 ч · 2 блока') && has(tapped, 'Отменить'),
+    line(tapped, 'Учтено'),
+  )
+
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const undone = await screen()
+  check(
+    '«Отменить» снимает последний блок',
+    has(undone, 'Учтено 30 мин · 1 блок') && !has(undone, 'Отменить'),
+    line(undone, 'Учтено'),
+  )
+  // До начала окна дня неучтённого нет, и строки о нём тоже.
+  const beforeWindow = new Date().getHours() < 8
+  check(
+    'неучтённое — от прошедшей части окна дня — Р-21',
+    has(undone, 'Окно дня') && (beforeWindow || has(undone, 'из прошедших')),
+    line(undone, 'Неучтено'),
+  )
+
+  await act(`document.querySelector('[aria-label^="Убрать: Чтение"]')?.click()`)
+  await sleep(700)
+  check('блок снимается из списка дня', has(await screen(), 'За день ничего не учтено'))
+
+  await go('/')
+  await act(`byText('button', 'Прогулка +30')?.click()`)
+  await sleep(700)
+  const today = await screen()
+  check(
+    'кнопки и итог — и на «Сегодня»',
+    has(today, 'Учтено 30 мин · 1 блок') && has(today, 'Записано: Прогулка'),
+    line(today, 'Учтено'),
   )
 
   // ─ Настройки: разделы свёрнуты оглавлением, у свёрнутой копии — итог.
@@ -636,7 +686,7 @@ async function dataScenario(file) {
   const loaded = /Загружено записей: (\d+)/.exec(restored.replace(/ /g, ' '))
   check('копия загрузилась через «Восстановить из копии»', loaded !== null, loaded?.[0] ?? restored.slice(0, 160))
 
-  const routes = ['/', '/inbox', '/time/categories', '/settings']
+  const routes = ['/', '/time', '/inbox', '/time/categories', '/settings']
 
   for (const route of routes) {
     await go(route)

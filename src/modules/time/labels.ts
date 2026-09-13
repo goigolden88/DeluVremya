@@ -3,7 +3,9 @@
  * (правило в CLAUDE.md).
  */
 
+import { plural } from '../../core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
+import { DAY_WINDOW } from './day.ts'
 
 /**
  * Признак категории. Нужен только обзору недели (Р-05): на экране дня
@@ -40,4 +42,31 @@ export function formatMinutes(total: number): string {
   const minutes = rounded % MINUTES_PER_HOUR
   if (hours === 0) return `${minutes} мин`
   return minutes === 0 ? `${hours} ч` : `${hours} ч ${minutes} мин`
+}
+
+/** Категория блока, которой нет ни живой, ни в надгробиях. */
+export const UNKNOWN_CATEGORY = 'без категории'
+
+export function blocksWord(count: number): string {
+  return plural(count, ['блок', 'блока', 'блоков'])
+}
+
+/** Главная строка итога: сумма с основанием — по скольким блокам. */
+export function summaryLine(total: number, count: number): string {
+  return count === 0 ? 'За день ничего не учтено' : `Учтено ${formatMinutes(total)} · ${count} ${blocksWord(count)}`
+}
+
+/** Неучтённое — с основанием: от чего оно считается (Р-21). */
+export function unaccountedLine(unaccounted: number, elapsed: number): string {
+  return `Неучтено ${formatMinutes(unaccounted)} из прошедших ${formatMinutes(elapsed)} окна дня`
+}
+
+/** Отклик на тап: что записано и сколько теперь по этой категории за день. */
+export function addedLine(name: string, minutes: number, categoryTotal: number): string {
+  return `Записано: ${name}, ${formatMinutes(minutes)}. По категории за день — ${formatMinutes(categoryTotal)}`
+}
+
+/** Пояснение к «неучтено» под итогом дня. */
+export function windowNote(): string {
+  return `Окно дня — с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}: неучтённое считается от прошедшей его части, а не от суток.`
 }
