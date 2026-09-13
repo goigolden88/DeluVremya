@@ -50,8 +50,8 @@ describe('адрес запуска → маршрут — Р-16', () => {
     expect(launchRoute('?title=%20&text=&url=')).toBe('/inbox')
   })
 
-  it('ярлыки ведут на свои экраны', () => {
-    expect(launchRoute('?go=inbox')).toBe('/inbox')
+  it('ярлыки ведут на свои экраны; «Записать» — с курсором в поле', () => {
+    expect(launchRoute('?go=inbox')).toBe('/inbox?write=1')
     expect(launchRoute('?go=time')).toBe('/time')
   })
 

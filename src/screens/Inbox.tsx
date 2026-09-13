@@ -71,6 +71,23 @@ export function Inbox() {
     if (shared) setText(shared)
   }, [shared])
 
+  // Ярлык «Записать» (`?go=inbox` → `?write=1`): курсор сразу в поле.
+  // Параметр снимается, чтобы «назад» и перезагрузка его не повторяли.
+  // Откроется ли клавиатура сама — решает телефон.
+  const write = params.has('write')
+  useEffect(() => {
+    if (!write) return
+    field.current?.focus()
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('write')
+        return next
+      },
+      { replace: true },
+    )
+  }, [write, setParams])
+
   async function save() {
     const draft = captureNote(text, today, kind)
     if (!draft) return

@@ -19,8 +19,12 @@
 /** Параметры `share_target`. Имена — те, что Android подставит в адрес. */
 export const SHARE_PARAMS = { title: 'title', text: 'text', url: 'url' } as const
 
-/** Куда ведут ярлыки: значение `go` в адресе → маршрут. */
-export const GO_ROUTES = { inbox: '/inbox', time: '/time' } as const
+/**
+ * Куда ведут ярлыки: значение `go` в адресе → маршрут. «Записать» ставит
+ * курсор в поле — захват в два действия (03-План, Этап 3); `write` снимает
+ * сам экран, как `shared`. Адрес ярлыка от этого не меняется.
+ */
+export const GO_ROUTES = { inbox: '/inbox?write=1', time: '/time' } as const
 
 export type Go = keyof typeof GO_ROUTES
 

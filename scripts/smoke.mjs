@@ -634,10 +634,11 @@ async function scenario() {
   // ─ Ярлыки: адрес с ?go=, а не с # (Р-16).
   await open(`${APP}?go=inbox`)
   const inboxHash = await run('location.hash')
+  const focused = await run(`document.activeElement?.getAttribute('name') ?? ''`)
   check(
-    'ярлык «Записать» открывает входящие',
-    inboxHash === '#/inbox' && (await captureField()) !== null,
-    `хеш ${inboxHash}`,
+    'ярлык «Записать» открывает заметки с курсором в поле, ?write из адреса ушёл',
+    inboxHash === '#/inbox' && focused === 'text',
+    `хеш ${inboxHash}; в фокусе «${focused}»`,
   )
   await open(`${APP}?go=time`)
   const timeHash = await run('location.hash')
