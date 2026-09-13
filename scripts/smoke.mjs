@@ -658,6 +658,20 @@ async function scenario() {
     about.replace(/\s+/g, ' ').slice(0, 200),
   )
 
+  // ─ Напоминание о незаполненном дне (Р-24). Фоновую проверку браузер
+  // вне установленного приложения не даёт; «Проверить сейчас» — тот же
+  // расчёт, что у service worker. За сегодня блоки есть — напоминать не о чем.
+  const granted = await grantNotifications()
+  await unfold('Напоминания')
+  await act(`byText('button', 'Проверить сейчас')?.click()`)
+  await sleep(1500)
+  const reminders = await screen()
+  check(
+    'напоминания: «Проверить сейчас» доходит, за учтённый день напоминать не о чем — Р-24',
+    granted && has(reminders, 'Напоминать не о чем — за сегодня время уже учтено'),
+    line(reminders, 'Напомина'),
+  )
+
   // ─ Копия файлом: туда и обратно.
   await unfold('Экспорт и импорт')
   await act(`byText('button', 'Сохранить в файл')?.click()`)

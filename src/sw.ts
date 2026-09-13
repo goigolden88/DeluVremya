@@ -17,6 +17,7 @@
 import { clientsClaim } from 'workbox-core'
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
+import { remind, REMINDER_TAG } from './notify.ts'
 
 /**
  * Ровно то, чем работник пользуется. Библиотека типов `webworker` целиком
@@ -63,7 +64,12 @@ if (!import.meta.env.DEV) {
   registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')))
 }
 
-// Здесь встанет обработчик `periodicsync` — напоминания (Р-14, Этап 1).
+// Напоминание о незаполненном дне (Р-14, Р-24): браузер будит проверку
+// сам, примерно раз в сутки. Имя проверки после выпуска не меняется.
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag !== REMINDER_TAG) return
+  event.waitUntil(remind(self.registration))
+})
 
 // Тап по уведомлению открывает приложение там, куда уведомление зовёт.
 // Уже открытое приложение переводится туда же, а не открывается второй копией.
