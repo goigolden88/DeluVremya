@@ -3,14 +3,17 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // GitHub Pages отдаёт сайт проекта не с корня домена, а по /<имя репозитория>/.
-// Репозиторий называется Dnevniki → https://goigolden88.github.io/Dnevniki/
+// Репозиторий называется DeluVremya → https://goigolden88.github.io/DeluVremya/
 //
 // Если base не выставить, сборка пройдёт зелёной, а страница откроется белой:
 // все скрипты уйдут в 404. Симптом выглядит как сломанная сборка, причина — здесь.
-// Переименуете репозиторий — правьте эту строку, остальное подтянется. См. Р-17.
-const BASE = '/Dnevniki/'
+// Переименуете репозиторий — правьте эту строку, остальное подтянется. См. Р-06.
+const BASE = '/DeluVremya/'
 
 const THEME = '#1b1c1e'
+
+/** Иконка ярлыка. Без своей Android рисует пустую заглушку. */
+const SHORTCUT_ICON = { src: `${BASE}pwa-192x192.png`, sizes: '192x192', type: 'image/png' }
 
 export default defineConfig({
   base: BASE,
@@ -25,10 +28,10 @@ export default defineConfig({
     react(),
 
     VitePWA({
-      // Service worker свой, а не собранный плагином (Р-50): в нём живут
-      // напоминания о просроченном, а в сгенерированный код их не положить.
-      // Имя на выходе прежнее — sw.js, иначе установленные копии остались бы
-      // со старым работником навсегда.
+      // Service worker свой, а не собранный плагином: в нём будут
+      // напоминания (Р-14), а в сгенерированный код их не положить.
+      // Имя на выходе — sw.js, и меняться оно не должно никогда: иначе
+      // установленные копии остались бы со старым работником навсегда.
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
@@ -44,9 +47,9 @@ export default defineConfig({
 
       manifest: {
         id: BASE,
-        name: 'Дневники',
-        short_name: 'Дневники',
-        description: 'Циклы, здоровье и контент. Работает без сети.',
+        name: 'Делу Время',
+        short_name: 'Делу Время',
+        description: 'План дня, входящие и учёт времени. Работает без сети.',
         lang: 'ru',
         // Пути с base. При base '/' манифест соберётся, но иконка
         // на телефон не встанет — установка просто не предложится.
@@ -64,6 +67,22 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'maskable',
           },
+        ],
+
+        // «Поделиться» и ярлыки — основной путь ввода (Р-09). Оба зашиваются
+        // в установленное приложение на Android, поэтому объявлены с первого
+        // дня, а старый адрес обязан работать и после любой правки.
+        // Приём — GET на корень, разбор при старте в src/launch.ts,
+        // без работника (Р-16).
+        share_target: {
+          action: BASE,
+          method: 'GET',
+          params: { title: 'title', text: 'text', url: 'url' },
+        },
+        shortcuts: [
+          { name: 'Записать', url: `${BASE}?go=inbox`, icons: [SHORTCUT_ICON] },
+          { name: 'План дня', url: BASE, icons: [SHORTCUT_ICON] },
+          { name: 'Учесть время', url: `${BASE}?go=time`, icons: [SHORTCUT_ICON] },
         ],
       },
 

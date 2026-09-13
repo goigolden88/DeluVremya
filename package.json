@@ -1,5 +1,5 @@
 {
-  "name": "dnevniki",
+  "name": "deluvremya",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,7 +10,6 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "smoke": "node scripts/smoke.mjs",
-    "check:data": "node scripts/check-data.mjs",
     "icons": "node scripts/icons.mjs"
   },
   "dependencies": {

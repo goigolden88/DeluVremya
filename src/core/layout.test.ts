@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { blobSha } from './github.ts'
 import { buildFiles, canonical, parseFile, parseMeta, storeOf } from './layout.ts'
 import { SCHEMA_VERSION, SYNCED_STORES } from './model.ts'
-import type { ContentEntry, CycleEvent, StoreRecord, SyncedStore } from './model.ts'
+import type { Note, StoreRecord, SyncedStore, TimeBlock } from './model.ts'
 
 /** Пустая база: все хранилища есть, записей нет. */
 function empty(): { [S in SyncedStore]: StoreRecord[S][] } {
@@ -15,20 +15,20 @@ function withData(over: Partial<{ [S in SyncedStore]: StoreRecord[S][] }>) {
   return { ...empty(), ...over }
 }
 
-function mark(id: string, date: string, over: Partial<CycleEvent> = {}): CycleEvent {
-  return { id, updatedAt: '2026-09-09T10:00:00.000Z', itemId: 'item1', date, ...over }
+function block(id: string, date: string, over: Partial<TimeBlock> = {}): TimeBlock {
+  return { id, updatedAt: '2026-09-09T10:00:00.000Z', categoryId: 'cat1', minutes: 30, date, ...over }
 }
 
-function entry(id: string, start: string | null): ContentEntry {
+function note(id: string, capturedOn: string | null, over: Partial<Note> = {}): Note {
   return {
     id,
     updatedAt: '2026-09-09T10:00:00.000Z',
-    type: 'anime',
-    title: 'Тайтл',
-    start,
-    end: null,
-    status: start === null ? 'planned' : 'done',
-    score: null,
+    text: 'Мысль',
+    kind: 'thought',
+    capturedOn,
+    plannedFor: null,
+    status: 'open',
+    ...over,
   }
 }
 
@@ -40,52 +40,45 @@ describe('раскладка', () => {
   it('пустая база даёт файлы без нарезки и meta', () => {
     expect(pathsOf(buildFiles(empty()))).toEqual([
       'categories.json',
-      'health/episodes.json',
-      'health/measures.json',
-      'health/sessions.json',
-      'items.json',
       'meta.json',
-      'tags.json',
+      'presets.json',
+      'reviews.json',
       'templates.json',
     ])
   })
 
-  it('отметки циклов режутся по годам', () => {
-    const files = buildFiles(
-      withData({ cycleEvents: [mark('a', '2025-12-31'), mark('b', '2026-01-01')] }),
-    )
-    expect(pathsOf(files)).toContain('cycles/2025.json')
-    expect(pathsOf(files)).toContain('cycles/2026.json')
+  it('блоки времени режутся по годам', () => {
+    const files = buildFiles(withData({ time: [block('a', '2025-12-31'), block('b', '2026-01-01')] }))
+    expect(pathsOf(files)).toContain('time/2025.json')
+    expect(pathsOf(files)).toContain('time/2026.json')
 
-    const y2026 = files.find((file) => file.path === 'cycles/2026.json')
+    const y2026 = files.find((file) => file.path === 'time/2026.json')
     expect(JSON.parse(y2026?.content ?? '[]')).toHaveLength(1)
   })
 
-  it('контент с месячной датой попадает в год месяца', () => {
-    // Р-25: у контента дата может быть точностью до месяца.
-    const files = buildFiles(withData({ content: [entry('a', '2026-03')] }))
-    expect(pathsOf(files)).toContain('content/2026.json')
+  it('заметка ложится в год, когда записана, а не в год плана', () => {
+    // Мысль из декабря, поставленная в план на январь, остаётся декабрьской.
+    const files = buildFiles(withData({ notes: [note('a', '2025-12-30', { plannedFor: '2026-01-05' })] }))
+    expect(pathsOf(files)).toContain('notes/2025.json')
+    expect(pathsOf(files)).not.toContain('notes/2026.json')
   })
 
-  it('запись без даты уезжает в undated, а не теряется', () => {
-    // Р-34: список «к просмотру» — 72 записи уже в базе, года у них нет.
-    const files = buildFiles(withData({ content: [entry('a', null), entry('b', '2026-03')] }))
-    expect(pathsOf(files)).toContain('content/undated.json')
-    expect(JSON.parse(files.find((f) => f.path === 'content/undated.json')?.content ?? '[]'))
+  it('заметка без даты уезжает в undated, а не теряется — Р-08', () => {
+    const files = buildFiles(withData({ notes: [note('a', null), note('b', '2026-03-01')] }))
+    expect(pathsOf(files)).toContain('notes/undated.json')
+    expect(JSON.parse(files.find((f) => f.path === 'notes/undated.json')?.content ?? '[]'))
       .toHaveLength(1)
   })
 
-  it('запись с испорченной датой тоже не пропадает', () => {
-    const files = buildFiles(withData({ cycleEvents: [mark('a', 'не дата')] }))
-    expect(pathsOf(files)).toContain('cycles/undated.json')
+  it('заметка с испорченной датой тоже не пропадает — Р-08', () => {
+    const files = buildFiles(withData({ notes: [note('a', '31.02.2026')] }))
+    expect(pathsOf(files)).toContain('notes/undated.json')
   })
 
   it('надгробия уезжают вместе с живыми записями', () => {
-    // Без них второе устройство воскресит удалённое (Р-07).
-    const files = buildFiles(
-      withData({ cycleEvents: [mark('a', '2026-01-01', { deleted: true })] }),
-    )
-    const content = files.find((file) => file.path === 'cycles/2026.json')?.content ?? ''
+    // Без них второе устройство воскресит удалённое.
+    const files = buildFiles(withData({ time: [block('a', '2026-01-01', { deleted: true })] }))
+    const content = files.find((file) => file.path === 'time/2026.json')?.content ?? ''
     expect(JSON.parse(content)[0].deleted).toBe(true)
   })
 
@@ -96,19 +89,19 @@ describe('раскладка', () => {
 })
 
 describe('опустевший год', () => {
-  const before = withData({ cycleEvents: [mark('a', '2025-12-31')] })
-  const after = withData({ cycleEvents: [mark('a', '2026-01-01')] })
+  const before = withData({ time: [block('a', '2025-12-31')] })
+  const after = withData({ time: [block('a', '2026-01-01')] })
 
   it('перезаписывается пустым, если файл читали на этом же проходе', () => {
     // Иначе на сервере навсегда осталась бы копия записи в старом году.
     const files = buildFiles(after, { merged: pathsOf(buildFiles(before)) })
-    const old = files.find((file) => file.path === 'cycles/2025.json')
+    const old = files.find((file) => file.path === 'time/2025.json')
     expect(JSON.parse(old?.content ?? 'null')).toEqual([])
   })
 
   it('нечитанные пути не трогаются', () => {
     const files = buildFiles(after)
-    expect(pathsOf(files)).not.toContain('cycles/2025.json')
+    expect(pathsOf(files)).not.toContain('time/2025.json')
   })
 
   it('чужие файлы в репозитории не затираются', () => {
@@ -121,7 +114,7 @@ describe('опустевший год', () => {
 describe('канонический вид', () => {
   it('порядок ключей в записи не меняет файл', async () => {
     // Запись из формы и запись с сервера собираются по-разному. Разойдись
-    // тут байты — каждая синхронизация переписывала бы весь репозиторий (Р-33).
+    // тут байты — каждая синхронизация переписывала бы весь репозиторий.
     const one = canonical([{ id: 'a', updatedAt: '2026-01-01T00:00:00.000Z', deleted: false } as never])
     const two = canonical([{ deleted: false, updatedAt: '2026-01-01T00:00:00.000Z', id: 'a' } as never])
     expect(one).toBe(two)
@@ -129,20 +122,20 @@ describe('канонический вид', () => {
   })
 
   it('порядок записей на входе не меняет файл', () => {
-    const a = mark('a', '2026-01-01')
-    const b = mark('b', '2026-02-01')
+    const a = block('a', '2026-01-01')
+    const b = block('b', '2026-02-01')
     expect(canonical([a, b])).toBe(canonical([b, a]))
   })
 
   it('вложенные объекты тоже упорядочиваются', () => {
-    const one = { id: 'a', updatedAt: 'x', ext: { source: 's', id: 'i' } } as never
-    const two = { id: 'a', updatedAt: 'x', ext: { id: 'i', source: 's' } } as never
+    const one = { id: 'a', updatedAt: 'x', items: [{ title: 't', estMin: 30 }] } as never
+    const two = { id: 'a', updatedAt: 'x', items: [{ estMin: 30, title: 't' }] } as never
     expect(canonical([one])).toBe(canonical([two]))
   })
 
   it('порядок в массивах сохраняется — это данные', () => {
-    const one = { id: 'a', updatedAt: 'x', symptoms: ['b', 'a'] } as never
-    const two = { id: 'a', updatedAt: 'x', symptoms: ['a', 'b'] } as never
+    const one = { id: 'a', updatedAt: 'x', refs: ['b', 'a'] } as never
+    const two = { id: 'a', updatedAt: 'x', refs: ['a', 'b'] } as never
     expect(canonical([one])).not.toBe(canonical([two]))
   })
 
@@ -153,24 +146,22 @@ describe('канонический вид', () => {
 
 describe('storeOf', () => {
   it('узнаёт свои файлы', () => {
-    expect(storeOf('items.json')).toBe('items')
-    expect(storeOf('health/measures.json')).toBe('measures')
-    expect(storeOf('cycles/2026.json')).toBe('cycleEvents')
-    expect(storeOf('content/undated.json')).toBe('content')
+    expect(storeOf('categories.json')).toBe('categories')
+    expect(storeOf('reviews.json')).toBe('reviews')
+    expect(storeOf('time/2026.json')).toBe('time')
+    expect(storeOf('notes/undated.json')).toBe('notes')
   })
 
   it('чужие файлы не признаёт своими', () => {
     expect(storeOf('README.md')).toBeNull()
     expect(storeOf('meta.json')).toBeNull()
-    expect(storeOf('cycles/2026.txt')).toBeNull()
-    expect(storeOf('cycles/двадцать.json')).toBeNull()
+    expect(storeOf('time/2026.txt')).toBeNull()
+    expect(storeOf('time/двадцать.json')).toBeNull()
     expect(storeOf('other/2026.json')).toBeNull()
   })
 
   it('каждый построенный файл, кроме meta, опознаётся обратно', () => {
-    const files = buildFiles(
-      withData({ cycleEvents: [mark('a', '2026-01-01')], content: [entry('b', null)] }),
-    )
+    const files = buildFiles(withData({ time: [block('a', '2026-01-01')], notes: [note('b', null)] }))
     for (const file of files) {
       if (file.path === 'meta.json') continue
       expect(storeOf(file.path), file.path).not.toBeNull()
@@ -180,30 +171,30 @@ describe('storeOf', () => {
 
 describe('разбор файлов с сервера', () => {
   it('читает список записей', () => {
-    const records = parseFile('items.json', '[{"id":"a","updatedAt":"2026-01-01T00:00:00.000Z"}]')
+    const records = parseFile('categories.json', '[{"id":"a","updatedAt":"2026-01-01T00:00:00.000Z"}]')
     expect(records).toHaveLength(1)
   })
 
   it('отвергает не JSON и не список', () => {
-    expect(() => parseFile('items.json', 'мусор')).toThrow('не JSON')
-    expect(() => parseFile('items.json', '{}')).toThrow('не список')
+    expect(() => parseFile('categories.json', 'мусор')).toThrow('не JSON')
+    expect(() => parseFile('categories.json', '{}')).toThrow('не список')
   })
 
   it('отвергает записи без id или updatedAt — на них держится слияние', () => {
-    expect(() => parseFile('items.json', '[{"id":"a"}]')).toThrow('без id или updatedAt')
-    expect(() => parseFile('items.json', '[null]')).toThrow('без id или updatedAt')
+    expect(() => parseFile('categories.json', '[{"id":"a"}]')).toThrow('без id или updatedAt')
+    expect(() => parseFile('categories.json', '[null]')).toThrow('без id или updatedAt')
   })
 
   it('meta.json без версии — не наш репозиторий', () => {
     expect(parseMeta('{"schemaVersion":1}')).toBe(1)
-    expect(() => parseMeta('{}')).toThrow('не репозиторий Дневников')
-    expect(() => parseMeta('{"schemaVersion":"1"}')).toThrow('не репозиторий Дневников')
+    expect(() => parseMeta('{}')).toThrow('не репозиторий «Делу Время»')
+    expect(() => parseMeta('{"schemaVersion":"1"}')).toThrow('не репозиторий «Делу Время»')
     expect(() => parseMeta('нет')).toThrow('не JSON')
   })
 
   it('свой же файл читается обратно', () => {
-    const files = buildFiles(withData({ cycleEvents: [mark('a', '2026-01-01')] }))
-    const file = files.find((each) => each.path === 'cycles/2026.json')
+    const files = buildFiles(withData({ time: [block('a', '2026-01-01')] }))
+    const file = files.find((each) => each.path === 'time/2026.json')
     expect(parseFile(file?.path ?? '', file?.content ?? '')[0]?.id).toBe('a')
   })
 })

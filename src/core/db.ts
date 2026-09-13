@@ -27,20 +27,19 @@ import { nowIso } from './dates.ts'
 import { SCHEMA_VERSION, SYNCED_STORES, migrations } from './model.ts'
 import type { Base, Migration, StoreRecord, SyncedStore } from './model.ts'
 
-const DB_NAME = 'dnevniki'
+// Своё имя, не 'dnevniki': оба приложения живут на одном origin
+// goigolden88.github.io, а IndexedDB общая на origin и различается только
+// именем базы (02-Архитектура, «Локальное хранилище»).
+const DB_NAME = 'deluvremya'
 
 /** Индексы сверх `updatedAt`, который заводится на каждом хранилище. */
 const INDEXES: Record<SyncedStore, readonly string[]> = {
-  items: [],
-  // Заводит миграция 2, а не `createStores`; индексов сверх `updatedAt` нет.
   categories: [],
-  tags: [],
+  presets: [],
   templates: [],
-  cycleEvents: ['date', 'itemId'], // itemId — история позиции, Этап 1
-  episodes: ['start'],
-  measures: ['date', 'metric'],
-  sessions: ['date'],
-  content: ['start'],
+  notes: ['capturedOn', 'plannedFor'],
+  time: ['date'],
+  reviews: ['weekStart'],
 }
 
 /** Откуда пришла запись. Определяет, двигать ли `updatedAt` и метить ли грязной. */
@@ -218,14 +217,12 @@ export async function createLegacyBase(
  * миграции на свежей базе споткнулся бы о хранилище, которое уже есть.
  */
 const V1_STORES: readonly SyncedStore[] = [
-  'items',
-  'tags',
+  'categories',
+  'presets',
   'templates',
-  'cycleEvents',
-  'episodes',
-  'measures',
-  'sessions',
-  'content',
+  'notes',
+  'time',
+  'reviews',
 ]
 
 function createStores(database: IDBDatabase): void {
@@ -488,7 +485,7 @@ function parseSnapshot(text: string): Snapshot {
 
   const raw = value as Partial<Snapshot>
   if (typeof raw.schemaVersion !== 'number') {
-    throw new Error('В файле нет версии схемы — это не слепок Дневников')
+    throw new Error('В файле нет версии схемы — это не слепок «Делу Время»')
   }
   if (typeof raw.data !== 'object' || raw.data === null) {
     throw new Error('В файле нет данных')

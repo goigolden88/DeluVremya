@@ -40,15 +40,14 @@ type Place<S extends SyncedStore> =
  * Новый модуль дописывает сюда строку.
  */
 const PLACES: { [S in SyncedStore]: Place<S> } = {
-  items: { split: 'none', path: 'items.json' },
   categories: { split: 'none', path: 'categories.json' },
-  tags: { split: 'none', path: 'tags.json' },
+  presets: { split: 'none', path: 'presets.json' },
   templates: { split: 'none', path: 'templates.json' },
-  cycleEvents: { split: 'year', dir: 'cycles', dateOf: (event) => event.date },
-  episodes: { split: 'none', path: 'health/episodes.json' },
-  measures: { split: 'none', path: 'health/measures.json' },
-  sessions: { split: 'none', path: 'health/sessions.json' },
-  content: { split: 'year', dir: 'content', dateOf: (entry) => entry.start },
+  // Год — по дате записи, а не по дню в плане: мысль, записанная в марте
+  // и поднятая в план в июне, остаётся мартовской. Без даты — undated (Р-08).
+  notes: { split: 'year', dir: 'notes', dateOf: (note) => note.capturedOn },
+  time: { split: 'year', dir: 'time', dateOf: (block) => block.date },
+  reviews: { split: 'none', path: 'reviews.json' },
 }
 
 /** Версия схемы лежит отдельным файлом — по ней проверяется совместимость. */
@@ -223,7 +222,7 @@ export function parseMeta(text: string): number {
   }
   const version = (value as { schemaVersion?: unknown } | null)?.schemaVersion
   if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-    throw new Error('В meta.json нет версии схемы. Это не репозиторий Дневников')
+    throw new Error('В meta.json нет версии схемы. Это не репозиторий «Делу Время»')
   }
   return version
 }
