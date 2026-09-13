@@ -462,6 +462,12 @@ export async function syncNow(): Promise<SyncResult | null> {
     const config = await readConfig()
     if (!configured(config)) {
       await refreshStatus()
+      // Отпустить проход и здесь: `finally` ниже эту ветку не накрывает.
+      // Без этой строки первый вызов при выключенной синхронизации — а он
+      // случается на старте — занимал `running` навсегда, и включённая
+      // потом синхронизация отвечала «не заполнены» до перезапуска
+      // приложения. Поймал прогон «Делу Время»; в «Дневниках» так же.
+      running = null
       return null
     }
 
