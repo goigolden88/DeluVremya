@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
-import { formatDateLong, today } from '../core/dates.ts'
+import { formatDateLong } from '../core/dates.ts'
 import { IosNote } from '../ui/Install.tsx'
+import { useToday } from '../ui/useToday.ts'
 import { useFirstRun } from './useFirstRun.ts'
 import { Welcome } from './Welcome.tsx'
 
@@ -11,6 +12,7 @@ import { Welcome } from './Welcome.tsx'
  */
 export function Today() {
   const first = useFirstRun()
+  const day = useToday()
 
   return (
     <>
@@ -23,7 +25,7 @@ export function Today() {
             </Link>
           </div>
         </div>
-        <p className="muted">{formatDateLong(today())}</p>
+        <p className="muted">{formatDateLong(day)}</p>
       </header>
 
       {/* Первый запуск: пока база пуста и приветствие не закрыли. */}
