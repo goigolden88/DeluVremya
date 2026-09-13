@@ -10,12 +10,17 @@ import {
   formatDateLoose,
   formatDateOrMonth,
   formatMonth,
+  formatPeriod,
+  inPeriod,
   isDateStr,
   parseDate,
+  periodDays,
   plural,
   timeSpan,
   toDateStr,
   today,
+  weekPeriod,
+  weekStart,
 } from './dates.ts'
 
 describe('parseDate', () => {
@@ -241,5 +246,46 @@ describe('formatMonth и formatDateOrMonth', () => {
     expect(formatDateOrMonth('2026-13')).toBe('2026-13')
     expect(formatMonth('2026-01-05')).toBe('2026-01-05')
     expect(formatDateOrMonth('')).toBe('')
+  })
+})
+
+describe('недели и промежутки — Р-41, Р-52', () => {
+  it('понедельник недели: сам понедельник, середина, воскресенье', () => {
+    // 14.09.2026 — понедельник, 13.09.2026 — воскресенье.
+    expect(weekStart('2026-09-14')).toBe('2026-09-14')
+    expect(weekStart('2026-09-17')).toBe('2026-09-14')
+    expect(weekStart('2026-09-13')).toBe('2026-09-07')
+  })
+
+  it('неделя через границу месяца и года', () => {
+    expect(weekPeriod('2026-09-02')).toEqual({ from: '2026-08-31', to: '2026-09-06' })
+    // 01.01.2026 — четверг.
+    expect(weekPeriod('2026-01-01')).toEqual({ from: '2025-12-29', to: '2026-01-04' })
+  })
+
+  it('день в промежутке — концы включительно, кривая строка — нет', () => {
+    const week = { from: '2026-09-07', to: '2026-09-13' }
+    expect(inPeriod('2026-09-07', week)).toBe(true)
+    expect(inPeriod('2026-09-13', week)).toBe(true)
+    expect(inPeriod('2026-09-14', week)).toBe(false)
+    expect(inPeriod('2026-09-1', week)).toBe(false)
+    expect(inPeriod('2026-09-10x', week)).toBe(false)
+  })
+
+  it('дни промежутка по порядку, через конец месяца', () => {
+    expect(periodDays({ from: '2026-02-27', to: '2026-03-02' })).toEqual([
+      '2026-02-27',
+      '2026-02-28',
+      '2026-03-01',
+      '2026-03-02',
+    ])
+    expect(periodDays({ from: '2026-09-07', to: '2026-09-07' })).toEqual(['2026-09-07'])
+  })
+
+  it('подпись промежутка не повторяет общий месяц и год', () => {
+    expect(formatPeriod({ from: '2026-09-07', to: '2026-09-13' })).toBe('7–13 сентября 2026')
+    expect(formatPeriod({ from: '2026-08-31', to: '2026-09-06' })).toBe('31 августа – 6 сентября 2026')
+    expect(formatPeriod({ from: '2025-12-29', to: '2026-01-04' })).toBe('29 декабря 2025 – 4 января 2026')
+    expect(formatPeriod({ from: '2026-09-07', to: '2026-09-07' })).toBe('7 сентября 2026')
   })
 })

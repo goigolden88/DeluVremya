@@ -224,6 +224,54 @@ export function addDays(d: DateStr, n: number): DateStr {
   return toDateStr(date)
 }
 
+// ─── Недели и промежутки ───────────────────────────────────────────────────
+// Своё «Делу Время»: обзор недели (Р-41) и итоги за промежуток (Р-52).
+
+/**
+ * Промежуток дней, оба конца включительно. Итоги обзора считаются по нему,
+ * а не по «неделе»: на тех же расчётах встанут месяц и год (Р-52).
+ */
+export type Period = { from: DateStr; to: DateStr }
+
+/** Понедельник недели, в которую входит день: неделя — с понедельника (Р-41). */
+export function weekStart(d: DateStr): DateStr {
+  // У `getDay` воскресенье — ноль; сдвиг до понедельника: пн 0 … вс 6.
+  return addDays(d, -((toDate(d).getDay() + 6) % 7))
+}
+
+/** Неделя, в которую входит день: понедельник — воскресенье. */
+export function weekPeriod(d: DateStr): Period {
+  const from = weekStart(d)
+  return { from, to: addDays(from, 6) }
+}
+
+/** Лежит ли день в промежутке. Кривая строка — нет: сравнение строк её бы пропустило. */
+export function inPeriod(d: string, period: Period): boolean {
+  return isDateStr(d) && d >= period.from && d <= period.to
+}
+
+/** Дни промежутка по порядку. */
+export function periodDays(period: Period): DateStr[] {
+  const list: DateStr[] = []
+  for (let day = period.from; day <= period.to; day = addDays(day, 1)) list.push(day)
+  return list
+}
+
+/**
+ * `7–13 сентября 2026`, `31 августа – 6 сентября 2026`,
+ * `29 декабря 2025 – 4 января 2026`. Общий месяц и год не повторяются.
+ */
+export function formatPeriod({ from, to }: Period): string {
+  if (from === to) return formatDateLong(from)
+  const start = toDate(from)
+  const end = toDate(to)
+  if (start.getFullYear() !== end.getFullYear()) return `${formatDateLong(from)} – ${formatDateLong(to)}`
+  if (start.getMonth() !== end.getMonth()) {
+    return `${start.getDate()} ${MONTHS_GENITIVE[start.getMonth()]} – ${formatDateLong(to)}`
+  }
+  return `${start.getDate()}–${formatDateLong(to)}`
+}
+
 /**
  * Последний день месяца: `2026-02` → `2026-02-28`. Для месячных дат
  * (Р-25), когда сомнение толкуется в пользу позднего дня.
