@@ -763,6 +763,45 @@ async function scenario() {
   await sleep(1000)
   check('копия восстанавливается из файла', has(await screen(), 'Загружено записей: 1'))
 
+  // ─ Импорт записей (Этап 1, п. 6): свой формат, сводка до записи,
+  // только добавляет. Новая категория, повтор уже загруженного, кривая дата.
+  await unfold('Импорт записей')
+  const importFile = JSON.stringify({
+    format: 'deluvremya-import',
+    version: 1,
+    time: [
+      { date: '2026-02-03', category: 'Бег', minutes: 30 },
+      { date: '2026-02-03', category: 'чтение', minutes: 45, background: 'Ютуб' },
+      { date: '2026-02-03', category: 'Чтение', minutes: 45 },
+      { date: '03.02.2026', category: 'Чтение', minutes: 20 },
+    ],
+  })
+  await act(`
+    set(document.querySelector('.import__text'), ${JSON.stringify(importFile)});
+    byText('button', 'Разобрать')?.click();
+  `)
+  await sleep(700)
+  const planned = await screen()
+  check(
+    'импорт: до записи — что добавится, что уже есть, что не разобрано',
+    has(planned, 'Добавится: 2 блока времени, 1 категория') &&
+      has(planned, 'пропущено, не перезаписано: 1') &&
+      has(planned, 'Не разобрано — в базу не попадёт: 1') &&
+      has(planned, 'не ГГГГ-ММ-ДД'),
+    `${line(planned, 'Добавится')}; ${line(planned, 'Не разобрано')}`,
+  )
+  await act(`startsWith('button', 'Загрузить')?.click()`)
+  await sleep(1000)
+  check('импорт пишет по кнопке', has(await screen(), 'Загружено записей: 3'))
+  await go('/time?day=2026-02-03')
+  const imported = await screen()
+  check(
+    'импортированный день виден на «Времени», фоновая — отдельно',
+    has(imported, 'Учтено 1 ч 15 мин · 2 блока') && has(imported, 'Фоном, в сумму не входит: Ютуб 45 мин'),
+    line(imported, 'Учтено'),
+  )
+  await go('/settings')
+
   await go('/inbox')
   const merged = await screen()
   check(

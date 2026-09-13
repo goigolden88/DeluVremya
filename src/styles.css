@@ -665,6 +665,36 @@ a {
   color: var(--error);
 }
 
+/* ─── Импорт записей ─────────────────────────────────────────────────────── */
+
+.import {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Поле под ответ ИИ: JSON длинный, шрифт как у поля формы. */
+.import__text {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+
+/* Сам промпт: виден целиком и выделяется руками, если буфер не дался. */
+.prompt {
+  white-space: pre-wrap;
+  font-size: 12px;
+  max-height: 320px;
+  overflow: auto;
+}
+
 /* Листание дней на «Времени» (Р-25): стрелки по краям, дата посередине. */
 .day-nav {
   display: flex;

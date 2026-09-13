@@ -8,19 +8,10 @@ import { importPrompt, planImport } from '../registry.ts'
 import { Fold } from '../ui/Fold.tsx'
 
 /**
- * Справочники раньше событий, которые на них ссылаются: прерванная
- * посередине запись оставит категорию без позиций, а не отметку без позиции.
+ * Справочники раньше записей, которые на них ссылаются: прерванная
+ * посередине запись оставит категорию без блоков, а не блок без категории.
  */
-const WRITE_ORDER: readonly SyncedStore[] = [
-  'categories',
-  'tags',
-  'items',
-  'content',
-  'cycleEvents',
-  'episodes',
-  'measures',
-  'sessions',
-]
+const WRITE_ORDER: readonly SyncedStore[] = ['categories', 'presets', 'templates', 'notes', 'time', 'reviews']
 
 /** Сколько строк отчёта показывать. Остальные — числом. */
 const ISSUE_LINES = 20
@@ -82,7 +73,7 @@ export function ImportRecords({ onChanged }: { onChanged: () => Promise<void> })
   return (
     <div className="import">
       <p className="muted">
-        Записи из других дневников и сервисов. Файл готовится по промпту ниже — например, с ИИ.
+        Записи из таблиц, заметок и других сервисов. Файл готовится по промпту ниже — например, с ИИ.
         Импорт только добавляет: то, что уже есть, не перезаписывается, и повторная загрузка
         ничего не удвоит.
       </p>

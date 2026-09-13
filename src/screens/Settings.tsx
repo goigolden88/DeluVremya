@@ -21,6 +21,7 @@ import { Fold } from '../ui/Fold.tsx'
 import { InstallNote } from '../ui/Install.tsx'
 import { useSyncStatus } from '../ui/useSync.ts'
 import { isEmptyBase } from './firstRun.ts'
+import { ImportRecords } from './ImportRecords.tsx'
 
 const LABELS: Record<SyncedStore, string> = {
   categories: 'Категории',
@@ -268,6 +269,11 @@ function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
           Восстановление не стирает то, что уже есть: записи сливаются по времени правки,
           побеждает более поздняя.
         </p>
+      </Fold>
+
+      {/* Чужие записи — свой вход: копия приложения сюда не принимается (Р-08). */}
+      <Fold id="settings:transfer:import" title="Импорт записей" sub folded>
+        <ImportRecords onChanged={onChanged} />
       </Fold>
 
       {/* .txt — копия, отправленная через «Поделиться» (см. deliver). */}
