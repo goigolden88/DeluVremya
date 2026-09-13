@@ -567,6 +567,19 @@ a {
   align-self: flex-start;
 }
 
+/* «Удалить» и выбор, куда перенести блоки, — отдельной строкой под кнопками. */
+.cat__remove {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.cat__remove .form {
+  align-self: stretch;
+}
+
 /* ─── Учёт времени ───────────────────────────────────────────────────────── */
 
 .presets {
@@ -623,6 +636,14 @@ a {
   gap: 12px;
   min-height: 44px;
   border-bottom: 1px solid var(--line);
+}
+
+/* Заметка блока — под строкой, мелко: в несколько строк, и не раздвигает экран. */
+.tblock__note {
+  margin: 4px 0 6px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .tblock__main {

@@ -47,6 +47,8 @@ export type BlockDraft = {
   date: string
   /** Фоновая активность: покер под ютуб. Нет — без фоновой. */
   bgCategoryId?: string
+  /** Заметка к блоку, обрезанная. Нет — без заметки. */
+  note?: string
 }
 
 export type BlockProblem = 'category' | 'minutes' | 'date' | 'future' | 'same-bg'
@@ -67,8 +69,8 @@ export function blockProblem(draft: BlockDraft, today: DateStr): BlockProblem | 
 
 /**
  * Блок из черновика. Правка сохраняет id и прочие поля блока — меняется
- * ровно то, что есть в форме. Фоновая в форме есть всегда: убранная
- * там — убирается и из блока.
+ * ровно то, что есть в форме. Фоновая и заметка в форме есть всегда:
+ * убранные там — убираются и из блока.
  */
 export function blockFromDraft(draft: BlockDraft, existing?: TimeBlock): TimeBlock {
   const block: TimeBlock = {
@@ -79,6 +81,8 @@ export function blockFromDraft(draft: BlockDraft, existing?: TimeBlock): TimeBlo
   }
   if (draft.bgCategoryId) block.bgCategoryId = draft.bgCategoryId
   else delete block.bgCategoryId
+  if (draft.note) block.note = draft.note
+  else delete block.note
   return block
 }
 

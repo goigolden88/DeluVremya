@@ -126,6 +126,14 @@ export function Categories() {
                         Вернуть
                       </button>
                     </div>
+                    {/* Из архива удаляется так же, как рабочая: возвращать ради этого незачем. */}
+                    <RemoveCategory
+                      category={category}
+                      categories={catalog.categories}
+                      presets={catalog.presets}
+                      blocks={time.blocks}
+                      save={save}
+                    />
                   </li>
                 ))}
               </ul>
@@ -161,21 +169,7 @@ function CategoryRow({
   const [name, setName] = useState(category.name)
   const [minutes, setMinutes] = useState('')
   const [problem, setProblem] = useState('')
-  /** Выбор, куда перенести блоки перед удалением. Null — не удаляем. */
-  const [moving, setMoving] = useState<string | null>(null)
   const own = presetsOf(presets, category.id)
-  const used = blocksUsing(blocks, category.id)
-  const targets = activeCategories(categories).filter((each) => each.id !== category.id)
-
-  function remove(moveTo: string | null) {
-    if (used > 0 && moveTo === null) {
-      setMoving('')
-      return
-    }
-    if (used === 0 && !window.confirm(deleteConfirm(category.name))) return
-    const plan = removeCategoryPlan(categories, presets, blocks, category.id, moveTo)
-    if (plan) void save(() => writeRemoval(plan))
-  }
 
   function rename() {
     const found = nameProblem(categories, name, category.id)
@@ -316,45 +310,86 @@ function CategoryRow({
             >
               В архив
             </button>
-            <button type="button" className="btn btn--danger" onClick={() => remove(null)}>
-              Удалить
-            </button>
           </div>
 
-          {moving !== null && (
-            <div className="form">
-              <p>{moveLine(category.name, used)}</p>
-              <select
-                name="move-target"
-                aria-label="Куда перенести блоки"
-                value={moving}
-                onChange={(event) => setMoving(event.target.value)}
-              >
-                <option value="">— выберите категорию —</option>
-                {targets.map((each) => (
-                  <option key={each.id} value={each.id}>
-                    {each.name}
-                  </option>
-                ))}
-              </select>
-              <div className="form__actions">
-                <button type="button" className="btn" onClick={() => setMoving(null)}>
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--danger"
-                  disabled={!moving}
-                  onClick={() => remove(moving)}
-                >
-                  Перенести и удалить
-                </button>
-              </div>
-            </div>
-          )}
+          <RemoveCategory category={category} categories={categories} presets={presets} blocks={blocks} save={save} />
         </div>
       )}
     </li>
+  )
+}
+
+/**
+ * Удаление категории (Р-22): пустой — после подтверждения, с блоками —
+ * только переносом их в другую рабочую. Одно и то же для рабочей
+ * и архивной.
+ */
+function RemoveCategory({
+  category,
+  categories,
+  presets,
+  blocks,
+  save,
+}: {
+  category: Category
+  categories: Category[]
+  presets: Preset[]
+  blocks: TimeBlock[]
+  save: Save
+}) {
+  /** Выбор, куда перенести блоки перед удалением. Null — не удаляем. */
+  const [moving, setMoving] = useState<string | null>(null)
+  const used = blocksUsing(blocks, category.id)
+  const targets = activeCategories(categories).filter((each) => each.id !== category.id)
+
+  function remove(moveTo: string | null) {
+    if (used > 0 && moveTo === null) {
+      setMoving('')
+      return
+    }
+    if (used === 0 && !window.confirm(deleteConfirm(category.name))) return
+    const plan = removeCategoryPlan(categories, presets, blocks, category.id, moveTo)
+    if (plan) void save(() => writeRemoval(plan))
+  }
+
+  return (
+    <div className="cat__remove">
+      <button
+        type="button"
+        className="btn btn--danger"
+        aria-label={`Удалить категорию «${category.name}»`}
+        onClick={() => remove(null)}
+      >
+        Удалить
+      </button>
+
+      {moving !== null && (
+        <div className="form">
+          <p>{moveLine(category.name, used)}</p>
+          <select
+            name="move-target"
+            aria-label="Куда перенести блоки"
+            value={moving}
+            onChange={(event) => setMoving(event.target.value)}
+          >
+            <option value="">— выберите категорию —</option>
+            {targets.map((each) => (
+              <option key={each.id} value={each.id}>
+                {each.name}
+              </option>
+            ))}
+          </select>
+          <div className="form__actions">
+            <button type="button" className="btn" onClick={() => setMoving(null)}>
+              Отмена
+            </button>
+            <button type="button" className="btn btn--danger" disabled={!moving} onClick={() => remove(moving)}>
+              Перенести и удалить
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

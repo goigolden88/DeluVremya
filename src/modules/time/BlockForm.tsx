@@ -53,6 +53,7 @@ export function BlockForm({
   const [minutes, setMinutes] = useState(String(existing?.minutes ?? (categoryId ? suggest(categoryId) : DEFAULT_MINUTES)))
   const [date, setDate] = useState(existing?.date ?? defaultDate ?? today)
   const [background, setBackground] = useState(existing?.bgCategoryId ?? '')
+  const [note, setNote] = useState(existing?.note ?? '')
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -78,7 +79,8 @@ export function BlockForm({
 
   function save() {
     const base = { categoryId, minutes: Number(minutes), date }
-    const draft = background ? { ...base, bgCategoryId: background } : base
+    const withBackground = background ? { ...base, bgCategoryId: background } : base
+    const draft = note.trim() ? { ...withBackground, note: note.trim() } : withBackground
     const found = blockProblem(draft, today)
     if (found) {
       setProblem(BLOCK_PROBLEMS[found])
@@ -168,6 +170,11 @@ export function BlockForm({
           ))}
         </div>
       </div>
+
+      <label className="field">
+        <span>Заметка — необязательно</span>
+        <textarea name="block-note" rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
+      </label>
 
       {problem && <p className="error">{problem}</p>}
 

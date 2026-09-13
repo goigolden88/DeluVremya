@@ -624,6 +624,12 @@ async function scenario() {
   await act(`byText('button', 'Перенести и удалить')?.click()`)
   await sleep(700)
   check('категория с блоками удалена после переноса', !has(await screen(), 'Шахматы'))
+
+  // Архивную — прямо из архива, возвращать ради этого незачем.
+  await unfold('Архив')
+  await act(`window.confirm = () => true; document.querySelector('[aria-label="Удалить категорию «Покер»"]')?.click()`)
+  await sleep(700)
+  check('архивная категория удаляется прямо из архива', !has(await screen(), 'Покер'))
   await go('/time')
   const transferred = await screen()
   check(
@@ -672,6 +678,22 @@ async function scenario() {
 
   await go('/time?day=2099-01-01')
   check('будущий день в адресе — сегодня', has(await screen(), 'Учтено 2 ч 5 мин · 3 блока'))
+
+  // ─ Заметка блока: пишется в правке, видна в списке дня.
+  await act(`startsWith('button', 'Прогулка ·')?.click()`)
+  await sleep(400)
+  await act(`
+    const form = [...document.querySelectorAll('input[name=block-minutes]')].find((el) => el.value === '40').closest('form');
+    set(form.querySelector('textarea[name=block-note]'), 'по набережной');
+    form.querySelector('button[type=submit]').click();
+  `)
+  await sleep(700)
+  const noted = await screen()
+  check(
+    'заметка блока пишется в правке и видна в списке дня',
+    has(noted, 'по набережной') && has(noted, 'Учтено 2 ч 5 мин · 3 блока'),
+    line(noted, 'набережной'),
+  )
 
   // ─ Настройки: разделы свёрнуты оглавлением, у свёрнутой копии — итог.
   // Шестерёнка живёт в шапке «Сегодня».

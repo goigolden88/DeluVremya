@@ -242,6 +242,7 @@ function DayBlocks({
                   Убрать
                 </button>
               </div>
+              {block.note && <p className="muted tblock__note">{block.note}</p>}
               {open && (
                 <BlockForm
                   categories={categories}

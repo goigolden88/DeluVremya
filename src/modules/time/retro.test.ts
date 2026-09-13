@@ -64,23 +64,32 @@ describe('блок из черновика', () => {
   })
 
   it('правка — тот же id, поля вне формы на месте', () => {
-    const existing = block('X', 30, { bgCategoryId: 'p', note: 'под подкаст' })
-    expect(blockFromDraft({ categoryId: 'b', minutes: 45, date: '2026-09-12', bgCategoryId: 'q' }, existing)).toEqual({
+    const existing = block('X', 30, { bgCategoryId: 'p', note: 'под подкаст', refs: ['r1'] })
+    expect(
+      blockFromDraft({ categoryId: 'b', minutes: 45, date: '2026-09-12', bgCategoryId: 'q', note: 'Толстой' }, existing),
+    ).toEqual({
       ...existing,
       categoryId: 'b',
       minutes: 45,
       date: '2026-09-12',
       bgCategoryId: 'q',
+      note: 'Толстой',
     })
   })
 
-  it('фоновую убрали в форме — уходит и из блока', () => {
-    const existing = block('X', 30, { bgCategoryId: 'p', note: 'под подкаст' })
+  it('фоновую и заметку убрали в форме — уходят и из блока', () => {
+    const existing = block('X', 30, { bgCategoryId: 'p', note: 'под подкаст', refs: ['r1'] })
     const edited = blockFromDraft({ categoryId: 'a', minutes: 30, date: TODAY }, existing)
     expect('bgCategoryId' in edited).toBe(false)
-    expect(edited.note).toBe('под подкаст')
+    expect('note' in edited).toBe(false)
+    expect(edited.refs).toEqual(['r1'])
     // Исходный блок не тронут: правка — новая запись, а не порча старой.
     expect(existing.bgCategoryId).toBe('p')
+    expect(existing.note).toBe('под подкаст')
+  })
+
+  it('новый с заметкой — заметка в блоке', () => {
+    expect(blockFromDraft({ categoryId: 'a', minutes: 30, date: TODAY, note: 'Толстой' }).note).toBe('Толстой')
   })
 })
 
