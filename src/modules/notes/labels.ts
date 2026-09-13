@@ -278,6 +278,11 @@ export function staleLead(count: number, threshold: number): string {
   return `Висят ${days(threshold)} и дольше: ${tasksText(count)}`
 }
 
+/** Висяков нет — сказано, от какого порога. */
+export function staleNone(threshold: number): string {
+  return `Висяков нет: ни одно дело не лежит в «${UNSORTED_TITLE}» ${days(threshold)} и дольше`
+}
+
 /** Остальные висяки — числом, а не молча (Р-46). */
 export function staleRest(count: number): string {
   return `Ещё ${tasksText(count)} — в следующий раз`

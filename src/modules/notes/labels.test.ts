@@ -23,6 +23,7 @@ import {
   repeatText,
   shownText,
   staleLead,
+  staleNone,
   staleRest,
 } from './labels.ts'
 import type { PlanFact } from './period.ts'
@@ -64,6 +65,7 @@ describe('тексты обзора недели — Р-44, Р-46, Р-49', () =>
   it('повтор, висяки, возврат', () => {
     expect(repeatText({ text: 'Зарядка', days: 6, done: 4 })).toBe('Зарядка — 4 из 6 дней')
     expect(staleLead(7, 30)).toBe('Висят 30 дней и дольше: 7 дел')
+    expect(staleNone(28)).toBe('Висяков нет: ни одно дело не лежит в «Неразобранное» 28 дней и дольше')
     expect(staleRest(1)).toBe('Ещё 1 дело — в следующий раз')
     expect(recallTitle(4, { from: '2026-08-10', to: '2026-08-16' })).toBe('4 недели назад · 10–16 августа 2026')
   })

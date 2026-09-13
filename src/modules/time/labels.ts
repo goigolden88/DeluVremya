@@ -10,10 +10,12 @@ import {
   MAX_NORM_DAYS,
   MAX_NORM_MINUTES,
   NORM_RULES,
+  type KindTotal,
   type Norm,
   type NormCheck,
   type NormProblem,
   type NormRule,
+  type PeriodSummary,
 } from './period.ts'
 import type { BlockProblem } from './retro.ts'
 
@@ -179,6 +181,27 @@ export function checkText(check: NormCheck): string {
 /** Вместо серии (Р-45): в скольких из последних недель норма выполнена. */
 export function keptText(kept: number, weeks: number): string {
   return `выполнена в ${kept} из ${weeks} ${plural(weeks, ['недели', 'недель', 'недель'])}`
+}
+
+// ─── Итог промежутка (Р-43) ────────────────────────────────────────────────
+
+/** Итог промежутка — с основанием: сколько блоков и в скольких днях из наступивших. */
+export function periodLine(summary: PeriodSummary): string {
+  if (summary.count === 0) return 'Ничего не учтено'
+  const days = `учёт был в ${summary.days} ${plural(summary.days, ['дне', 'днях', 'днях'])} из ${summary.elapsedDays}`
+  return `Учтено ${formatMinutes(summary.total)} · ${summary.count} ${blocksWord(summary.count)} · ${days}`
+}
+
+/** По признаку категории — только в обзоре (Р-05). */
+export function kindLine(byKind: readonly KindTotal[]): string {
+  return byKind
+    .map((each) => `${each.kind === null ? 'без признака' : KIND_LABELS[each.kind]} ${formatMinutes(each.minutes)}`)
+    .join(' · ')
+}
+
+/** Фоновое у категории — отдельно и не в сумме (Р-43). */
+export function backgroundText(minutes: number): string {
+  return `ещё ${formatMinutes(minutes)} фоном`
 }
 
 /** Пояснение к блоку «Неделя» на экране учёта. */

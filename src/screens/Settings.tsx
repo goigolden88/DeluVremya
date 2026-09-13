@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { db } from '../core/db.ts'
-import { today } from '../core/dates.ts'
+import { days, today } from '../core/dates.ts'
 import { SCHEMA_VERSION, SYNCED_STORES } from '../core/model.ts'
 import type { SyncedStore } from '../core/model.ts'
 import {
@@ -23,8 +23,11 @@ import { SyncSettings } from '../ui/SyncSettings.tsx'
 import { useSyncStatus } from '../ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
+import { UNSORTED_TITLE } from '../modules/notes/labels.ts'
 import { isEmptyBase } from './firstRun.ts'
 import { ImportRecords } from './ImportRecords.tsx'
+import { DEFAULT_THRESHOLDS, readThreshold, THRESHOLD_PROBLEM, type Thresholds } from './review.ts'
+import { readThresholds, saveThresholds } from './useReview.ts'
 
 const LABELS: Record<SyncedStore, string> = {
   categories: 'Категории',
@@ -90,6 +93,8 @@ export function Settings() {
       <DataTransfer onChanged={load} />
 
       <Reminders />
+
+      <ReviewSection />
 
       <ScreenNamesSection />
 
@@ -415,6 +420,94 @@ function ScreenNamesSection() {
           </button>
         </div>
       </form>
+    </Fold>
+  )
+}
+
+// ─── Обзор недели (Р-48) ──────────────────────────────────────────────────
+
+/**
+ * Пороги разбора в обзоре: висяк и замысел без движения. У свёрнутого —
+ * нынешние пороги. Пороги — этого устройства: синхронизируемых настроек нет.
+ */
+function ReviewSection() {
+  const [current, setCurrent] = useState<Thresholds | null>(null)
+  const [draft, setDraft] = useState<{ stale: string; goal: string } | null>(null)
+  const [note, setNote] = useState('')
+
+  useEffect(() => {
+    void readThresholds()
+      .catch(() => DEFAULT_THRESHOLDS)
+      .then((read) => {
+        setCurrent(read)
+        setDraft({ stale: String(read.stale), goal: String(read.goal) })
+      })
+  }, [])
+
+  async function save() {
+    if (!draft) return
+    const stale = readThreshold(draft.stale)
+    const goal = readThreshold(draft.goal)
+    if (stale === null || goal === null) {
+      setNote(THRESHOLD_PROBLEM)
+      return
+    }
+    setNote('')
+    try {
+      await saveThresholds({ stale, goal })
+      setCurrent({ stale, goal })
+      setNote('Сохранено')
+    } catch (failure) {
+      setNote(describe(failure))
+    }
+  }
+
+  return (
+    <Fold
+      id="settings:review"
+      title="Обзор недели"
+      summary={current ? `висяки — ${days(current.stale)}, замыслы — ${days(current.goal)}` : undefined}
+      folded
+    >
+      {draft && (
+        <form
+          className="form"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault()
+            void save()
+          }}
+        >
+          <label className="field">
+            <span>Висяк — дело лежит в «{UNSORTED_TITLE}» столько дней и дольше</span>
+            <input
+              name="review-stale"
+              inputMode="numeric"
+              value={draft.stale}
+              onChange={(event) => setDraft({ ...draft, stale: event.target.value })}
+            />
+          </label>
+          <label className="field">
+            <span>Замысел без движения — ни одного дела столько дней</span>
+            <input
+              name="review-goal"
+              inputMode="numeric"
+              value={draft.goal}
+              onChange={(event) => setDraft({ ...draft, goal: event.target.value })}
+            />
+          </label>
+          <p className="muted">
+            По умолчанию — {days(DEFAULT_THRESHOLDS.stale)} и {days(DEFAULT_THRESHOLDS.goal)}. Пороги — этого
+            устройства: на телефоне и компьютере они свои.
+          </p>
+          {note && <p className="muted">{note}</p>}
+          <div className="form__actions">
+            <button type="submit" className="btn btn--primary">
+              Сохранить
+            </button>
+          </div>
+        </form>
+      )}
     </Fold>
   )
 }

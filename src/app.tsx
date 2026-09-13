@@ -4,6 +4,7 @@ import { startAutoSync } from './core/sync.ts'
 import { Layout } from './ui/Layout.tsx'
 import { Today } from './screens/Today.tsx'
 import { Inbox } from './screens/Inbox.tsx'
+import { Review } from './screens/Review.tsx'
 import { Settings } from './screens/Settings.tsx'
 import { Templates } from './modules/notes/Templates.tsx'
 import { Categories } from './modules/time/Categories.tsx'
@@ -36,6 +37,8 @@ export function App() {
           <Route path="time" element={<TimeScreen />} />
           <Route path="time/categories" element={<Categories />} />
           <Route path="templates" element={<Templates />} />
+          {/* Обзор недели (Р-41): неделя — в `?week=`, без него — неделя к обзору. */}
+          <Route path="review" element={<Review />} />
           {/* Незнакомый адрес — на главный. Так и ярлык на экран, которого
               ещё нет, открывает приложение, а не пустоту. */}
           <Route path="*" element={<Navigate to="/" replace />} />

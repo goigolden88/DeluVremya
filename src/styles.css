@@ -976,3 +976,9 @@ span.plan-item__text {
   font-size: 16px;
   text-align: center;
 }
+
+/* Обзор недели: мысль возврата и наблюдение — как записаны, с переносами строк. */
+.recall {
+  white-space: pre-wrap;
+  padding-block: 4px;
+}

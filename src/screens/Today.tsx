@@ -10,6 +10,7 @@ import { useScreenNames } from '../ui/useScreenNames.ts'
 import { PlanDay } from '../modules/notes/PlanDay.tsx'
 import { windowLeft } from '../modules/time/day.ts'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
+import { ReviewCall } from './Review.tsx'
 import { useFirstRun } from './useFirstRun.ts'
 import { Welcome } from './Welcome.tsx'
 
@@ -59,6 +60,9 @@ export function Today() {
         </section>
       )}
 
+      {/* В воскресенье и понедельник, пока обзор недели не проведён (Р-41). */}
+      <ReviewCall today={day} />
+
       <PlanDay today={day} left={windowLeft(day, now)} />
 
       {/* Учёт времени: кнопки и итог дня. Список блоков — на экране учёта. */}
@@ -68,6 +72,11 @@ export function Today() {
           <Link to="/time">Все блоки дня →</Link>
         </p>
       </Fold>
+
+      {/* Обзор — не вкладка: его открывают раз в неделю (Р-41). */}
+      <p className="muted">
+        <Link to="/review">Обзор недели →</Link>
+      </p>
     </>
   )
 }
