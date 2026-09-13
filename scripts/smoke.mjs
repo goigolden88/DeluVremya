@@ -840,12 +840,18 @@ async function scenario() {
   await act(`startsWith('button', 'Загрузить')?.click()`)
   await sleep(1000)
   check('импорт пишет по кнопке', has(await screen(), 'Загружено записей: 3'))
-  await go('/time?day=2026-02-03')
+  // К дню месяцы назад — полем даты, а не сотней тапов «‹» (Р-27).
+  await go('/time')
+  await act(`set(document.querySelector('input[name=day]'), '2026-02-03')`)
+  await sleep(700)
   const imported = await screen()
+  const pickedHash = await run('location.hash')
   check(
-    'импортированный день виден на «Времени», фоновая — отдельно',
-    has(imported, 'Учтено 1 ч 15 мин · 2 блока') && has(imported, 'Фоном, в сумму не входит: Ютуб 45 мин'),
-    line(imported, 'Учтено'),
+    'импортированный день открывается полем даты, фоновая — отдельно — Р-27',
+    pickedHash === '#/time?day=2026-02-03' &&
+      has(imported, 'Учтено 1 ч 15 мин · 2 блока') &&
+      has(imported, 'Фоном, в сумму не входит: Ютуб 45 мин'),
+    `${pickedHash}; ${line(imported, 'Учтено')}`,
   )
   await go('/settings')
 

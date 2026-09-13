@@ -39,10 +39,20 @@ export function TimeScreen() {
           <button type="button" className="icon-btn" aria-label="Предыдущий день" onClick={() => show(addDays(day, -1))}>
             ‹
           </button>
-          <span className="day-nav__date">
-            {formatDateLong(day)}
-            {isToday && <span className="muted"> · сегодня</span>}
-          </span>
+          {/* Календарь — поле даты браузера (Р-27): к дню месяцы назад
+              одним выбором, а не сотней тапов «‹». */}
+          <input
+            type="date"
+            name="day"
+            className="day-nav__date"
+            aria-label="Выбрать день"
+            max={today}
+            value={day}
+            onChange={(event) => {
+              // Пустое — поле очистили крестиком: переходить некуда.
+              if (event.target.value) show(viewedDay(event.target.value, today))
+            }}
+          />
           <button
             type="button"
             className="icon-btn"
@@ -53,6 +63,10 @@ export function TimeScreen() {
             ›
           </button>
         </div>
+        <p className="muted">
+          {formatDateLong(day)}
+          {isToday && ' · сегодня'}
+        </p>
         {!isToday && (
           <button type="button" className="link-btn" onClick={() => show(today)}>
             К сегодняшнему дню
