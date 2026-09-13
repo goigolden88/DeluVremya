@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { Category, Preset } from '../../core/model.ts'
+import type { Category, Preset, TimeBlock } from '../../core/model.ts'
 import {
   activeCategories,
   archivedCategories,
+  blocksUsing,
+  removeCategoryPlan,
   categoryIdFor,
   createCategory,
   createPreset,
@@ -135,6 +137,59 @@ describe('порядок и архив', () => {
     expect(moveCategory(list, 'c', 1)).toEqual([])
     expect(moveCategory(list, 'z', 1)).toEqual([])
     expect(moveCategory(list, 'нет', 1)).toEqual([])
+  })
+})
+
+describe('удаление категории — Р-22', () => {
+  const categories = [cat('a', 'Ютуб', 0), cat('b', 'Шахматы', 1), cat('c', 'Прочее', 2), cat('x', 'Старое', 3, { deleted: true })]
+  const presets = [preset('b', 30), preset('b', 60, { deleted: true }), preset('a', 30)]
+  function block(id: string, categoryId: string, extra: Partial<TimeBlock> = {}): TimeBlock {
+    return { id, updatedAt: AT, date: '2026-09-13', categoryId, minutes: 30, ...extra }
+  }
+
+  it('блоки считаются и основные, и фоновые, удалённые — нет', () => {
+    const blocks = [block('1', 'b'), block('2', 'a', { bgCategoryId: 'b' }), block('3', 'b', { deleted: true })]
+    expect(blocksUsing(blocks, 'b')).toBe(2)
+  })
+
+  it('пустая — надгробие ей и её живым кнопкам, блоков не трогает', () => {
+    const plan = removeCategoryPlan(categories, presets, [block('1', 'a')], 'b', null)
+    expect(plan?.categories).toEqual([{ ...categories[1], deleted: true }])
+    expect(plan?.presets.map((each) => [each.id, each.deleted])).toEqual([['preset:b:30', true]])
+    expect(plan?.blocks).toEqual([])
+  })
+
+  it('с блоками и без переноса — нельзя', () => {
+    const blocks = [block('1', 'b')]
+    expect(removeCategoryPlan(categories, presets, blocks, 'b', null)).toBeNull()
+    expect(removeCategoryPlan(categories, presets, blocks, 'b', 'b')).toBeNull()
+    expect(removeCategoryPlan(categories, presets, blocks, 'b', 'x')).toBeNull()
+    expect(removeCategoryPlan(categories, presets, blocks, 'b', 'нет')).toBeNull()
+  })
+
+  it('перенос — и основной, и фоновой; совпавшая с основной фоновая снимается', () => {
+    const blocks = [
+      block('1', 'b'),
+      block('2', 'a', { bgCategoryId: 'b' }),
+      block('3', 'c', { bgCategoryId: 'b' }),
+      block('4', 'b', { bgCategoryId: 'c' }),
+      block('5', 'a'),
+    ]
+    const moved = removeCategoryPlan(categories, presets, blocks, 'b', 'c')?.blocks ?? []
+    expect(moved.map((each) => [each.id, each.categoryId, each.bgCategoryId])).toEqual([
+      ['1', 'c', undefined],
+      ['2', 'a', 'c'],
+      ['3', 'c', undefined],
+      ['4', 'c', undefined],
+    ])
+    expect(moved.every((each) => !('bgCategoryId' in each) || each.bgCategoryId !== each.categoryId)).toBe(true)
+    // Исходные блоки не тронуты: план — новые записи.
+    expect(blocks[0]?.categoryId).toBe('b')
+  })
+
+  it('удалять нечего — удалённая или неизвестная', () => {
+    expect(removeCategoryPlan(categories, presets, [], 'x', null)).toBeNull()
+    expect(removeCategoryPlan(categories, presets, [], 'нет', null)).toBeNull()
   })
 })
 

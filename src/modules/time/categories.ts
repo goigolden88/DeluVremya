@@ -7,7 +7,7 @@
  */
 
 import { nowIso } from '../../core/dates.ts'
-import type { Category, Preset } from '../../core/model.ts'
+import type { Category, Preset, TimeBlock } from '../../core/model.ts'
 
 export type CategoryKind = Category['kind']
 
@@ -134,6 +134,66 @@ export function moveCategory(categories: readonly Category[], id: string, step: 
   list[from] = b
   list[to] = a
   return list.flatMap((category, order) => (category.order === order ? [] : [{ ...category, order }]))
+}
+
+// ─── Удаление (Р-22) ───────────────────────────────────────────────────────
+
+function uses(block: TimeBlock, id: string): boolean {
+  return !block.deleted && (block.categoryId === id || block.bgCategoryId === id)
+}
+
+/** Сколько живых блоков ссылается на категорию — основной или фоновой. */
+export function blocksUsing(blocks: readonly TimeBlock[], id: string): number {
+  return blocks.filter((block) => uses(block, id)).length
+}
+
+/** Что записать, чтобы удалить категорию. */
+export type RemovePlan = { categories: Category[]; presets: Preset[]; blocks: TimeBlock[] }
+
+/**
+ * Блок переходит из `from` в `to` — и основной, и фоновой. Если фоновая
+ * совпала с основной, она снимается: один и тот же час дважды не пишется.
+ */
+function moveBlock(block: TimeBlock, from: string, to: string): TimeBlock {
+  const next = { ...block }
+  if (next.categoryId === from) next.categoryId = to
+  if (next.bgCategoryId === from) next.bgCategoryId = to
+  if (next.bgCategoryId === next.categoryId) delete next.bgCategoryId
+  return next
+}
+
+/**
+ * Удаление категории (Р-22): надгробие ей и её кнопкам. Если на неё
+ * ссылаются блоки, они сначала переходят в `moveTo` — без этого удалить
+ * нельзя, и ответ null. Null и тогда, когда удалять нечего.
+ *
+ * Перенос — это и слияние двух категорий: отдельного механизма для него нет.
+ */
+export function removeCategoryPlan(
+  categories: readonly Category[],
+  presets: readonly Preset[],
+  blocks: readonly TimeBlock[],
+  id: string,
+  moveTo: string | null,
+): RemovePlan | null {
+  const category = categories.find((each) => each.id === id && !each.deleted)
+  if (!category) return null
+
+  const using = blocks.filter((block) => uses(block, id))
+  let moved: TimeBlock[] = []
+  if (using.length > 0) {
+    const target = categories.find((each) => each.id === moveTo && !each.deleted)
+    if (!target || target.id === id) return null
+    moved = using.map((block) => moveBlock(block, id, target.id))
+  }
+
+  return {
+    categories: [{ ...category, deleted: true }],
+    presets: presets
+      .filter((preset) => !preset.deleted && preset.categoryId === id)
+      .map((preset) => ({ ...preset, deleted: true })),
+    blocks: moved,
+  }
 }
 
 // ─── Пресеты ───────────────────────────────────────────────────────────────

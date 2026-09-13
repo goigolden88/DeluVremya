@@ -4,9 +4,11 @@ import { db } from '../../core/db.ts'
 import { ulid } from '../../core/id.ts'
 import type { Category, Preset } from '../../core/model.ts'
 import { Fold } from '../../ui/Fold.tsx'
+import type { TimeBlock } from '../../core/model.ts'
 import {
   activeCategories,
   archivedCategories,
+  blocksUsing,
   createCategory,
   createPreset,
   MINUTES_PER_DAY,
@@ -14,10 +16,13 @@ import {
   nameProblem,
   presetProblem,
   presetsOf,
+  removeCategoryPlan,
   restoreCategory,
   type CategoryKind,
+  type RemovePlan,
 } from './categories.ts'
-import { KIND_LABELS, NAME_PROBLEMS, PRESET_PROBLEMS, presetLabel } from './labels.ts'
+import { deleteConfirm, KIND_LABELS, moveLine, NAME_PROBLEMS, PRESET_PROBLEMS, presetLabel } from './labels.ts'
+import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
 
 const KINDS: readonly CategoryKind[] = ['useful', 'neutral', 'idle']
@@ -29,15 +34,25 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
 }
 
+/** Блоки — первыми: прерванная посередине запись оставит живую категорию без блоков, а не блоки без категории. */
+async function writeRemoval(plan: RemovePlan): Promise<void> {
+  await db.putMany('time', plan.blocks)
+  await db.putMany('presets', plan.presets)
+  await db.putMany('categories', plan.categories)
+}
+
 /**
- * Категории и кнопки: порядок, название, признак, кнопки категории, архив.
+ * Категории и кнопки: порядок, название, признак, кнопки категории,
+ * архив, удаление.
  *
- * Удаления категории нет, есть архив: у категории есть блоки, и удалённая
- * оставила бы их без названия. Архивная пропадает из кнопок и выбора,
- * а в итогах её блоки остаются.
+ * Архив — для категории, которой больше не размечают, но чьи блоки
+ * остаются под своим именем: она пропадает из кнопок и выбора, а в итогах
+ * остаётся. Удаление — пустой сразу, с блоками только переносом их
+ * в другую категорию (Р-22).
  */
 export function Categories() {
   const catalog = useCatalog()
+  const time = useBlocks()
   const [open, setOpen] = useState<string | null>(null)
   const [error, setError] = useState('')
 
@@ -67,9 +82,11 @@ export function Categories() {
       </header>
 
       {catalog.status === 'failed' && <p className="error">Категории не прочитались: {catalog.error}</p>}
+      {time.status === 'failed' && <p className="error">Блоки времени не прочитались: {time.error}</p>}
       {error && <p className="error">Не записалось: {error}</p>}
 
-      {catalog.status === 'ready' && (
+      {/* Без блоков не посчитать, что удаление перенесёт: ждём и их. */}
+      {catalog.status === 'ready' && time.status === 'ready' && (
         <>
           <section className="block">
             <ul className="plain">
@@ -79,6 +96,7 @@ export function Categories() {
                   category={category}
                   categories={catalog.categories}
                   presets={catalog.presets}
+                  blocks={time.blocks}
                   open={open === category.id}
                   first={index === 0}
                   last={index === active.length - 1}
@@ -121,6 +139,7 @@ function CategoryRow({
   category,
   categories,
   presets,
+  blocks,
   open,
   first,
   last,
@@ -130,6 +149,7 @@ function CategoryRow({
   category: Category
   categories: Category[]
   presets: Preset[]
+  blocks: TimeBlock[]
   open: boolean
   first: boolean
   last: boolean
@@ -139,7 +159,21 @@ function CategoryRow({
   const [name, setName] = useState(category.name)
   const [minutes, setMinutes] = useState('')
   const [problem, setProblem] = useState('')
+  /** Выбор, куда перенести блоки перед удалением. Null — не удаляем. */
+  const [moving, setMoving] = useState<string | null>(null)
   const own = presetsOf(presets, category.id)
+  const used = blocksUsing(blocks, category.id)
+  const targets = activeCategories(categories).filter((each) => each.id !== category.id)
+
+  function remove(moveTo: string | null) {
+    if (used > 0 && moveTo === null) {
+      setMoving('')
+      return
+    }
+    if (used === 0 && !window.confirm(deleteConfirm(category.name))) return
+    const plan = removeCategoryPlan(categories, presets, blocks, category.id, moveTo)
+    if (plan) void save(() => writeRemoval(plan))
+  }
 
   function rename() {
     const found = nameProblem(categories, name, category.id)
@@ -272,13 +306,50 @@ function CategoryRow({
 
           {problem && <p className="error">{problem}</p>}
 
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => void save(() => db.put('categories', { ...category, archived: true }))}
-          >
-            В архив
-          </button>
+          <div className="row row--wrap">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void save(() => db.put('categories', { ...category, archived: true }))}
+            >
+              В архив
+            </button>
+            <button type="button" className="btn btn--danger" onClick={() => remove(null)}>
+              Удалить
+            </button>
+          </div>
+
+          {moving !== null && (
+            <div className="form">
+              <p>{moveLine(category.name, used)}</p>
+              <select
+                name="move-target"
+                aria-label="Куда перенести блоки"
+                value={moving}
+                onChange={(event) => setMoving(event.target.value)}
+              >
+                <option value="">— выберите категорию —</option>
+                {targets.map((each) => (
+                  <option key={each.id} value={each.id}>
+                    {each.name}
+                  </option>
+                ))}
+              </select>
+              <div className="form__actions">
+                <button type="button" className="btn" onClick={() => setMoving(null)}>
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  disabled={!moving}
+                  onClick={() => remove(moving)}
+                >
+                  Перенести и удалить
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </li>

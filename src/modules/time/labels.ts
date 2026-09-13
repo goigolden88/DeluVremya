@@ -29,6 +29,16 @@ export const PRESET_PROBLEMS: Record<PresetProblem, string> = {
   duplicate: 'Такая кнопка у категории уже есть',
 }
 
+/** Удаление пустой категории — после подтверждения (Р-22). */
+export function deleteConfirm(name: string): string {
+  return `Удалить категорию «${name}»? Её кнопки уйдут вместе с ней.`
+}
+
+/** Удаление категории с блоками — только переносом (Р-22). Число — с основанием. */
+export function moveLine(name: string, count: number): string {
+  return `На «${name}» записано ${count} ${blocksWord(count)}. Удалить можно, только перенеся их в другую категорию:`
+}
+
 /** Подпись кнопки: «+30». Категория стоит рядом. */
 export function presetLabel(minutes: number): string {
   return `+${minutes}`
