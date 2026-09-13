@@ -5,6 +5,7 @@ import { useScreenNames } from '../../ui/useScreenNames.ts'
 import { viewedDay } from './day.ts'
 import { windowNote } from './labels.ts'
 import { TimeDay } from './TimeDay.tsx'
+import { WeekProgress } from './Week.tsx'
 
 /**
  * Учёт времени — экран `/time`. Сюда ведёт ярлык «Учесть время» по долгому
@@ -76,6 +77,9 @@ export function TimeScreen() {
 
       {/* Ключ — день: отклик «Отменить» и форма «задним числом» — про свой день. */}
       <TimeDay key={day} day={day} today={today} />
+
+      {/* Нормы — про идущую неделю: на прошлом дне они сбивали бы с толку. */}
+      {isToday && <WeekProgress today={today} />}
 
       <p className="muted">{windowNote()}</p>
     </>

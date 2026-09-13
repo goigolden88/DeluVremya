@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { DAY_WINDOW } from './day.ts'
+import { MAX_NORM_DAYS, MAX_NORM_MINUTES } from './period.ts'
 import {
   addedLine,
   blocksWord,
+  checkText,
+  keptText,
+  NORM_PROBLEMS,
+  normText,
   runningLine,
   savedLine,
   startedLine,
@@ -56,5 +61,28 @@ describe('тексты таймера и ретро-ввода', () => {
   it('записано не сегодня — с датой, а не молча', () => {
     expect(savedLine('Чтение', 30, TODAY, TODAY)).toBe('Записано: Чтение, 30 мин')
     expect(savedLine('Чтение', 30, '2026-09-12', TODAY)).toBe('Записано на 12 сентября 2026: Чтение, 30 мин')
+  })
+})
+
+describe('тексты норм недели — Р-45', () => {
+  it('норма словами, правила по порядку, склонение дней после «не меньше»', () => {
+    expect(normText({ maxMinutes: 600, minDays: 3, minMinutes: 90 })).toBe('не меньше 3 дней · не меньше 1 ч 30 мин · не больше 10 ч')
+    expect(normText({ minDays: 1 })).toBe('не меньше 1 дня')
+  })
+
+  it('как идёт правило — с основанием; выполненное — галочкой, без упрёка', () => {
+    expect(checkText({ rule: 'minDays', target: 3, actual: 2, met: false })).toBe('2 из 3 дней')
+    expect(checkText({ rule: 'minMinutes', target: 300, actual: 330, met: true })).toBe('5 ч 30 мин из 5 ч ✓')
+    expect(checkText({ rule: 'maxMinutes', target: 600, actual: 660, met: false })).toBe('11 ч при пределе 10 ч')
+  })
+
+  it('вместо серии — из скольких недель', () => {
+    expect(keptText(3, 4)).toBe('выполнена в 3 из 4 недель')
+    expect(keptText(1, 1)).toBe('выполнена в 1 из 1 недели')
+  })
+
+  it('пределы в причинах — из констант', () => {
+    expect(NORM_PROBLEMS.days).toContain(String(MAX_NORM_DAYS))
+    expect(NORM_PROBLEMS.hours).toContain(String(MAX_NORM_MINUTES / 60))
   })
 })

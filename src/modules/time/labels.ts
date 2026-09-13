@@ -6,6 +6,15 @@
 import { formatDateLong, plural, type DateStr } from '../../core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW } from './day.ts'
+import {
+  MAX_NORM_DAYS,
+  MAX_NORM_MINUTES,
+  NORM_RULES,
+  type Norm,
+  type NormCheck,
+  type NormProblem,
+  type NormRule,
+} from './period.ts'
 import type { BlockProblem } from './retro.ts'
 
 /**
@@ -124,4 +133,55 @@ export function writingFor(day: DateStr): string {
 /** Пояснение к «неучтено» под итогом дня. */
 export function windowNote(): string {
   return `Окно дня — с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}: неучтённое считается от прошедшей его части, а не от суток.`
+}
+
+// ─── Нормы недели (Р-45) ───────────────────────────────────────────────────
+
+export const NORM_PROBLEMS: Record<NormProblem, string> = {
+  days: `Дней — целым числом, от одного до ${MAX_NORM_DAYS}`,
+  hours: `Часы — числом больше нуля и не больше ${MAX_NORM_MINUTES / MINUTES_PER_HOUR}`,
+  order: 'Предел «не больше» меньше нормы «не меньше»',
+}
+
+/** После «из» и «не меньше»: «из 1 дня», «из 3 дней», «из 21 дня». */
+function daysAfter(count: number): string {
+  return plural(count, ['дня', 'дней', 'дней'])
+}
+
+/** Правило словами: «не меньше 3 дней», «не меньше 5 ч», «не больше 10 ч». */
+export function normRuleText(rule: NormRule, target: number): string {
+  if (rule === 'minDays') return `не меньше ${target} ${daysAfter(target)}`
+  return `${rule === 'minMinutes' ? 'не меньше' : 'не больше'} ${formatMinutes(target)}`
+}
+
+/** Норма целиком, правила по порядку. */
+export function normText(norm: Norm): string {
+  return NORM_RULES.flatMap((rule) => {
+    const target = norm[rule]
+    return target === undefined ? [] : [normRuleText(rule, target)]
+  }).join(' · ')
+}
+
+/**
+ * Как идёт правило: «2 из 3 дней», «4 ч из 5 ч», «11 ч при пределе 10 ч».
+ * Выполненное — галочкой; невыполненное — без цвета и без упрёка (Р-05).
+ */
+export function checkText(check: NormCheck): string {
+  const text =
+    check.rule === 'minDays'
+      ? `${check.actual} из ${check.target} ${daysAfter(check.target)}`
+      : check.rule === 'minMinutes'
+        ? `${formatMinutes(check.actual)} из ${formatMinutes(check.target)}`
+        : `${formatMinutes(check.actual)} при пределе ${formatMinutes(check.target)}`
+  return check.met ? `${text} ✓` : text
+}
+
+/** Вместо серии (Р-45): в скольких из последних недель норма выполнена. */
+export function keptText(kept: number, weeks: number): string {
+  return `выполнена в ${kept} из ${weeks} ${plural(weeks, ['недели', 'недель', 'недель'])}`
+}
+
+/** Пояснение к блоку «Неделя» на экране учёта. */
+export function progressLead(from: DateStr): string {
+  return `С понедельника, ${formatDateLong(from)}. Здесь нормы «не меньше»; пределы «не больше» — только в обзоре недели.`
 }

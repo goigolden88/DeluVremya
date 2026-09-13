@@ -21,9 +21,20 @@ import {
   type CategoryKind,
   type RemovePlan,
 } from './categories.ts'
-import { deleteConfirm, KIND_LABELS, moveLine, NAME_PROBLEMS, PRESET_PROBLEMS, presetLabel } from './labels.ts'
+import {
+  deleteConfirm,
+  KIND_LABELS,
+  moveLine,
+  NAME_PROBLEMS,
+  NORM_PROBLEMS,
+  normText,
+  PRESET_PROBLEMS,
+  presetLabel,
+} from './labels.ts'
+import { normInput, readNorm, withNorm, type NormInput } from './period.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
+import { quoted } from '../../ui/screenNames.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
 
 const KINDS: readonly CategoryKind[] = ['useful', 'neutral', 'idle']
@@ -79,7 +90,8 @@ export function Categories() {
         <h1>Категории</h1>
         <p className="muted">
           Порядок здесь — порядок кнопок на экране дня. Признак категории нужен только обзору недели:
-          на экране дня он ничего не красит.
+          на экране дня он ничего не красит. Норма недели «не меньше» видна на экране {quoted(names.time)},
+          «не больше» — только в обзоре недели.
         </p>
       </header>
 
@@ -258,6 +270,8 @@ function CategoryRow({
             </select>
           </label>
 
+          <NormForm category={category} save={save} />
+
           {own.length > 0 && (
             <div className="chips">
               {own.map((each) => (
@@ -390,6 +404,63 @@ function RemoveCategory({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Норма недели (Р-45): дней с блоком не меньше, часов не меньше, часов не
+ * больше. Пустое поле — без этого правила; все пустые — нормы нет.
+ * noValidate: пределы проверяет `readNorm` и называет причину.
+ */
+function NormForm({ category, save }: { category: Category; save: Save }) {
+  const [input, setInput] = useState<NormInput>(() => normInput(category.norm))
+  const [problem, setProblem] = useState('')
+
+  function submit() {
+    const read = readNorm(input)
+    if ('problem' in read) {
+      setProblem(NORM_PROBLEMS[read.problem])
+      return
+    }
+    setProblem('')
+    void save(() => db.put('categories', withNorm(category, read.norm)))
+  }
+
+  const field = (key: keyof NormInput, label: string, mode: 'numeric' | 'decimal') => (
+    <label className="field">
+      <span>{label}</span>
+      <input
+        name={`norm-${key}`}
+        inputMode={mode}
+        value={input[key]}
+        onChange={(event) => setInput({ ...input, [key]: event.target.value })}
+      />
+    </label>
+  )
+
+  return (
+    <form
+      className="form"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault()
+        submit()
+      }}
+    >
+      <p className="muted">
+        {category.norm ? `Норма недели: ${normText(category.norm)}.` : 'Нормы недели нет.'} Пустое поле — без этого
+        правила.
+      </p>
+      {field('minDays', 'Дней с блоком — не меньше', 'numeric')}
+      {field('minHours', 'Часов — не меньше', 'decimal')}
+      {field('maxHours', 'Часов — не больше', 'decimal')}
+      {problem && <p className="error">{problem}</p>}
+      <div className="form__actions">
+        <button type="submit" className="btn">
+          Сохранить норму
+        </button>
+      </div>
+    </form>
   )
 }
 
