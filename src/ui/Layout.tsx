@@ -7,7 +7,10 @@ import { NavLink, Outlet } from 'react-router-dom'
  * «Настроек» здесь нет намеренно, как и в «Дневниках»: в них заходят раз
  * в месяц, и живут они шестерёнкой в шапке «Сегодня».
  */
-const TABS = [{ to: '/', label: 'Сегодня', end: true }]
+const TABS = [
+  { to: '/', label: 'Сегодня', end: true },
+  { to: '/inbox', label: 'Входящие', end: false },
+]
 
 export function Layout() {
   return (

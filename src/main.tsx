@@ -3,8 +3,13 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import { App } from './app.tsx'
 import { db } from './core/db.ts'
+import { applyLaunch } from './launch.ts'
 import { listenInstall } from './ui/install.ts'
 import './styles.css'
+
+// До первого экрана: «Поделиться» и ярлыки приходят адресом `?text=…`
+// и `?go=…`, и роутер должен увидеть уже готовый маршрут (Р-16).
+applyLaunch()
 
 // До первого экрана: Chrome присылает событие установки рано и один раз.
 listenInstall()

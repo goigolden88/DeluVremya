@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { SHARE_PARAMS, SHORTCUTS, shortcutUrl } from './src/launch.ts'
 
 // GitHub Pages отдаёт сайт проекта не с корня домена, а по /<имя репозитория>/.
 // Репозиторий называется DeluVremya → https://goigolden88.github.io/DeluVremya/
@@ -73,17 +74,18 @@ export default defineConfig({
         // в установленное приложение на Android, поэтому объявлены с первого
         // дня, а старый адрес обязан работать и после любой правки.
         // Приём — GET на корень, разбор при старте в src/launch.ts,
-        // без работника (Р-16).
+        // без работника (Р-16). Имена и адреса берутся оттуда же, где
+        // их разбирают: разойтись они не могут.
         share_target: {
           action: BASE,
           method: 'GET',
-          params: { title: 'title', text: 'text', url: 'url' },
+          params: { ...SHARE_PARAMS },
         },
-        shortcuts: [
-          { name: 'Записать', url: `${BASE}?go=inbox`, icons: [SHORTCUT_ICON] },
-          { name: 'План дня', url: BASE, icons: [SHORTCUT_ICON] },
-          { name: 'Учесть время', url: `${BASE}?go=time`, icons: [SHORTCUT_ICON] },
-        ],
+        shortcuts: SHORTCUTS.map((shortcut) => ({
+          name: shortcut.name,
+          url: shortcutUrl(BASE, shortcut.go),
+          icons: [SHORTCUT_ICON],
+        })),
       },
 
       // Что уходит в кеш для работы без сети. Подмена навигации на

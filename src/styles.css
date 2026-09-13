@@ -1120,6 +1120,32 @@ a {
   }
 }
 
+/* ─── Входящие ───────────────────────────────────────────────────────────── */
+
+/* Поле захвата — в несколько строк: из «Поделиться» приходят заголовок
+   и ссылка на отдельных строках. */
+.field textarea.inbox__field {
+  min-height: 96px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.inbox__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+/* Ссылки длинные и без пробелов: без переноса они раздвигают экран вбок. */
+.inbox__text {
+  font-size: 15px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Главная строка блока — «не болел столько-то». Крупнее соседей,
    потому что это и есть ответ, за которым открывают итоги. */
 .lead {
