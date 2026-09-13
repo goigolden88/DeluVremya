@@ -12,11 +12,13 @@
  * а это запрещено жёстче. Цена — новый модуль дописывает строку в `PLACES`
  * ниже; шаг внесён в чеклист «Как добавить модуль» в 02-Архитектура.
  *
- * Нарезка по годам нужна git, а не человеку: без неё каждая отметка щётки
- * переписывала бы всю базу и раздувала историю коммитов (Р-08).
+ * Нарезка нужна git и сети, а не человеку: без неё каждая отметка
+ * переписывала бы всю базу и раздувала историю коммитов (Р-08 «Дневников»).
+ * По месяцам, а не по годам, как у них, — Р-28 «Делу Время»: годовой файл
+ * блоков к декабрю отправлялся бы по полмегабайта на каждое нажатие.
  */
 
-import { yearOf } from './dates.ts'
+import { isDateOrMonth } from './dates.ts'
 import { SCHEMA_VERSION, SYNCED_STORES } from './model.ts'
 import type { AnyRecord, StoreRecord, SyncedStore } from './model.ts'
 
@@ -25,13 +27,13 @@ export type RepoFile = {
   content: string
 }
 
-/** Где лежит хранилище: одним файлом или нарезанное по годам. */
+/** Где лежит хранилище: одним файлом или нарезанное по месяцам. */
 type Place<S extends SyncedStore> =
   | { split: 'none'; path: string }
   | {
-      split: 'year'
+      split: 'month'
       dir: string
-      /** Дата, по которой запись попадает в год. null — года нет (Р-34). */
+      /** Дата, по которой запись попадает в месяц. null — даты нет (Р-34). */
       dateOf: (record: StoreRecord[S]) => string | null
     }
 
@@ -43,10 +45,10 @@ const PLACES: { [S in SyncedStore]: Place<S> } = {
   categories: { split: 'none', path: 'categories.json' },
   presets: { split: 'none', path: 'presets.json' },
   templates: { split: 'none', path: 'templates.json' },
-  // Год — по дате записи, а не по дню в плане: мысль, записанная в марте
+  // Месяц — по дате записи, а не по дню в плане: мысль, записанная в марте
   // и поднятая в план в июне, остаётся мартовской. Без даты — undated (Р-08).
-  notes: { split: 'year', dir: 'notes', dateOf: (note) => note.capturedOn },
-  time: { split: 'year', dir: 'time', dateOf: (block) => block.date },
+  notes: { split: 'month', dir: 'notes', dateOf: (note) => note.capturedOn },
+  time: { split: 'month', dir: 'time', dateOf: (block) => block.date },
   reviews: { split: 'none', path: 'reviews.json' },
 }
 
@@ -57,7 +59,7 @@ export const META_PATH = 'meta.json'
  * Куда попадают записи без года (Р-34).
  *
  * Заведено ради списка «к просмотру»: у записи `planned` даты начала нет
- * вовсе, а нарезка по годам её требует. Год по времени создания не годится —
+ * вовсе, а нарезка её требует. Месяц по времени создания не годится —
  * такого поля в модели нет, а выводить его из `id` нельзя: у перенесённых
  * из Obsidian записей идентификаторы детерминированные, не ULID.
  *
@@ -72,7 +74,7 @@ const UNDATED = 'undated'
  * Одинаковые данные обязаны давать побайтово одинаковый файл.
  *
  * Иначе отпечаток каждый раз новый, и каждая синхронизация переписывает весь
- * репозиторий — ровно то, ради чего заведена нарезка по годам (Р-33).
+ * репозиторий — ровно то, ради чего заведена нарезка (Р-33).
  * Порядок ключей в объекте зависит от того, как запись собиралась: пришла ли
  * она из формы, из переноса или с сервера. Поэтому ключи сортируются, а
  * записи выстраиваются по `id`.
@@ -106,9 +108,17 @@ function pathFor<S extends SyncedStore>(store: S, record: StoreRecord[S]): strin
   if (place.split === 'none') return place.path
 
   const date = place.dateOf(record)
-  const year = date === null ? null : yearOf(date)
-  return `${place.dir}/${year ?? UNDATED}.json`
+  const month = date === null ? null : monthOf(date)
+  return `${place.dir}/${month ?? UNDATED}.json`
 }
+
+/** `2026-02-14` → `2026-02`. Не дата — null: запись уедет в undated. */
+function monthOf(date: string): string | null {
+  return isDateOrMonth(date) ? date.slice(0, 7) : null
+}
+
+/** Имя файла месяца: `2026-02`. Месяц тринадцатый — файл не наш. */
+const MONTH_FILE = '\\d{4}-(?:0[1-9]|1[0-2])'
 
 /** Все файлы, которые хранилище занимает при таком наборе записей. */
 function filesFor<S extends SyncedStore>(
@@ -136,12 +146,12 @@ function filesFor<S extends SyncedStore>(
  * Полное дерево файлов по содержимому базы.
  *
  * Собирается целиком, а не по списку изменённых записей (Р-33): у отметки
- * может смениться дата, а с ней год — по пометке «запись такая-то изменилась»
+ * может смениться дата, а с ней месяц — по пометке «запись такая-то изменилась»
  * старый файл не найти. Отправлены будут только те файлы, чей отпечаток
- * разошёлся с деревом на сервере, так что прошлые годы не переписываются.
+ * разошёлся с деревом на сервере, так что прошлые месяцы не переписываются.
  *
  * `merged` — пути, чьё содержимое уже влито в базу на этом же проходе. Если
- * год опустел (последняя запись переехала в соседний), его файл перезаписывается
+ * месяц опустел (последняя запись переехала в другой), его файл перезаписывается
  * пустым списком; без этого на сервере навсегда осталась бы копия записи.
  * Пути, которые не читались, сюда передавать нельзя — затрём чужие данные.
  */
@@ -177,7 +187,7 @@ export function storeOf(path: string): SyncedStore | null {
     const place = PLACES[store] as Place<SyncedStore>
     if (place.split === 'none') {
       if (place.path === path) return store
-    } else if (new RegExp(`^${place.dir}/(\\d{4}|${UNDATED})\\.json$`).test(path)) {
+    } else if (new RegExp(`^${place.dir}/(?:${MONTH_FILE}|${UNDATED})\\.json$`).test(path)) {
       return store
     }
   }

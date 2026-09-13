@@ -47,20 +47,32 @@ describe('раскладка', () => {
     ])
   })
 
-  it('блоки времени режутся по годам', () => {
-    const files = buildFiles(withData({ time: [block('a', '2025-12-31'), block('b', '2026-01-01')] }))
-    expect(pathsOf(files)).toContain('time/2025.json')
-    expect(pathsOf(files)).toContain('time/2026.json')
+  it('блоки времени режутся по месяцам — Р-28', () => {
+    const files = buildFiles(
+      withData({
+        time: [block('a', '2025-12-31'), block('b', '2026-01-31'), block('c', '2026-02-01'), block('d', '2026-02-28')],
+      }),
+    )
+    expect(pathsOf(files).filter((path) => path.startsWith('time/'))).toEqual([
+      'time/2025-12.json',
+      'time/2026-01.json',
+      'time/2026-02.json',
+    ])
 
-    const y2026 = files.find((file) => file.path === 'time/2026.json')
-    expect(JSON.parse(y2026?.content ?? '[]')).toHaveLength(1)
+    const february = files.find((file) => file.path === 'time/2026-02.json')
+    expect(JSON.parse(february?.content ?? '[]')).toHaveLength(2)
   })
 
-  it('заметка ложится в год, когда записана, а не в год плана', () => {
-    // Мысль из декабря, поставленная в план на январь, остаётся декабрьской.
-    const files = buildFiles(withData({ notes: [note('a', '2025-12-30', { plannedFor: '2026-01-05' })] }))
-    expect(pathsOf(files)).toContain('notes/2025.json')
-    expect(pathsOf(files)).not.toContain('notes/2026.json')
+  it('заметка ложится в месяц, когда записана, а не в месяц плана', () => {
+    // Мысль из января, поставленная в план на февраль, остаётся январской.
+    const files = buildFiles(withData({ notes: [note('a', '2026-01-30', { plannedFor: '2026-02-05' })] }))
+    expect(pathsOf(files)).toContain('notes/2026-01.json')
+    expect(pathsOf(files)).not.toContain('notes/2026-02.json')
+  })
+
+  it('блок с испорченной датой не пропадает — уезжает в undated', () => {
+    const files = buildFiles(withData({ time: [block('a', '2026-02-30')] }))
+    expect(pathsOf(files)).toContain('time/undated.json')
   })
 
   it('заметка без даты уезжает в undated, а не теряется — Р-08', () => {
@@ -78,7 +90,7 @@ describe('раскладка', () => {
   it('надгробия уезжают вместе с живыми записями', () => {
     // Без них второе устройство воскресит удалённое.
     const files = buildFiles(withData({ time: [block('a', '2026-01-01', { deleted: true })] }))
-    const content = files.find((file) => file.path === 'time/2026.json')?.content ?? ''
+    const content = files.find((file) => file.path === 'time/2026-01.json')?.content ?? ''
     expect(JSON.parse(content)[0].deleted).toBe(true)
   })
 
@@ -88,20 +100,20 @@ describe('раскладка', () => {
   })
 })
 
-describe('опустевший год', () => {
-  const before = withData({ time: [block('a', '2025-12-31')] })
-  const after = withData({ time: [block('a', '2026-01-01')] })
+describe('опустевший месяц', () => {
+  const before = withData({ time: [block('a', '2026-01-31')] })
+  const after = withData({ time: [block('a', '2026-02-01')] })
 
   it('перезаписывается пустым, если файл читали на этом же проходе', () => {
-    // Иначе на сервере навсегда осталась бы копия записи в старом году.
+    // Иначе на сервере навсегда осталась бы копия записи в старом месяце.
     const files = buildFiles(after, { merged: pathsOf(buildFiles(before)) })
-    const old = files.find((file) => file.path === 'time/2025.json')
+    const old = files.find((file) => file.path === 'time/2026-01.json')
     expect(JSON.parse(old?.content ?? 'null')).toEqual([])
   })
 
   it('нечитанные пути не трогаются', () => {
     const files = buildFiles(after)
-    expect(pathsOf(files)).not.toContain('time/2025.json')
+    expect(pathsOf(files)).not.toContain('time/2026-01.json')
   })
 
   it('чужие файлы в репозитории не затираются', () => {
@@ -148,16 +160,21 @@ describe('storeOf', () => {
   it('узнаёт свои файлы', () => {
     expect(storeOf('categories.json')).toBe('categories')
     expect(storeOf('reviews.json')).toBe('reviews')
-    expect(storeOf('time/2026.json')).toBe('time')
+    expect(storeOf('time/2026-02.json')).toBe('time')
+    expect(storeOf('notes/2026-12.json')).toBe('notes')
     expect(storeOf('notes/undated.json')).toBe('notes')
   })
 
   it('чужие файлы не признаёт своими', () => {
     expect(storeOf('README.md')).toBeNull()
     expect(storeOf('meta.json')).toBeNull()
-    expect(storeOf('time/2026.txt')).toBeNull()
+    expect(storeOf('time/2026-02.txt')).toBeNull()
     expect(storeOf('time/двадцать.json')).toBeNull()
-    expect(storeOf('other/2026.json')).toBeNull()
+    expect(storeOf('other/2026-02.json')).toBeNull()
+    // Годовой файл раскладки «Дневников» здесь чужой (Р-28).
+    expect(storeOf('time/2026.json')).toBeNull()
+    expect(storeOf('time/2026-13.json')).toBeNull()
+    expect(storeOf('time/2026-2.json')).toBeNull()
   })
 
   it('каждый построенный файл, кроме meta, опознаётся обратно', () => {
@@ -194,7 +211,7 @@ describe('разбор файлов с сервера', () => {
 
   it('свой же файл читается обратно', () => {
     const files = buildFiles(withData({ time: [block('a', '2026-01-01')] }))
-    const file = files.find((each) => each.path === 'time/2026.json')
+    const file = files.find((each) => each.path === 'time/2026-01.json')
     expect(parseFile(file?.path ?? '', file?.content ?? '')[0]?.id).toBe('a')
   })
 })

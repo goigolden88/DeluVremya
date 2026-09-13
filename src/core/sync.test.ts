@@ -414,19 +414,19 @@ describe('порядок «сначала чужое, потом своё»', ()
   })
 })
 
-describe('переезд записи между годами', () => {
+describe('переезд записи между месяцами', () => {
   it('старый файл перезаписывается пустым, копии не остаётся', async () => {
-    const seed = { time: [mark('e1', '2025-12-31', '2026-01-01T10:00:00.000Z')] }
+    const seed = { time: [mark('e1', '2026-01-31', '2026-02-01T10:00:00.000Z')] }
     const repo = fakeRepo(repoWith(seed))
     const local = fakeDb(seed)
     await runSync(repo.api, local.ports)
 
-    // Дату поправили: отметка была не 31 декабря, а 1 января.
-    local.data.time[0] = mark('e1', '2026-01-01', '2026-01-02T10:00:00.000Z')
+    // Дату поправили: блок был не 31 января, а 1 февраля.
+    local.data.time[0] = mark('e1', '2026-02-01', '2026-02-02T10:00:00.000Z')
     await runSync(repo.api, local.ports)
 
-    expect(JSON.parse(repo.files()['time/2025.json'] ?? 'null')).toEqual([])
-    expect(JSON.parse(repo.files()['time/2026.json'] ?? '[]')).toHaveLength(1)
+    expect(JSON.parse(repo.files()['time/2026-01.json'] ?? 'null')).toEqual([])
+    expect(JSON.parse(repo.files()['time/2026-02.json'] ?? '[]')).toHaveLength(1)
   })
 })
 
