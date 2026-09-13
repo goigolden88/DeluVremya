@@ -134,6 +134,38 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Точка на шестерёнке: очередь не ушла либо что-то сломалось.
+   Стоит в потоке рядом с глифом — шестерёнка flex-строка, и
+   позиционировать точку абсолютно не от чего. */
+.dot {
+  align-self: flex-start;
+  margin: 6px 0 0 1px;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot--error {
+  background: var(--error);
+}
+
+/* Флажок «Синхронизировать» в настройках. */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
 .screen-head p {
   margin: 4px 0 0;
 }

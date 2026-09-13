@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { formatDateLong } from '../core/dates.ts'
 import { IosNote } from '../ui/Install.tsx'
+import { syncDot } from '../ui/syncDot.ts'
+import { useSyncStatus } from '../ui/useSync.ts'
 import { useToday } from '../ui/useToday.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
@@ -16,6 +18,7 @@ export function Today() {
   const first = useFirstRun()
   const day = useToday()
   const names = useScreenNames()
+  const mark = syncDot(useSyncStatus())
 
   return (
     <>
@@ -25,6 +28,7 @@ export function Today() {
           <div className="screen-head__tools">
             <Link className="gear" to="/settings" aria-label="Настройки">
               <span aria-hidden="true">⚙</span>
+              {mark && <span className={mark} aria-hidden="true" />}
             </Link>
           </div>
         </div>

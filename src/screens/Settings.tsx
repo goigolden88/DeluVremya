@@ -19,6 +19,7 @@ import {
 import { backupNote, backupSummary } from '../ui/backup.ts'
 import { Fold } from '../ui/Fold.tsx'
 import { InstallNote } from '../ui/Install.tsx'
+import { SyncSettings } from '../ui/SyncSettings.tsx'
 import { useSyncStatus } from '../ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
@@ -51,7 +52,8 @@ function describe(error: unknown): string {
  * оглавление. Итог у заголовка говорит, стоит ли разворачивать, — отсутствие
  * копии видно и у свёрнутого.
  *
- * Синхронизация, напоминания и импорт записей встанут сюда по этапам.
+ * Синхронизация — первой: беда с ней видна в итоге у заголовка, и сюда
+ * приходят по точке на шестерёнке «Сегодня».
  */
 export function Settings() {
   const [state, setState] = useState<State>({ status: 'loading' })
@@ -82,6 +84,8 @@ export function Settings() {
       <header className="screen-head">
         <h1>Настройки</h1>
       </header>
+
+      <SyncSettings onChanged={load} />
 
       <DataTransfer onChanged={load} />
 
@@ -171,9 +175,9 @@ function About({ state }: { state: State }) {
 }
 
 /**
- * Ручной перенос файлом. До Этапа 2 это единственный способ увезти данные
- * на второе устройство, а после него — запасной, на случай отвалившейся
- * синхронизации, и способ забрать всё с собой при отказе от приложения.
+ * Ручной перенос файлом. Запасной путь на случай отвалившейся синхронизации,
+ * единственный — у того, кто её не заводил, и способ забрать всё с собой
+ * при отказе от приложения.
  */
 function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
   const input = useRef<HTMLInputElement>(null)

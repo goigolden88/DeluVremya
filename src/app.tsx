@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { startAutoSync } from './core/sync.ts'
 import { Layout } from './ui/Layout.tsx'
 import { Today } from './screens/Today.tsx'
 import { Inbox } from './screens/Inbox.tsx'
@@ -10,10 +12,13 @@ import { TimeScreen } from './modules/time/TimeScreen.tsx'
  * Роутинг через хеш: на GitHub Pages обычные пути дают 404 при обновлении
  * страницы — сервер ищет файл, которого нет. Всё после # до сервера не доходит.
  *
- * Синхронизация здесь не запускается до Этапа 2: код ядра уже на месте,
- * а подключение и настройки — там (Р-15).
+ * Синхронизация запускается здесь, один раз на приложение: проход идёт
+ * по таймеру и по событиям и не зависит от того, какой экран открыт.
+ * Не настроена — проход ничего не делает и в сеть не ходит.
  */
 export function App() {
+  useEffect(() => startAutoSync(), [])
+
   return (
     <HashRouter>
       <Routes>
