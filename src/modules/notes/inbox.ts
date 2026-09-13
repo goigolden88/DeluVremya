@@ -1,41 +1,222 @@
 /**
- * Входящие: захват одной строкой и что лежит неразобранным.
+ * Заметки: захват одной строкой, неразобранное, замыслы, поиск.
  *
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { nowIso } from '../../core/dates.ts'
+import { daysBetween, formatDate, formatDateLong, formatMonth, isDateStr, nowIso, type DateStr } from '../../core/dates.ts'
 import { ulid } from '../../core/id.ts'
 import type { Note, NoteKind } from '../../core/model.ts'
 
 /** Вид записи, когда при захвате его не выбрали (Р-13). */
 export const DEFAULT_KIND: NoteKind = 'task'
 
+/** Виды в порядке переключателя и чипов (Р-31). */
+export const NOTE_KINDS: readonly NoteKind[] = ['task', 'thought', 'goal']
+
 /**
- * Запись во входящие из одного поля. Кроме текста — ничего обязательного
- * (Р-09): дата записи — сегодня, в план не поставлена, открыта, вид — дело.
- * Null — текста нет, записывать нечего.
+ * Запись из одного поля. Кроме текста — ничего обязательного (Р-09):
+ * дата записи — сегодня, в план не поставлена, открыта, вид — дело,
+ * если другой не выбрали. Null — текста нет, записывать нечего.
  */
-export function captureNote(text: string, today: string): Note | null {
+export function captureNote(text: string, today: string, kind: NoteKind = DEFAULT_KIND): Note | null {
   const trimmed = text.trim()
   if (!trimmed) return null
   return {
     id: ulid(),
     updatedAt: nowIso(),
     text: trimmed,
-    kind: DEFAULT_KIND,
+    kind,
     capturedOn: today,
     plannedFor: null,
     status: 'open',
   }
 }
 
+// ─── Порядок и группы ──────────────────────────────────────────────────────
+
+/** День записи, если он читается. Null — даты нет или она кривая. */
+function dayOf(note: Note): DateStr | null {
+  return note.capturedOn !== null && isDateStr(note.capturedOn) ? note.capturedOn : null
+}
+
 /**
- * Что лежит во входящих: не поставлено ни на какой день и не закрыто.
- * Свежие сверху — по `id`: ULID сортируется по времени создания.
+ * Порядок записей: по дню записи, свежие сверху; внутри дня — по `id`,
+ * ULID сортируется по времени создания. Не по одному `id`: у заметки,
+ * пришедшей импортом, он — момент импорта, и мартовская встала бы выше
+ * сегодняшних. Без даты — в конце: сверху им не место, их находят поиском (Р-08).
  */
+export function compareNotes(a: Note, b: Note): number {
+  const first = dayOf(a)
+  const second = dayOf(b)
+  if (first !== second) {
+    if (first === null) return 1
+    if (second === null) return -1
+    return second.localeCompare(first)
+  }
+  return b.id.localeCompare(a.id)
+}
+
+/** Лежит в неразобранном: не в плане, открыто, не замысел — у него свой блок (Р-31). */
+export function isUnsorted(note: Note): boolean {
+  return !note.deleted && note.plannedFor === null && note.status === 'open' && note.kind !== 'goal'
+}
+
+/** Неразобранное в порядке экрана. */
 export function inboxOf(notes: readonly Note[]): Note[] {
+  return notes.filter(isUnsorted).sort(compareNotes)
+}
+
+/** Замыслы в работе: не достигнуты, не отброшены, не удалены. */
+export function goalsOf(notes: readonly Note[]): Note[] {
+  return notes.filter((note) => !note.deleted && note.kind === 'goal' && note.status === 'open').sort(compareNotes)
+}
+
+/** Записи одного месяца. `month` — `ГГГГ-ММ`; null — без даты. */
+export type MonthGroup = { month: string | null; notes: Note[] }
+
+/** Разбивка по месяцам записи — «где то, что я записал в марте?». На входе порядок любой. */
+export function groupByMonth(notes: readonly Note[]): MonthGroup[] {
+  const groups: MonthGroup[] = []
+  for (const note of [...notes].sort(compareNotes)) {
+    const day = dayOf(note)
+    const month = day === null ? null : day.slice(0, 7)
+    const last = groups.at(-1)
+    if (last && last.month === month) last.notes.push(note)
+    else groups.push({ month, notes: [note] })
+  }
+  return groups
+}
+
+/** Сколько записей каждого вида. */
+export function kindCounts(notes: readonly Note[]): Record<NoteKind, number> {
+  const counts: Record<NoteKind, number> = { task: 0, thought: 0, goal: 0 }
+  for (const note of notes) counts[note.kind] += 1
+  return counts
+}
+
+// ─── Поиск ─────────────────────────────────────────────────────────────────
+
+/** Для поиска: регистр, «ё» и лишние пробелы не в счёт — как в ленте «Дневников». */
+export function normalize(text: string): string {
+  return text.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
+}
+
+/** Слова запроса. Пустой запрос — пустой список: подходит всё. */
+export function queryWords(query: string): string[] {
+  return normalize(query).split(' ').filter(Boolean)
+}
+
+/**
+ * Дата записи всеми словами, какими её ищут: `2026-03-12`, `12.03.2026`,
+ * «12 марта 2026» и «март 2026». Именительный нужен отдельно: «май»
+ * в «мая» не входит. Без даты — «без даты»; кривая — как лежит.
+ */
+function dateWords(note: Note): string {
+  const day = dayOf(note)
+  if (day === null) return note.capturedOn ?? 'без даты'
+  return `${day} ${formatDate(day)} ${formatDateLong(day)} ${formatMonth(day.slice(0, 7))}`
+}
+
+/**
+ * Подходит ли запись. Слова ищутся по отдельности и нужны все: «воды
+ * фильтр» находит «Купить фильтр для воды» — правило поиска ленты
+ * «Дневников». `extra` — что ещё ищется, но в тексте записи не стоит:
+ * название замысла у его дела.
+ */
+export function matchesQuery(note: Note, words: readonly string[], extra = ''): boolean {
+  if (words.length === 0) return true
+  const haystack = normalize(`${note.text} ${dateWords(note)} ${extra}`)
+  return words.every((word) => haystack.includes(word))
+}
+
+// ─── Возраст ───────────────────────────────────────────────────────────────
+
+/**
+ * Сколько дней записи. Null — дата неизвестна или не читается. Дата
+ * в будущем — ноль: часы устройства бывают неверны, отрицательный возраст
+ * ничего не значит.
+ */
+export function ageDays(note: Note, today: DateStr): number | null {
+  const day = dayOf(note)
+  return day === null ? null : Math.max(0, daysBetween(day, today))
+}
+
+// ─── Правки из карточки (Р-30) ─────────────────────────────────────────────
+
+/** Новый текст. Null — пустой: запись без текста не бывает. Прежний — та же запись. */
+export function withText(note: Note, text: string): Note | null {
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  return trimmed === note.text ? note : { ...note, text: trimmed }
+}
+
+/** Смена вида. Переставая быть делом, запись теряет ссылку на замысел: она про дело (Р-31). */
+export function withKind(note: Note, kind: NoteKind): Note {
+  if (note.kind === kind) return note
+  const next = { ...note, kind }
+  return kind === 'task' ? next : withGoal(next, null)
+}
+
+/** Сделано — или замысел достигнут: из неразобранного и из блока замыслов уходит. */
+export function markDone(note: Note, today: DateStr): Note {
+  return { ...note, status: 'done', doneOn: today }
+}
+
+/** «Отменить» после «Сделано»: снова открыта, дня выполнения нет. */
+export function reopen(note: Note): Note {
+  const { doneOn: _doneOn, ...rest } = note
+  return { ...rest, status: 'open' }
+}
+
+// ─── Замыслы и их дела (Р-31) ──────────────────────────────────────────────
+
+/** Ссылка на заметку в `refs`: вид записи — в начале строки (02-Архитектура). */
+const NOTE_REF = 'note:'
+
+export function noteRef(id: string): string {
+  return `${NOTE_REF}${id}`
+}
+
+/** id замысла, к которому относится дело. Null — ни к какому. */
+export function goalIdOf(note: Note): string | null {
+  const ref = note.refs?.find((each) => each.startsWith(NOTE_REF))
+  return ref === undefined ? null : ref.slice(NOTE_REF.length)
+}
+
+/**
+ * Отнести к замыслу или отвязать (`null`). Одно дело — один замысел:
+ * прежняя ссылка на заметку заменяется. Ссылки на заметки сейчас бывают
+ * только такие; другие связи в `refs` не трогаются.
+ */
+export function withGoal(note: Note, goalId: string | null): Note {
+  const others = (note.refs ?? []).filter((each) => !each.startsWith(NOTE_REF))
+  const refs = goalId === null ? others : [...others, noteRef(goalId)]
+  const { refs: _refs, ...rest } = note
+  return refs.length > 0 ? { ...rest, refs } : rest
+}
+
+/**
+ * Замысел дела — живая запись вида «замысел». Удалённый или переделанный
+ * в другой вид не показывается: ссылка просто молчит (Р-31).
+ */
+export function goalOf(note: Note, notes: readonly Note[]): Note | null {
+  const id = goalIdOf(note)
+  if (id === null) return null
+  return notes.find((each) => each.id === id && !each.deleted && each.kind === 'goal') ?? null
+}
+
+/** Дела замысла: живые, не отброшенные, в порядке экрана. */
+export function tasksOfGoal(goalId: string, notes: readonly Note[]): Note[] {
   return notes
-    .filter((note) => !note.deleted && note.plannedFor === null && note.status === 'open')
-    .sort((a, b) => b.id.localeCompare(a.id))
+    .filter((note) => !note.deleted && note.kind === 'task' && note.status !== 'dropped' && goalIdOf(note) === goalId)
+    .sort(compareNotes)
+}
+
+export type GoalProgress = { total: number; done: number }
+
+/** Сколько дел у замысла и сколько из них сделано — число с основанием. */
+export function goalProgress(goalId: string, notes: readonly Note[]): GoalProgress {
+  const tasks = tasksOfGoal(goalId, notes)
+  return { total: tasks.length, done: tasks.filter((task) => task.status === 'done').length }
 }

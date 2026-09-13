@@ -57,7 +57,7 @@ export type DayTemplate = Base & {
 
 // ─── Записи ────────────────────────────────────────────────────────────────
 
-/** Одна сущность на входящее, дело, наблюдение и пункт плана дня (Р-12). */
+/** Одна сущность на входящее, дело, наблюдение, замысел и пункт плана дня (Р-12, Р-31). */
 export type Note = Base & {
   text: string
   /** Не выбран при захвате — 'task' (Р-13). */
@@ -73,10 +73,12 @@ export type Note = Base & {
   status: NoteStatus
   /** YYYY-MM-DD, когда выполнено */
   doneOn?: string
+  /** Связи с другими записями: `note:<id>` — замысел, к которому относится дело (Р-31). */
   refs?: string[]
 }
 
-export type NoteKind = 'task' | 'thought'
+/** Дело, мысль (она же наблюдение), замысел (Р-31). */
+export type NoteKind = 'task' | 'thought' | 'goal'
 export type NoteStatus = 'open' | 'done' | 'someday' | 'dropped'
 
 /** Блок учтённого времени. */
