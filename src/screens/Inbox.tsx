@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import type { DateStr } from '../core/dates.ts'
 import { db } from '../core/db.ts'
 import type { Note, NoteKind } from '../core/model.ts'
 import {
@@ -21,11 +22,14 @@ import {
   KIND_NAMES,
   KIND_PLURALS,
   monthHeading,
+  plannedCountText,
+  plannedLine,
   savedLine,
   shownText,
   UNSORTED_TITLE,
 } from '../modules/notes/labels.ts'
 import { NoteItem } from '../modules/notes/NoteItem.tsx'
+import { plannedCount, withPlan } from '../modules/notes/plan.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../ui/Fold.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
@@ -62,6 +66,8 @@ export function Inbox() {
   const [openId, setOpenId] = useState<string | null>(null)
   /** Последнее «Сделано» — его снимает «Отменить». */
   const [finished, setFinished] = useState<Note | null>(null)
+  /** Последнее «В план» — его тоже снимает «Отменить». */
+  const [planned, setPlanned] = useState<Note | null>(null)
   const read = useNotes()
   const names = useScreenNames()
   const today = useToday()
@@ -114,6 +120,7 @@ export function Inbox() {
     setError('')
     try {
       setFinished(await db.put('notes', markDone(note, today)))
+      setPlanned(null)
       setOpenId(null)
     } catch (failure) {
       setError(describe(failure))
@@ -131,12 +138,36 @@ export function Inbox() {
     }
   }
 
+  // Дело уходит из неразобранного в план дня (Р-37) — отклик с «Отменить».
+  async function plan(note: Note, day: DateStr) {
+    setError('')
+    try {
+      setPlanned(await db.put('notes', withPlan(note, day)))
+      setFinished(null)
+      setOpenId(null)
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
+  async function unplan() {
+    if (!planned) return
+    setError('')
+    try {
+      await db.put('notes', withPlan(planned, null))
+      setPlanned(null)
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
   const all = read.notes ?? []
   const words = queryWords(query)
   const goals = goalsOf(all)
   const shownGoals = goals.filter((goal) => matchesQuery(goal, words))
   const unsorted = inboxOf(all)
   const counts = kindCounts(unsorted)
+  const waiting = plannedCount(all)
   // У дела ищется и название его замысла: «испанский» находит его дела.
   const shown = unsorted.filter(
     (note) => (only === null || note.kind === only) && matchesQuery(note, words, goalOf(note, all)?.text),
@@ -152,6 +183,7 @@ export function Inbox() {
       open={openId === note.id}
       onToggle={() => setOpenId(openId === note.id ? null : note.id)}
       onDone={(done) => void finish(done)}
+      onPlan={(each, day) => void plan(each, day)}
       onError={setError}
     />
   )
@@ -206,6 +238,14 @@ export function Inbox() {
         <p className="added">
           <span>{doneLine(finished.kind)}</span>
           <button type="button" className="link-btn" onClick={() => void undo()}>
+            Отменить
+          </button>
+        </p>
+      )}
+      {planned && (
+        <p className="added">
+          <span>{plannedLine(planned.plannedFor ?? today, today)}</span>
+          <button type="button" className="link-btn" onClick={() => void unplan()}>
             Отменить
           </button>
         </p>
@@ -279,6 +319,12 @@ export function Inbox() {
                   ))
                 )}
               </>
+            )}
+            {/* Поставленное в план отсюда ушло — не молча: числом и где искать. */}
+            {waiting > 0 && (
+              <p className="muted">
+                <Link to="/">{plannedCountText(waiting, names.today)}</Link>
+              </p>
             )}
           </section>
         </>

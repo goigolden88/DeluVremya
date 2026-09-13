@@ -10,6 +10,8 @@ import {
   deleteConfirm,
   durationText,
   monthHeading,
+  offPlanMeta,
+  overdueLead,
   plannedCountText,
   plannedLine,
   progressText,
@@ -119,5 +121,16 @@ describe('план дня', () => {
 
   it('поставленное в план названо числом и экраном — своим именем устройства', () => {
     expect(plannedCountText(3, 'День')).toBe('Ещё 3 записи в плане — экран «День»')
+  })
+
+  it('хвост прошлых дней — сколько ждут решения', () => {
+    expect(overdueLead(1)).toBe('1 пункт ждёт решения')
+    expect(overdueLead(3)).toBe('3 пункта ждут решения')
+    expect(overdueLead(5)).toBe('5 пунктов ждут решения')
+  })
+
+  it('сделанное вне плана — откуда оно', () => {
+    expect(offPlanMeta(captured(TODAY), TODAY)).toBe('не было в плане')
+    expect(offPlanMeta({ ...captured(TODAY), plannedFor: '2026-09-12' }, TODAY)).toBe('из плана на вчера')
   })
 })

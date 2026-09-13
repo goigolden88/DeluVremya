@@ -756,6 +756,155 @@ a {
   color: var(--error);
 }
 
+/* ─── План дня ───────────────────────────────────────────────────────────── */
+
+.plan-item {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.plan-item__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+}
+
+/* Текст пункта — кнопка карточки: палец попадает в строку целиком. */
+.plan-item__text {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 400;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+span.plan-item__text {
+  display: flex;
+  align-items: center;
+}
+
+.plan-item--done .plan-item__text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.plan-item__est {
+  flex: none;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.plan-item__actions {
+  padding: 2px 0 6px;
+}
+
+/* Галочка: под палец — квадрат 44 пикселя, рисуется меньше. */
+.check-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: -10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.check-btn__box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--muted);
+  border-radius: 6px;
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.check-btn[aria-pressed='true'] .check-btn__box {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.star-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin-right: -10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.star-btn[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+/* Слот главного — отдельно от списка: второе туда не помещается (Р-07). */
+.plan__main {
+  margin-bottom: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.plan__main .plan-item {
+  border-bottom: 0;
+}
+
+.plan__main > .muted {
+  margin: 8px 0;
+}
+
+.plan__label {
+  display: block;
+  padding-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.plan__add,
+.plan__bulk {
+  margin-bottom: 8px;
+}
+
+.plan__realism {
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+/* Не влезает — акцентом, а не красным: это предупреждение до начала дня,
+   а не провал (тот же довод, что в Р-05). */
+.plan__realism--over {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.plan-card {
+  padding: 4px 0 10px;
+}
+
 /* ─── Импорт записей ─────────────────────────────────────────────────────── */
 
 .import {

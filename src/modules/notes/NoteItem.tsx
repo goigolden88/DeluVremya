@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import type { DateStr } from '../../core/dates.ts'
 import { db } from '../../core/db.ts'
 import type { Note } from '../../core/model.ts'
 import { goalOf, goalProgress, linksOf, NOTE_KINDS, tasksOfGoal, withGoal, withKind, withText } from './inbox.ts'
 import { ageText, deleteConfirm, DONE_LABELS, firstLine, goalLine, KIND_NAMES, progressText } from './labels.ts'
+import { PlanButtons } from './PlanItem.tsx'
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
@@ -14,11 +16,13 @@ type Props = {
   notes: readonly Note[]
   /** Замыслы в работе — выбор в карточке дела (Р-31). */
   goals: readonly Note[]
-  today: string
+  today: DateStr
   open: boolean
   onToggle: () => void
   /** «Сделано» или «Достигнут»: отклик с «Отменить» — у экрана. */
   onDone: (note: Note) => void
+  /** Дело — в план на день (Р-37): отклик с «Отменить» — у экрана. */
+  onPlan: (note: Note, day: DateStr) => void
   onError: (message: string) => void
 }
 
@@ -26,7 +30,7 @@ type Props = {
  * Строка записи: текст, вид и возраст серым. Тап раскрывает карточку
  * на месте (Р-30), а не уводит на другой экран.
  */
-export function NoteItem({ note, notes, goals, today, open, onToggle, onDone, onError }: Props) {
+export function NoteItem({ note, notes, goals, today, open, onToggle, onDone, onPlan, onError }: Props) {
   const goal = note.kind === 'task' ? goalOf(note, notes) : null
   const meta = [KIND_NAMES[note.kind].toLowerCase(), ageText(note, today)]
   if (goal) meta.push(goalLine(goal))
@@ -38,22 +42,35 @@ export function NoteItem({ note, notes, goals, today, open, onToggle, onDone, on
         <span className="note__text">{note.text}</span>
       </button>
       <span className="muted note__meta">{meta.join(' · ')}</span>
-      {open && <NoteCard note={note} notes={notes} goals={goals} onDone={onDone} onError={onError} />}
+      {open && (
+        <NoteCard
+          note={note}
+          notes={notes}
+          goals={goals}
+          today={today}
+          onDone={onDone}
+          onPlan={onPlan}
+          onError={onError}
+        />
+      )}
     </li>
   )
 }
 
 /**
  * Карточка записи (Р-30): ссылки, вид, текст, замысел у дела, дела у замысла,
- * «Сделано» и «Удалить». Вид и замысел пишутся тапом сразу, текст — кнопкой.
+ * «В план» у дела, «Сделано» и «Удалить». Вид и замысел пишутся тапом сразу,
+ * текст — кнопкой.
  */
 function NoteCard({
   note,
   notes,
   goals,
+  today,
   onDone,
+  onPlan,
   onError,
-}: Pick<Props, 'note' | 'notes' | 'goals' | 'onDone' | 'onError'>) {
+}: Pick<Props, 'note' | 'notes' | 'goals' | 'today' | 'onDone' | 'onPlan' | 'onError'>) {
   const [text, setText] = useState(note.text)
   const edited = withText(note, text)
   const goal = note.kind === 'task' ? goalOf(note, notes) : null
@@ -139,6 +156,11 @@ function NoteCard({
       )}
 
       {note.kind === 'goal' && <GoalTasks goal={note} notes={notes} />}
+
+      {/* В план — только дело: мысль и замысел на день не ставятся. */}
+      {note.kind === 'task' && note.status === 'open' && (
+        <PlanButtons note={note} today={today} onMove={(day) => onPlan(note, day)} />
+      )}
 
       <div className="row row--wrap">
         {done && (

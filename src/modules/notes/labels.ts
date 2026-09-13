@@ -178,6 +178,16 @@ export function dayText(day: string, today: DateStr): string {
   return formatDateLong(day)
 }
 
+/** Над хвостом прошлых дней: сколько ждут решения (Р-34). */
+export function overdueLead(count: number): string {
+  return `${count} ${plural(count, ['пункт ждёт', 'пункта ждут', 'пунктов ждут'])} решения`
+}
+
+/** Откуда сделанное вне плана: не стояло в плане — или стояло на другой день. */
+export function offPlanMeta(note: Note, today: DateStr): string {
+  return note.plannedFor === null ? 'не было в плане' : `из плана на ${dayText(note.plannedFor, today)}`
+}
+
 /** Отклик после «В план»: куда поставлено. */
 export function plannedLine(day: DateStr, today: DateStr): string {
   return `Поставлено на ${dayText(day, today)}`

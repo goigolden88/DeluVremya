@@ -1110,6 +1110,8 @@ async function scenario() {
 
   await syncScenario()
 
+  await planScenario()
+
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
     navigator.serviceWorker.ready.then((r) => r.active?.state ?? 'нет'),
@@ -1133,6 +1135,233 @@ async function scenario() {
   const offlineShare = await captureField()
   check('«Поделиться» без сети тоже доезжает — Р-16', offlineShare === 'без сети', `в поле «${offlineShare}»`)
   await offline(false)
+}
+
+/** День со сдвигом от сегодняшнего, `ГГГГ-ММ-ДД`, по часам этого компьютера — как `today()`. */
+function localDay(offset = 0) {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * План дня (Этап 4) на «Сегодня»: пункт полем, оценка и реализм (Р-35),
+ * дело из неразобранного одним тапом, главное — одно (Р-40), галочка,
+ * перенос на завтра и «Впереди» (Р-37), «В план» и «Отменить» на «Заметках»,
+ * сделанное вне плана, хвост прошлых дней из копии (Р-34).
+ *
+ * Идёт после синхронизации: та считает файлы заметок. «Купить фильтр для
+ * воды» в конце снова лежит в неразобранном — его ищет проверка без сети.
+ */
+async function planScenario() {
+  await go('/')
+  const block = (title) =>
+    run(`[...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === ${JSON.stringify(title)})?.closest('section')?.innerText ?? ''`)
+  const fold = (title) =>
+    run(`[...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === ${JSON.stringify(title)})?.closest('section')?.innerText ?? ''`)
+  const mainSlot = () => run(`document.querySelector('.plan__main')?.innerText ?? ''`)
+  const openItem = (text) => act(`startsWith('button.plan-item__text', ${JSON.stringify(text)})?.click()`)
+  const press = (label) => act(`document.querySelector(${JSON.stringify(`[aria-label="${label}"]`)})?.click()`)
+
+  // ─ Пункт полем: без оценки реализм не считает и говорит об этом.
+  await act(`
+    set(document.querySelector('input[name=plan-text]'), 'Позвонить в сервис');
+    byText('button', 'Добавить')?.click();
+  `)
+  await sleep(700)
+  const added = await block('План')
+  check(
+    'пункт в план — одним полем; без оценки реализм так и говорит — Р-35',
+    has(added, 'Позвонить в сервис') && has(added, 'у пункта нет оценки'),
+    line(added, 'Влезает'),
+  )
+
+  // ─ Оценка кнопкой в карточке; кривая — причина с пределами.
+  await openItem('Позвонить в сервис')
+  await sleep(400)
+  await act(`byText('.plan-card button', '30 мин')?.click()`)
+  await sleep(700)
+  await act(`
+    set(document.querySelector('input[name=plan-estimate]'), '0');
+    byText('.plan-card button', 'Поставить')?.click();
+  `)
+  await sleep(400)
+  const estimated = await block('План')
+  check(
+    'оценка — кнопкой в карточке, кривая — причиной с пределами; реализм считает',
+    has(estimated, 'Намечено 30 мин по 1 пункту') && has(estimated, 'от 1 до 1440'),
+    `${line(estimated, 'Намечено')}; ${line(estimated, 'Оценка —')}`,
+  )
+  await openItem('Позвонить в сервис')
+  await sleep(300)
+
+  // ─ Дело из неразобранного — одним тапом «+».
+  await unfold('Из «Неразобранное»')
+  await press('В план на сегодня: Починить полку')
+  await sleep(700)
+  const picked = await block('План')
+  check(
+    'дело из неразобранного — в план одним тапом; пункт без оценки назван числом',
+    has(picked, 'Починить полку') && has(picked, 'Намечено 30 мин по 1 пункту из 2'),
+    line(picked, 'Намечено'),
+  )
+
+  // ─ Не влезает: оценка больше всего окна дня — при любом часе прогона.
+  await openItem('Починить полку')
+  await sleep(400)
+  await act(`
+    set(document.querySelector('input[name=plan-estimate]'), '1020');
+    byText('.plan-card button', 'Поставить')?.click();
+  `)
+  await sleep(700)
+  const over = await block('План')
+  const warned = await run(`document.querySelector('.plan__realism--over') !== null`)
+  check(
+    'план больше остатка дня — «не влезает» с числом и основанием — Р-35',
+    has(over, 'Намечено 17 ч 30 мин по 2 пунктам') && has(over, 'не влезает на') && warned === true,
+    line(over, 'Намечено'),
+  )
+  await openItem('Починить полку')
+  await sleep(300)
+
+  // ─ Главное — одно: звезда у другого пункта переносит слот.
+  await press('Сделать главным: Позвонить в сервис')
+  await sleep(700)
+  const firstMain = await mainSlot()
+  await press('Сделать главным: Починить полку')
+  await sleep(700)
+  const secondMain = await mainSlot()
+  check(
+    'главное — один слот: звезда у другого пункта его переносит — Р-40',
+    has(firstMain, 'Позвонить в сервис') && has(secondMain, 'Починить полку') && !has(secondMain, 'Позвонить'),
+    `${firstMain.replace(/\s+/g, ' ')} → ${secondMain.replace(/\s+/g, ' ')}`,
+  )
+
+  // ─ Галочка: сделанное — зачёркнутым внизу, из суммы уходит.
+  await press('Сделано: Позвонить в сервис')
+  await sleep(700)
+  const doneRow = await run(`document.querySelector('.plan-item--done')?.innerText ?? ''`)
+  const afterDone = await block('План')
+  check(
+    'галочка — сделано: пункт зачёркнут, из суммы оценок ушёл',
+    has(doneRow, 'Позвонить в сервис') && has(afterDone, 'Намечено 17 ч по 1 пункту'),
+    line(afterDone, 'Намечено'),
+  )
+
+  // ─ На завтра: пункт уходит во «Впереди», главное снимается (Р-34).
+  await openItem('Починить полку')
+  await sleep(400)
+  await act(`byText('.plan-card button', 'На завтра')?.click()`)
+  await sleep(700)
+  await unfold('Впереди')
+  const later = await fold('Впереди')
+  const noMain = await mainSlot()
+  check(
+    '«На завтра» — пункт во «Впереди», главное снято — Р-34, Р-37',
+    has(later, 'завтра') && has(later, 'Починить полку') && has(noMain, 'не выбрано'),
+    `${later.replace(/\s+/g, ' ').slice(0, 80)}; ${noMain.replace(/\s+/g, ' ')}`,
+  )
+
+  // ─ «Заметки»: поставленное названо числом; «В план» и «Отменить».
+  await go('/inbox')
+  const waiting = await screen()
+  await act(`startsWith('.note__main', 'Купить фильтр для воды')?.click()`)
+  await sleep(400)
+  await act(`byText('.note__card button', 'На сегодня')?.click()`)
+  await sleep(700)
+  const put = await screen()
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const back = await screen()
+  check(
+    '«Заметки»: поставленное названо числом; «В план» из карточки и «Отменить»',
+    has(waiting, 'Ещё 1 запись в плане — экран «Сегодня»') &&
+      has(put, 'Поставлено на сегодня') &&
+      has(put, 'Ещё 2 записи в плане') &&
+      has(back, 'Ещё 1 запись в плане') &&
+      has(back, 'Купить фильтр для воды'),
+    `${line(waiting, 'Ещё')}; ${line(put, 'Поставлено')}; ${line(back, 'Ещё')}`,
+  )
+
+  // ─ Сделанное в «Заметках» видно на «Сегодня»; галочка там же его снимает.
+  await act(`startsWith('.note__main', 'Купить фильтр для воды')?.click()`)
+  await sleep(400)
+  await act(`byText('.note__card button', 'Сделано')?.click()`)
+  await sleep(700)
+  await go('/')
+  await unfold('Сделано вне плана')
+  const offPlan = await fold('Сделано вне плана')
+  await press('Не сделано: Купить фильтр для воды')
+  await sleep(700)
+  await go('/inbox')
+  const reopened = await screen()
+  check(
+    'сделанное вне плана — на «Сегодня»; галочка там возвращает его в неразобранное',
+    has(offPlan, 'Купить фильтр для воды') && has(offPlan, 'не было в плане') && has(reopened, 'Купить фильтр для воды'),
+    offPlan.replace(/\s+/g, ' ').slice(0, 100),
+  )
+
+  // ─ Хвост прошлых дней: пункты приходят копией, как с другого устройства.
+  const restore = join(profile, 'restore-plan.json')
+  const item = (id, text, plannedFor) => ({
+    id,
+    updatedAt: '2026-01-15T10:00:00.000Z',
+    text,
+    kind: 'task',
+    capturedOn: plannedFor,
+    plannedFor,
+    status: 'open',
+  })
+  writeFileSync(
+    restore,
+    JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: '2026-01-15T10:00:00.000Z',
+      data: {
+        notes: [
+          item('plan-old', 'Позавчерашний пункт', localDay(-2)),
+          item('plan-y1', 'Вчерашний пункт', localDay(-1)),
+          item('plan-y2', 'Ещё вчерашний пункт', localDay(-1)),
+        ],
+      },
+    }),
+  )
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  const { root } = await send('DOM.getDocument')
+  const { nodeId } = await send('DOM.querySelector', {
+    nodeId: root.nodeId,
+    selector: 'input[type=file][accept*="text/plain"]',
+  })
+  await send('DOM.setFileInputFiles', { nodeId, files: [restore] })
+  await sleep(1000)
+  check('пункты прошлых дней приходят копией', has(await screen(), 'Загружено записей: 3'))
+
+  await go('/')
+  const tail = await block('С прошлых дней')
+  check(
+    'невыполненное прошлых дней ждёт решения вверху «Сегодня» — Р-34',
+    has(tail, '3 пункта ждут решения') && has(tail, 'Вчерашний пункт') && has(tail, 'вчера'),
+    line(tail, 'ждут'),
+  )
+  await press('В «Неразобранное»: Позавчерашний пункт')
+  await sleep(700)
+  const fewer = await block('С прошлых дней')
+  await act(`byText('button', 'Всё — на сегодня')?.click()`)
+  await sleep(700)
+  const carried = await screen()
+  const plan = await block('План')
+  await go('/inbox')
+  const returned = await screen()
+  check(
+    'хвост: «В «Неразобранное»» и «Всё — на сегодня» — пункты там, куда решено',
+    has(fewer, '2 пункта ждут решения') &&
+      !has(carried, 'С прошлых дней') &&
+      has(plan, 'Вчерашний пункт') &&
+      has(plan, 'Ещё вчерашний пункт') &&
+      has(returned, 'Позавчерашний пункт'),
+    `${line(fewer, 'ждут')}; в плане: ${has(plan, 'Ещё вчерашний пункт') ? 'да' : 'нет'}`,
+  )
 }
 
 /** Месяц словом, как его ищут: «сентябрь». По часам этого компьютера — как `today()`. */
