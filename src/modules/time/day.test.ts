@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, TimeBlock } from '../../core/model.ts'
 import { createPreset } from './categories.ts'
-import { blockFromPreset, blocksOn, daySummary, DAY_WINDOW, windowElapsed } from './day.ts'
+import { blockFromPreset, blocksOn, daySummary, DAY_WINDOW, viewedDay, windowElapsed } from './day.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
 const DAY = '2026-09-13'
@@ -90,6 +90,20 @@ describe('итог дня', () => {
   it('пустой день — нули, без разбивки', () => {
     const summary = daySummary([], categories, DAY, now)
     expect([summary.total, summary.count, summary.byCategory.length]).toEqual([0, 0, 0])
+  })
+})
+
+describe('показанный день — Р-25', () => {
+  it('прошлый и сегодняшний — из адреса', () => {
+    expect(viewedDay('2026-09-12', DAY)).toBe('2026-09-12')
+    expect(viewedDay(DAY, DAY)).toBe(DAY)
+  })
+
+  it('нет, кривой или будущий — сегодня', () => {
+    expect(viewedDay(null, DAY)).toBe(DAY)
+    expect(viewedDay('вчера', DAY)).toBe(DAY)
+    expect(viewedDay('2026-02-30', DAY)).toBe(DAY)
+    expect(viewedDay('2026-09-14', DAY)).toBe(DAY)
   })
 })
 

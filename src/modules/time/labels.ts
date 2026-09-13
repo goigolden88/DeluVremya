@@ -113,6 +113,14 @@ export function savedLine(name: string, minutes: number, date: DateStr, today: D
     : `Записано на ${formatDateLong(date)}: ${name}, ${formatMinutes(minutes)}`
 }
 
+/**
+ * Подпись над кнопками прошлого дня (Р-25): тап пишет в показанный день,
+ * и без подписи запись во вчера была бы незаметна.
+ */
+export function writingFor(day: DateStr): string {
+  return `Кнопки записывают на ${formatDateLong(day)}`
+}
+
 /** Пояснение к «неучтено» под итогом дня. */
 export function windowNote(): string {
   return `Окно дня — с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}: неучтённое считается от прошедшей его части, а не от суток.`

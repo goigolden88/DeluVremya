@@ -15,6 +15,7 @@ import {
   summaryLine,
   UNKNOWN_CATEGORY,
   unaccountedLine,
+  writingFor,
 } from './labels.ts'
 import { TimerLine, TimerPanel } from './Timer.tsx'
 import { useBlocks } from './useBlocks.ts'
@@ -34,7 +35,17 @@ function describe(error: unknown): string {
  *
  * `compact` — на «Сегодня»: кнопки, идущий таймер и итог, без остального.
  */
-export function TimeDay({ day, compact = false }: { day: string; compact?: boolean }) {
+export function TimeDay({
+  day,
+  today = day,
+  compact = false,
+}: {
+  /** Показанный день: сегодня или прошлый (Р-25). */
+  day: string
+  /** Настоящее сегодня. Не задано — показан сегодняшний. */
+  today?: string
+  compact?: boolean
+}) {
   const catalog = useCatalog()
   const time = useBlocks()
   const timer = useTimer()
@@ -56,6 +67,7 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
   const categoryTotal =
     last === null ? 0 : (summary.byCategory.find((each) => each.categoryId === last.block.categoryId)?.minutes ?? 0)
   const nameOf = (id: string) => categoryName(catalog.categories, id) ?? UNKNOWN_CATEGORY
+  const isToday = day === today
 
   async function write(action: () => Promise<void>) {
     setError('')
@@ -82,6 +94,7 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
     <>
       <section className="block">
         {compact && <TimerLine timer={timer} categories={catalog.categories} />}
+        {!isToday && <p className="muted">{writingFor(day)}</p>}
 
         {buttons.length === 0 ? (
           <p className="stub">
@@ -112,9 +125,12 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
 
       {!compact && (
         <>
-          <Fold id="time:timer" title="Таймер" summary={timer.timer ? 'идёт' : undefined}>
-            <TimerPanel timer={timer} categories={catalog.categories} today={day} />
-          </Fold>
+          {/* Таймер всегда про сейчас — на прошлом дне его нет (Р-25). */}
+          {isToday && (
+            <Fold id="time:timer" title="Таймер" summary={timer.timer ? 'идёт' : undefined}>
+              <TimerPanel timer={timer} categories={catalog.categories} today={today} />
+            </Fold>
+          )}
 
           <Fold id="time:retro" title="Задним числом" summary="если забыл включить таймер" folded>
             <BlockForm
@@ -122,7 +138,8 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
               categories={catalog.categories}
               presets={catalog.presets}
               blocks={time.blocks}
-              today={day}
+              today={today}
+              defaultDate={day}
               onDone={(saved) => {
                 if (!saved) return
                 setRetroSaved(savedLine(nameOf(saved.categoryId), saved.minutes, saved.date, day))
@@ -137,7 +154,7 @@ export function TimeDay({ day, compact = false }: { day: string; compact?: boole
             all={time.blocks}
             categories={catalog.categories}
             presets={catalog.presets}
-            today={day}
+            today={today}
             onRemove={(block) => void remove(block)}
           />
         </>

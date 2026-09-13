@@ -4,7 +4,7 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { nowIso, toDateStr, type DateStr } from '../../core/dates.ts'
+import { isDateStr, nowIso, toDateStr, type DateStr } from '../../core/dates.ts'
 import { ulid } from '../../core/id.ts'
 import type { Category, Preset, TimeBlock } from '../../core/model.ts'
 
@@ -16,6 +16,15 @@ import type { Category, Preset, TimeBlock } from '../../core/model.ts'
 export const DAY_WINDOW = { from: 8, to: 24 } as const
 
 const MINUTES_PER_HOUR = 60
+
+/**
+ * Какой день показать на «Времени» (Р-25): из адреса — прошлый или
+ * сегодняшний; кривой, пустой или будущий — сегодня. Учёт про то, что
+ * было, и в будущее экран не листается.
+ */
+export function viewedDay(param: string | null, today: DateStr): DateStr {
+  return param !== null && isDateStr(param) && param <= today ? param : today
+}
 
 /** Тап по кнопке «Чтение +30» — новый блок на этот день (Р-20). */
 export function blockFromPreset(preset: Preset, date: DateStr): TimeBlock {

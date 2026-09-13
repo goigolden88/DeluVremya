@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
-import { formatDateLong } from '../../core/dates.ts'
+import { Link, useSearchParams } from 'react-router-dom'
+import { addDays, formatDateLong, type DateStr } from '../../core/dates.ts'
 import { useToday } from '../../ui/useToday.ts'
+import { viewedDay } from './day.ts'
 import { windowNote } from './labels.ts'
 import { TimeDay } from './TimeDay.tsx'
 
@@ -8,9 +9,18 @@ import { TimeDay } from './TimeDay.tsx'
  * Учёт времени — экран `/time`. Сюда ведёт ярлык «Учесть время» по долгому
  * тапу на иконке (`?go=time`, Р-16): адрес зашит в установленное приложение
  * и меняться не должен.
+ *
+ * Прошлый день — тот же экран с `?day=ГГГГ-ММ-ДД` (Р-25): день в адресе
+ * переживает перезагрузку и кнопку «назад», а без параметра — сегодня.
  */
 export function TimeScreen() {
-  const day = useToday()
+  const today = useToday()
+  const [params, setParams] = useSearchParams()
+  const day = viewedDay(params.get('day'), today)
+  const isToday = day === today
+
+  // Сегодняшний — без параметра: ровно тот адрес, что открывает ярлык.
+  const show = (next: DateStr) => setParams(next === today ? {} : { day: next })
 
   return (
     <>
@@ -23,10 +33,33 @@ export function TimeScreen() {
             </Link>
           </div>
         </div>
-        <p className="muted">{formatDateLong(day)}</p>
+        <div className="day-nav">
+          <button type="button" className="icon-btn" aria-label="Предыдущий день" onClick={() => show(addDays(day, -1))}>
+            ‹
+          </button>
+          <span className="day-nav__date">
+            {formatDateLong(day)}
+            {isToday && <span className="muted"> · сегодня</span>}
+          </span>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Следующий день"
+            disabled={isToday}
+            onClick={() => show(addDays(day, 1))}
+          >
+            ›
+          </button>
+        </div>
+        {!isToday && (
+          <button type="button" className="link-btn" onClick={() => show(today)}>
+            К сегодняшнему дню
+          </button>
+        )}
       </header>
 
-      <TimeDay day={day} />
+      {/* Ключ — день: отклик «Отменить» и форма «задним числом» — про свой день. */}
+      <TimeDay key={day} day={day} today={today} />
 
       <p className="muted">{windowNote()}</p>
     </>

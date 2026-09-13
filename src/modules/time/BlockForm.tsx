@@ -24,13 +24,17 @@ export function BlockForm({
   presets,
   blocks,
   today,
+  defaultDate,
   existing,
   onDone,
 }: {
   categories: Category[]
   presets: Preset[]
   blocks: TimeBlock[]
+  /** Настоящее сегодня: позже него день не ставится. */
   today: DateStr
+  /** День нового блока по умолчанию — показанный на экране (Р-25). */
+  defaultDate?: DateStr
   existing?: TimeBlock
   onDone: (saved: TimeBlock | null) => void
 }) {
@@ -47,7 +51,7 @@ export function BlockForm({
 
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? choices[0]?.id ?? '')
   const [minutes, setMinutes] = useState(String(existing?.minutes ?? (categoryId ? suggest(categoryId) : DEFAULT_MINUTES)))
-  const [date, setDate] = useState(existing?.date ?? today)
+  const [date, setDate] = useState(existing?.date ?? defaultDate ?? today)
   const [background, setBackground] = useState(existing?.bgCategoryId ?? '')
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)

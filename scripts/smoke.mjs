@@ -632,6 +632,47 @@ async function scenario() {
     line(transferred, 'фоном Прочее'),
   )
 
+  // ─ Прошлый день (Р-25): листается стрелкой, день — в адресе, кнопки
+  // пишут в показанный день. Вчера лежит блок «задним числом» выше.
+  const timerFold = () =>
+    run(`[...document.querySelectorAll('.fold__btn')].some((el) => el.textContent.trim() === 'Таймер')`)
+  await act(`document.querySelector('[aria-label="Предыдущий день"]')?.click()`)
+  await sleep(700)
+  const yesterday = await screen()
+  const yesterdayHash = await run('location.hash')
+  const yesterdayTimer = await timerFold()
+  check(
+    '«‹» — вчерашний день: его блоки, подпись над кнопками, без таймера — Р-25',
+    /day=\d{4}-\d{2}-\d{2}/.test(String(yesterdayHash)) &&
+      has(yesterday, 'Учтено 25 мин · 1 блок') &&
+      has(yesterday, 'Кнопки записывают на') &&
+      yesterdayTimer === false,
+    `${yesterdayHash}; ${line(yesterday, 'Учтено')}; таймер ${yesterdayTimer ? 'есть' : 'нет'}`,
+  )
+
+  await act(`byText('button', 'Чтение +30')?.click()`)
+  await sleep(700)
+  await send('Page.reload')
+  await sleep(2000)
+  const reloaded = await screen()
+  check(
+    'тап на вчерашнем пишет во вчера, перезагрузка остаётся на нём',
+    has(reloaded, 'Учтено 55 мин · 2 блока') && has(reloaded, 'Кнопки записывают на'),
+    line(reloaded, 'Учтено'),
+  )
+
+  await act(`document.querySelector('[aria-label="Следующий день"]')?.click()`)
+  await sleep(700)
+  const back = await screen()
+  check(
+    '«›» — снова сегодня, вчерашний тап сюда не лёг',
+    has(back, 'Учтено 2 ч 5 мин · 3 блока') && (await timerFold()) === true && (await run('location.hash')) === '#/time',
+    line(back, 'Учтено'),
+  )
+
+  await go('/time?day=2099-01-01')
+  check('будущий день в адресе — сегодня', has(await screen(), 'Учтено 2 ч 5 мин · 3 блока'))
+
   // ─ Настройки: разделы свёрнуты оглавлением, у свёрнутой копии — итог.
   // Шестерёнка живёт в шапке «Сегодня».
   await go('/')
