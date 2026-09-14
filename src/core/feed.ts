@@ -1,34 +1,38 @@
 /**
- * Лента: строка ленты и общие операции над ней (Р-48).
+ * Лента: строка ленты и общие операции над ней (их Р-48).
  *
  * Лента — единственное место, где записи разных модулей встречаются.
- * Ядро про модули при этом не знает: вид записи — `EventKind` из модели,
+ * Ядро про модули при этом не знает: вид записи — `RecordKind` из модели,
  * а переводят свои записи в строки ленты сами модули, каждый в своём
- * `modules/<имя>/feed.ts`. Сводит их вместе таблица `src/registry.ts`.
+ * `modules/<имя>/feed.ts`; обзор недели — `screens/reviewFeed.ts` (Р-60).
+ * Сводит их вместе таблица `src/registry.ts`.
  *
- * Здесь только то, что одинаково для всех: порядок дат разной точности,
- * разбивка по месяцам, поиск и подписи. Чистые функции, без React и `db`.
+ * Здесь только то, что одинаково для всех: порядок дат, разбивка по
+ * месяцам, поиск и подписи. Чистые функции, без React и `db`.
+ *
+ * Взято из «Дневников». Своё «Делу Время» (Р-61): запись без даты законна
+ * (Р-08) и стоит внизу, а не наверху красным; дата ищется и словами —
+ * тем же правилом ищут «Заметки».
  */
 
-import { formatDate, formatMonth, isDateOrMonth, isDateStr, isMonthStr, plural } from './dates.ts'
-import type { EventKind } from './model.ts'
+import { formatDate, formatDateLong, formatMonth, isDateOrMonth, isDateStr, isMonthStr, plural } from './dates.ts'
+import type { RecordKind } from './model.ts'
 
 export type FeedItem = {
-  kind: EventKind
+  kind: RecordKind
   /** id записи. Ключ в списке — вид вместе с id: хранилища разные. */
   id: string
   /**
-   * Дата события как она лежит в записи: `YYYY-MM-DD`, `YYYY-MM` (Р-25)
-   * или нечитаемая строка. Не приводится ни к чему: месяц не становится
-   * первым числом, а кривая строка не выбрасывается (Р-34).
+   * Дата записи как она лежит: `YYYY-MM-DD` или нечитаемая строка; пусто —
+   * даты нет (Р-08). Не приводится ни к чему: кривая строка не выбрасывается.
    */
   date: string
   title: string
-  /** Строка под названием: категория и цена, длительность, тип и оценка. */
+  /** Строка под названием: вид и состояние, итог дня, наблюдение недели. */
   detail: string
-  /** Куда ведёт тап. Путь хеш-роутинга. */
-  link: string
-  /** Что ещё ищется, но не показывается: заметки, симптомы, комментарии. */
+  /** Куда ведёт тап. Путь хеш-роутинга. Нет — строка без перехода (Р-59). */
+  link?: string
+  /** Что ещё ищется, но не показывается: заметки блоков, дни плана и выполнения. */
   extra?: string
 }
 
@@ -38,39 +42,41 @@ export function readableDate(item: FeedItem): string | null {
 }
 
 /**
- * Порядок ленты: нечитаемые даты сверху, дальше новыми вниз по времени.
+ * Порядок ленты: новые сверху, без даты — внизу.
  *
- * Даты разной точности сравниваются как строки (Р-25): `2026-09-10` больше
+ * Даты разной точности сравниваются как строки: `2026-09-10` больше
  * `2026-09`, так что запись, известная до месяца, встаёт в конец своего
  * месяца — после всех его дней, а не на первое число.
  *
- * Нечитаемые — наверх, а не вниз. В ленте нет списка «к просмотру», так что
- * запись без даты здесь — всегда поломка, которую надо увидеть и поправить
- * (Р-34, Р-52). Внизу длинной ленты её не увидит никто.
+ * Без даты — вниз, как на «Заметках»: здесь это законная запись, а не
+ * поломка (Р-08, Р-59). Сверху им не место, их находят поиском.
  *
- * Внутри одной даты — по названию: порядок хранилища не значит ничего.
+ * Внутри одной даты — по виду в порядке реестра, затем по названию: порядок
+ * хранилища не значит ничего.
  */
-export function compareFeed(a: FeedItem, b: FeedItem): number {
+export function compareFeed(a: FeedItem, b: FeedItem, order: readonly RecordKind[] = []): number {
   const first = readableDate(a)
   const second = readableDate(b)
   if (first !== second) {
-    if (first === null) return -1
-    if (second === null) return 1
+    if (first === null) return 1
+    if (second === null) return -1
     return second.localeCompare(first)
   }
-  return a.title.localeCompare(b.title, 'ru') || a.id.localeCompare(b.id)
+  return (
+    order.indexOf(a.kind) - order.indexOf(b.kind) || a.title.localeCompare(b.title, 'ru') || a.id.localeCompare(b.id)
+  )
 }
 
 export type FeedGroup = {
-  /** `YYYY-MM`. null — у строк группы дата не читается. */
+  /** `YYYY-MM`. null — у строк группы даты нет или она не читается. */
   month: string | null
   items: FeedItem[]
 }
 
-/** Разбивка по месяцам, как у контента (Р-44). На входе порядок любой. */
-export function groupFeed(items: readonly FeedItem[]): FeedGroup[] {
+/** Разбивка по месяцам. На входе порядок любой; `order` — порядок видов внутри дня. */
+export function groupFeed(items: readonly FeedItem[], order: readonly RecordKind[] = []): FeedGroup[] {
   const groups: FeedGroup[] = []
-  for (const item of [...items].sort(compareFeed)) {
+  for (const item of [...items].sort((a, b) => compareFeed(a, b, order))) {
     const date = readableDate(item)
     const month = date === null ? null : date.slice(0, 7)
     const last = groups.at(-1)
@@ -85,30 +91,44 @@ export function normalize(text: string): string {
   return text.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
 }
 
+/** Слова запроса. Пустой запрос — пустой список: подходит всё. */
+export function queryWords(query: string): string[] {
+  return normalize(query).split(' ').filter(Boolean)
+}
+
+/**
+ * Дата всеми словами, какими её ищут: `2026-03-12`, `12.03.2026`,
+ * «12 марта 2026» и «март 2026». Именительный нужен отдельно: «май»
+ * в «мая» не входит. Нет даты — «без даты»; кривая — как лежит.
+ */
+export function dateWords(date: string | null): string {
+  if (date === null || date === '') return 'без даты'
+  if (isDateStr(date)) return `${date} ${formatDate(date)} ${formatDateLong(date)} ${formatMonth(date.slice(0, 7))}`
+  if (isMonthStr(date)) return `${date} ${formatMonth(date)}`
+  return date
+}
+
 export type FeedFilter = {
-  /** Вид события. null — все. */
-  kind?: EventKind | null
+  /** Вид записи. null — все. */
+  kind?: RecordKind | null
   query?: string
 }
 
 /**
  * Отбор по виду и поиск.
  *
- * Слова запроса ищутся по отдельности, и нужны все: «стрижка 700» находит
- * стрижку за 700, в каком бы порядке ни стояли слова в строке. Ищется
- * и то, что на экране не видно, — заметки и симптомы, — и дата в обоих
- * видах: `2026-07` и `01.07`.
+ * Слова запроса ищутся по отдельности, и нужны все: «воды фильтр» находит
+ * «Купить фильтр для воды», в каком бы порядке ни стояли слова в строке.
+ * Ищется и то, что на экране не видно, — заметки блоков, дни плана, — и дата
+ * цифрами и словами: `01.07`, «июль», «1 июля».
  */
 export function filterFeed(items: readonly FeedItem[], filter: FeedFilter = {}): FeedItem[] {
-  const words = normalize(filter.query ?? '')
-    .split(' ')
-    .filter(Boolean)
+  const words = queryWords(filter.query ?? '')
 
   return items.filter((item) => {
     if (filter.kind && item.kind !== filter.kind) return false
     if (words.length === 0) return true
-    const shown = isDateStr(item.date) ? formatDate(item.date) : ''
-    const haystack = normalize(`${item.title} ${item.detail} ${item.extra ?? ''} ${item.date} ${shown}`)
+    const haystack = normalize(`${item.title} ${item.detail} ${item.extra ?? ''} ${dateWords(item.date)}`)
     return words.every((word) => haystack.includes(word))
   })
 }
@@ -117,18 +137,18 @@ export function filterFeed(items: readonly FeedItem[], filter: FeedFilter = {}):
  * Дата в строке ленты. Месяц и год уже стоят заголовком группы, так что
  * у дня — только число и месяц.
  *
- * Дата, известная до месяца, называется прямо — «без числа», — а не
- * рисуется первым числом (Р-25). Нечитаемая показывается как есть.
+ * Дата, известная до месяца, называется прямо — «без числа». Нечитаемая
+ * показывается как есть; без даты — прочерк: группа и так «Без даты».
  */
 export function feedDateText(date: string): string {
   if (isDateStr(date)) return formatDate(date).slice(0, 5)
   if (isMonthStr(date)) return 'без числа'
-  return date || 'нет даты'
+  return date || '—'
 }
 
-/** Заголовок группы: «Сентябрь 2026» либо предупреждение о нечитаемой дате. */
+/** Заголовок группы: «Сентябрь 2026» либо «Без даты». */
 export function feedHeading(month: string | null): string {
-  if (month === null) return 'Дата не читается'
+  if (month === null) return 'Без даты'
   const text = formatMonth(month)
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
@@ -142,8 +162,8 @@ export function recordsText(count: number): string {
  * Текст пользователя для markdown-выгрузки: служебные знаки экранируются,
  * переносы строк становятся пробелами.
  *
- * Название «*Звёздные* войны» иначе стало бы курсивом, а комментарий
- * в три строки разорвал бы пункт списка на куски.
+ * Текст «*важно* купить» иначе стал бы курсивом, а заметка в три строки
+ * разорвала бы пункт списка на куски.
  */
 export function escapeMarkdown(text: string): string {
   return text

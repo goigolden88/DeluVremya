@@ -4,7 +4,8 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { daysBetween, formatDate, formatDateLong, formatMonth, isDateStr, nowIso, type DateStr } from '../../core/dates.ts'
+import { daysBetween, isDateStr, nowIso, type DateStr } from '../../core/dates.ts'
+import { dateWords, normalize } from '../../core/feed.ts'
 import { ulid } from '../../core/id.ts'
 import type { Note, NoteKind } from '../../core/model.ts'
 
@@ -97,36 +98,19 @@ export function kindCounts(notes: readonly Note[]): Record<NoteKind, number> {
 
 // ─── Поиск ─────────────────────────────────────────────────────────────────
 
-/** Для поиска: регистр, «ё» и лишние пробелы не в счёт — как в ленте «Дневников». */
-export function normalize(text: string): string {
-  return text.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
-}
-
-/** Слова запроса. Пустой запрос — пустой список: подходит всё. */
-export function queryWords(query: string): string[] {
-  return normalize(query).split(' ').filter(Boolean)
-}
-
-/**
- * Дата записи всеми словами, какими её ищут: `2026-03-12`, `12.03.2026`,
- * «12 марта 2026» и «март 2026». Именительный нужен отдельно: «май»
- * в «мая» не входит. Без даты — «без даты»; кривая — как лежит.
- */
-function dateWords(note: Note): string {
-  const day = dayOf(note)
-  if (day === null) return note.capturedOn ?? 'без даты'
-  return `${day} ${formatDate(day)} ${formatDateLong(day)} ${formatMonth(day.slice(0, 7))}`
-}
+// Приведение текста, слова запроса и слова даты — общее правило ядра:
+// лента ищет так же (Р-61). Отсюда их берут шаблоны и план против факта.
+export { normalize, queryWords } from '../../core/feed.ts'
 
 /**
  * Подходит ли запись. Слова ищутся по отдельности и нужны все: «воды
- * фильтр» находит «Купить фильтр для воды» — правило поиска ленты
- * «Дневников». `extra` — что ещё ищется, но в тексте записи не стоит:
- * название замысла у его дела.
+ * фильтр» находит «Купить фильтр для воды»; дата — и цифрами, и словами.
+ * `extra` — что ещё ищется, но в тексте записи не стоит: название замысла
+ * у его дела.
  */
 export function matchesQuery(note: Note, words: readonly string[], extra = ''): boolean {
   if (words.length === 0) return true
-  const haystack = normalize(`${note.text} ${dateWords(note)} ${extra}`)
+  const haystack = normalize(`${note.text} ${dateWords(note.capturedOn)} ${extra}`)
   return words.every((word) => haystack.includes(word))
 }
 
