@@ -4,6 +4,7 @@ import { startAutoSync } from './core/sync.ts'
 import { Layout } from './ui/Layout.tsx'
 import { Today } from './screens/Today.tsx'
 import { Feed } from './screens/Feed.tsx'
+import { Help } from './screens/Help.tsx'
 import { Inbox } from './screens/Inbox.tsx'
 import { Month } from './screens/Month.tsx'
 import { Review } from './screens/Review.tsx'
@@ -48,6 +49,8 @@ export function App() {
           <Route path="year" element={<Year />} />
           {/* Лента (Р-62): не вкладка — её открывают не каждый день. */}
           <Route path="feed" element={<Feed />} />
+          {/* Справка (Р-64): вход — «?» рядом с шестерёнкой на главном. */}
+          <Route path="help" element={<Help />} />
           {/* Незнакомый адрес — на главный. Так и ярлык на экран, которого
               ещё нет, открывает приложение, а не пустоту. */}
           <Route path="*" element={<Navigate to="/" replace />} />

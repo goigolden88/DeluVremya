@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import help from './Help.tsx?raw'
 import welcome from './Welcome.tsx?raw'
 
 /**
  * Строки исходника, где число вписано цифрой. Импорты, комментарии и имена
- * тегов не в счёт: в комментариях — номера решений, в `<h2>` — разметка,
+ * тегов не в счёт: в комментариях — номера решений, в `<h1>` — разметка,
  * а не текст для человека.
  *
- * Сторож взят из «Дневников». Справка появится в Этапе 6 и встанет сюда же.
+ * Сторож взят из «Дневников»: справка и приветствие собирают числа
+ * из констант кода (Р-64, правило в CLAUDE.md).
  */
 function typedNumbers(source: string): string[] {
   return source
@@ -17,8 +19,11 @@ function typedNumbers(source: string): string[] {
     .map((line) => line.trim())
 }
 
-describe('приветствие — числа только из констант', () => {
-  it.each([['Welcome.tsx', welcome]])('в %s ни одна цифра не вписана руками', (_name, source) => {
+describe('справка и приветствие — числа только из констант', () => {
+  it.each([
+    ['Help.tsx', help],
+    ['Welcome.tsx', welcome],
+  ])('в %s ни одна цифра не вписана руками', (_name, source) => {
     expect(typedNumbers(source)).toEqual([])
   })
 

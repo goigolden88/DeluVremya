@@ -41,6 +41,10 @@ export function Today() {
         <div className="screen-head__row">
           <h1>{names.today}</h1>
           <div className="screen-head__tools">
+            {/* Справка (Р-64): непонятное случается здесь, на главном. */}
+            <Link className="gear" to="/help" aria-label="Справка">
+              <span aria-hidden="true">?</span>
+            </Link>
             <Link className="gear" to="/settings" aria-label="Настройки">
               <span aria-hidden="true">⚙</span>
               {mark && <span className={mark} aria-hidden="true" />}
