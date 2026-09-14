@@ -21,7 +21,8 @@ import { useCatalog } from './useCatalog.ts'
  * Отклик на неделе, а не только в воскресенье. Пределы «не больше» здесь
  * не показываются — только в обзоре недели (Р-05).
  *
- * Норм нет — блока нет: считать не с чем.
+ * Норм нет — блока нет: считать не с чем. Свёрнут, пока не развернули:
+ * экран учёта и так длинный, а итог «выполнено N из M» виден и у свёрнутого.
  */
 export function WeekProgress({ today }: { today: DateStr }) {
   const catalog = useCatalog()
@@ -33,7 +34,7 @@ export function WeekProgress({ today }: { today: DateStr }) {
   const done = rows.filter((row) => row.checks.every((check) => check.met)).length
 
   return (
-    <Fold id="time:week" title="Неделя" summary={`выполнено ${done} из ${rows.length}`}>
+    <Fold id="time:week" title="Неделя" summary={`выполнено ${done} из ${rows.length}`} folded>
       <p className="muted">{progressLead(weekStart(today))}</p>
       <table className="stats">
         <tbody>
