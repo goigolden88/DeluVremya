@@ -12,7 +12,9 @@ import { windowLeft } from '../modules/time/day.ts'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
 import { ReviewCall } from './Review.tsx'
 import { useFirstRun } from './useFirstRun.ts'
+import { useWhatsNew } from './useWhatsNew.ts'
 import { Welcome } from './Welcome.tsx'
+import { WhatsNew } from './WhatsNew.tsx'
 
 /** Остаток дня в реализме плана пересчитывается раз в минуту. */
 const MINUTE = 60 * 1000
@@ -27,6 +29,7 @@ const MINUTE = 60 * 1000
  */
 export function Today() {
   const first = useFirstRun()
+  const news = useWhatsNew(first)
   const day = useToday()
   const now = useNow(MINUTE)
   const names = useScreenNames()
@@ -49,6 +52,9 @@ export function Today() {
 
       {/* Первый запуск: пока база пуста и приветствие не закрыли. */}
       {first.welcome && <Welcome onDone={first.dismissWelcome} />}
+
+      {/* После обновления — что поменялось (Р-65). Свежей установке — ничего. */}
+      {news.show.length > 0 && <WhatsNew changes={news.show} onDone={news.dismiss} />}
 
       {/* iPhone во вкладке Safari: у установленного своё хранилище. */}
       {first.iosNote && (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { CHANGES } from '../changes.ts'
 import { db } from '../core/db.ts'
 import { days, today } from '../core/dates.ts'
 import { SCHEMA_VERSION, SYNCED_STORES } from '../core/model.ts'
@@ -27,6 +28,7 @@ import { UNSORTED_TITLE } from '../modules/notes/labels.ts'
 import { markdownExport } from '../registry.ts'
 import { isEmptyBase } from './firstRun.ts'
 import { ImportRecords } from './ImportRecords.tsx'
+import { ChangeList } from './WhatsNew.tsx'
 import { DEFAULT_THRESHOLDS, readThreshold, THRESHOLD_PROBLEM, type Thresholds } from './review.ts'
 import { readThresholds, saveThresholds } from './useReview.ts'
 
@@ -156,6 +158,12 @@ function About({ state }: { state: State }) {
           isEmptyBase(Object.fromEntries(state.rows.map((row) => [row.store, row.live])))
         }
       />
+
+      {/* Весь список изменений (Р-65): блок на главном экране закрыли, а спросить
+          «что тогда поменялось» можно и потом. */}
+      <Fold id="settings:about:changes" title="Что нового" sub folded>
+        <ChangeList changes={CHANGES} />
+      </Fold>
 
       {state.status === 'loading' && <p className="muted">Открываю базу…</p>}
 
