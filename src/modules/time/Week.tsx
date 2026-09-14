@@ -1,18 +1,10 @@
-import { weekPeriod, weekStart, type DateStr } from '../../core/dates.ts'
+import { weekStart, type DateStr } from '../../core/dates.ts'
 import { Fold } from '../../ui/Fold.tsx'
 import { quoted } from '../../ui/screenNames.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
-import {
-  backgroundText,
-  checkText,
-  formatMinutes,
-  historyText,
-  kindLine,
-  periodLine,
-  progressLead,
-  UNKNOWN_CATEGORY,
-} from './labels.ts'
-import { periodSummary, weekNorms, weekProgress } from './period.ts'
+import { backgroundText, checkText, historyText, progressLead } from './labels.ts'
+import { weekNorms, weekProgress } from './period.ts'
+import { Unready } from './Period.tsx'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
 
@@ -47,50 +39,6 @@ export function WeekProgress({ today }: { today: DateStr }) {
         </tbody>
       </table>
     </Fold>
-  )
-}
-
-/** Ошибка чтения — словами; ещё не прочитано — ничего. */
-function Unready({ catalog, time }: { catalog: ReturnType<typeof useCatalog>; time: ReturnType<typeof useBlocks> }) {
-  if (catalog.status === 'failed') return <p className="error">Категории не прочитались: {catalog.error}</p>
-  if (time.status === 'failed') return <p className="error">Блоки времени не прочитались: {time.error}</p>
-  return null
-}
-
-/**
- * Время недели — шаг обзора. Сумма с основанием, категории в своём порядке,
- * фоновое у категории отдельно и в сумму не входит (Р-43), разбивка по
- * признаку — только здесь, дневной экран им не красится (Р-05).
- */
-export function WeekTime({ week, today }: { week: DateStr; today: DateStr }) {
-  const catalog = useCatalog()
-  const time = useBlocks()
-  if (catalog.status !== 'ready' || time.status !== 'ready') return <Unready catalog={catalog} time={time} />
-
-  const summary = periodSummary(time.blocks, catalog.categories, weekPeriod(week), today)
-  const withBackground = summary.byCategory.some((row) => row.background > 0)
-
-  return (
-    <div className="day-sum">
-      <p className="lead">{periodLine(summary)}</p>
-      {summary.byCategory.length > 0 && (
-        <table className="stats">
-          <tbody>
-            {summary.byCategory.map((row) => (
-              <tr key={row.categoryId}>
-                <td>
-                  {row.name ?? UNKNOWN_CATEGORY}
-                  {row.background > 0 && <span className="muted"> · {backgroundText(row.background)}</span>}
-                </td>
-                <td className="num">{row.minutes > 0 ? formatMinutes(row.minutes) : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {withBackground && <p className="muted">Фоновое в сумму не входит: час ютуба под покер — один час.</p>}
-      {summary.byKind.length > 0 && <p className="muted">По признаку: {kindLine(summary.byKind)}</p>}
-    </div>
   )
 }
 

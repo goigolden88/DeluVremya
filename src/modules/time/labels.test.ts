@@ -8,6 +8,7 @@ import {
   historyText,
   historyWaitText,
   keptText,
+  marksLine,
   NORM_PROBLEMS,
   normText,
   runningLine,
@@ -15,6 +16,7 @@ import {
   startedLine,
   summaryLine,
   unaccountedLine,
+  weekCell,
   windowNote,
   writingFor,
 } from './labels.ts'
@@ -91,6 +93,16 @@ describe('тексты норм недели — Р-45', () => {
     const history = { since: '2026-08-03', marks: [], kept: 2, weeks: NORM_MIN_WEEKS }
     expect(historyText({ ...history, enough: true })).toBe(`выполнена в 2 из ${NORM_MIN_WEEKS} недель`)
     expect(historyText({ ...history, enough: false })).toContain('норма с 3 августа 2026')
+  })
+
+  it('отметки по неделям — числа дней, через месяц тоже; не в счёт не показаны (Р-55)', () => {
+    const marks = [
+      { week: { from: '2026-08-31', to: '2026-09-06' }, counted: true, met: true },
+      { week: { from: '2026-09-07', to: '2026-09-13' }, counted: true, met: false },
+      { week: { from: '2026-09-14', to: '2026-09-20' }, counted: false, met: false },
+    ]
+    expect(weekCell(marks[0]!.week)).toBe('31–6')
+    expect(marksLine(marks)).toBe('31–6 ✓ · 7–13 —')
   })
 
   it('пределы в причинах — из констант', () => {

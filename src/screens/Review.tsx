@@ -4,11 +4,12 @@ import { addDays, formatPeriod, weekPeriod, weekStart, type DateStr } from '../c
 import { db } from '../core/db.ts'
 import { captureNote, noteRef } from '../modules/notes/inbox.ts'
 import { durationText } from '../modules/notes/labels.ts'
-import { PlanWeek } from '../modules/notes/PlanWeek.tsx'
+import { PlanPeriod } from '../modules/notes/PlanPeriod.tsx'
 import { RecallWeeks } from '../modules/notes/Recall.tsx'
 import { StaleReview } from '../modules/notes/StaleReview.tsx'
 import { useNotes } from '../modules/notes/useNotes.ts'
-import { WeekNorms, WeekTime } from '../modules/time/Week.tsx'
+import { PeriodTime } from '../modules/time/Period.tsx'
+import { WeekNorms } from '../modules/time/Week.tsx'
 import { quoted } from '../ui/screenNames.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../ui/useToday.ts'
@@ -104,12 +105,12 @@ export function Review() {
 
       <section className="block">
         <h2>Время недели</h2>
-        <WeekTime week={week} today={today} />
+        <PeriodTime period={weekPeriod(week)} today={today} />
       </section>
 
       <section className="block">
         <h2>План против факта</h2>
-        <PlanWeek week={week} today={today} />
+        <PlanPeriod period={weekPeriod(week)} today={today} />
       </section>
 
       <section className="block">

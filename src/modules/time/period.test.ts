@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Category, TimeBlock } from '../../core/model.ts'
 import {
   checkNorm,
+  compareRows,
   normInput,
   normSince,
   periodNorms,
@@ -67,6 +68,20 @@ describe('итог промежутка — Р-43', () => {
       { kind: 'useful', minutes: 105 },
       { kind: 'neutral', minutes: 15 },
       { kind: 'idle', minutes: 60 },
+    ])
+  })
+
+  it('два промежутка рядом — Р-55: учтённая только в прежнем стоит с нулём, только фоном — нет', () => {
+    const current = periodSummary([block('1', 'b', '2026-09-08', 60)], categories, WEEK, SUNDAY)
+    const before = periodSummary(
+      [block('2', 'a', '2026-09-01', 30), block('3', 'b', '2026-09-02', 20, { bgCategoryId: 'p' })],
+      categories,
+      { from: '2026-08-31', to: '2026-09-06' },
+      SUNDAY,
+    )
+    expect(compareRows(current, before, categories).map((row) => [row.name, row.minutes, row.before])).toEqual([
+      ['Чтение', 0, 30],
+      ['Ютуб', 60, 20],
     ])
   })
 

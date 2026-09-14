@@ -3,7 +3,7 @@
  * (правило в CLAUDE.md).
  */
 
-import { formatDateLong, plural, type DateStr } from '../../core/dates.ts'
+import { formatDateLong, plural, type DateStr, type Period } from '../../core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW } from './day.ts'
 import {
@@ -18,6 +18,7 @@ import {
   type NormProblem,
   type NormRule,
   type PeriodSummary,
+  type WeekMark,
 } from './period.ts'
 import type { BlockProblem } from './retro.ts'
 
@@ -198,6 +199,29 @@ export function historyWaitText(since: DateStr | null, weeks: number): string {
   const need = `история — с ${NORM_MIN_WEEKS} ${plural(NORM_MIN_WEEKS, ['полной недели', 'полных недель', 'полных недель'])}, пока ${weeks}`
   return since === null ? need : `норма ${normSinceText(since)} · ${need}`
 }
+
+/** Неделя в отметках нормы — числами дней: «7–13», через месяц «31–6». */
+export function weekCell(week: Period): string {
+  return `${Number(week.from.slice(8))}–${Number(week.to.slice(8))}`
+}
+
+/**
+ * Отметки нормы по неделям в счёт (Р-55): «31–6 ✓ · 7–13 —». Недели не
+ * в счёт не показываются — число недель в счёт названо в строке истории.
+ */
+export function marksLine(marks: readonly WeekMark[]): string {
+  return marks
+    .filter((mark) => mark.counted)
+    .map((mark) => `${weekCell(mark.week)} ${mark.met ? '✓' : '—'}`)
+    .join(' · ')
+}
+
+/** Как читать отметки по неделям месяца (Р-55, Р-56). */
+export const MARKS_BASIS =
+  'Недели — те, чьё воскресенье в этом месяце. В счёт — закончившиеся и полные с дня нормы; ✓ — норма выполнена, «—» — нет.'
+
+/** Как считаются нормы за год. */
+export const YEAR_NORMS_BASIS = 'Недели — те, чьё воскресенье в этом году. В счёт — закончившиеся и полные с дня нормы.'
 
 /** История нормы словами: «выполнена в N из M недель» или когда появится. */
 export function historyText(history: NormHistory): string {

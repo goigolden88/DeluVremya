@@ -62,6 +62,17 @@ export type PeriodSummary = {
 
 const KIND_ORDER: readonly CategoryKind[] = ['useful', 'neutral', 'idle']
 
+/**
+ * Порядок строк итога — порядок категорий, неизвестные в конце: NaN от двух
+ * бесконечностей ложен, и сравнение уходит к имени.
+ */
+function categoryOrder(categories: readonly Category[]) {
+  const known = new Map(categories.map((category) => [category.id, category]))
+  const order = (id: string) => known.get(id)?.order ?? Number.POSITIVE_INFINITY
+  return (a: { categoryId: string; name: string | null }, b: { categoryId: string; name: string | null }) =>
+    order(a.categoryId) - order(b.categoryId) || (a.name ?? '').localeCompare(b.name ?? '', 'ru')
+}
+
 export function periodSummary(
   blocks: readonly TimeBlock[],
   categories: readonly Category[],
@@ -100,12 +111,9 @@ export function periodSummary(
     if (block.bgCategoryId) row(block.bgCategoryId).background += block.minutes
   }
 
-  // Порядок категорий, неизвестные — в конце: NaN от двух бесконечностей
-  // ложен, и сравнение уходит к имени.
-  const order = (id: string) => known.get(id)?.order ?? Number.POSITIVE_INFINITY
   const byCategory = [...rows.values()]
     .map(({ dates: own, ...rest }) => ({ ...rest, days: own.size }))
-    .sort((a, b) => order(a.categoryId) - order(b.categoryId) || (a.name ?? '').localeCompare(b.name ?? '', 'ru'))
+    .sort(categoryOrder(categories))
 
   const kinds = new Map<CategoryKind | null, number>()
   for (const each of byCategory) kinds.set(each.kind, (kinds.get(each.kind) ?? 0) + each.minutes)
@@ -122,6 +130,29 @@ export function periodSummary(
     byCategory,
     byKind,
   }
+}
+
+/** Строка сравнения: категория этого промежутка и её минуты в прежнем. */
+export type CompareRow = PeriodCategory & { before: number }
+
+/**
+ * Категории двух промежутков рядом (Р-55): у каждой — минуты в обоих, порядок
+ * категорий. Категория, учтённая только в прежнем, стоит с нулём в этом —
+ * иначе пропала бы молча; только фоном в прежнем — не стоит: сравнивать нечего.
+ */
+export function compareRows(
+  current: PeriodSummary,
+  before: PeriodSummary,
+  categories: readonly Category[],
+): CompareRow[] {
+  const earlier = new Map(before.byCategory.map((row) => [row.categoryId, row.minutes]))
+  const rows: CompareRow[] = current.byCategory.map((row) => ({ ...row, before: earlier.get(row.categoryId) ?? 0 }))
+  const present = new Set(rows.map((row) => row.categoryId))
+  for (const row of before.byCategory) {
+    if (present.has(row.categoryId) || row.minutes === 0) continue
+    rows.push({ ...row, minutes: 0, count: 0, days: 0, background: 0, before: row.minutes })
+  }
+  return rows.sort(categoryOrder(categories))
 }
 
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────

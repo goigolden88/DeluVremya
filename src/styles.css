@@ -200,6 +200,26 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
+/* Подписи столбцов сравнения (Р-55): мелко и серым, число важнее. */
+.stats th {
+  padding: 0 0 4px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats th.num {
+  text-align: right;
+}
+
+/* Отметки нормы по неделям месяца: цифры дней ровными столбиками. */
+.norm-marks {
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0;
+}
+
 .stats .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
