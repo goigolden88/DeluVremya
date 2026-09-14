@@ -86,7 +86,19 @@ export function Review() {
           >
             ‹
           </button>
-          <span className="day-nav__date">{formatPeriod(weekPeriod(week))}</span>
+          {/* Любая неделя — полем даты (Р-77): любой день открывает свою неделю. */}
+          <input
+            type="date"
+            name="week"
+            className="day-nav__date"
+            aria-label="Выбрать неделю — любой её день"
+            max={today}
+            value={week}
+            onChange={(event) => {
+              // Пустое — поле очистили крестиком: переходить некуда.
+              if (event.target.value) setParams({ week: viewedWeek(event.target.value, today) })
+            }}
+          />
           <button
             type="button"
             className="icon-btn"
@@ -98,7 +110,7 @@ export function Review() {
           </button>
         </div>
         <p className="muted">
-          {done ? doneText(done) : 'Обзор не проведён'}
+          {formatPeriod(weekPeriod(week))} · {done ? doneText(done) : 'Обзор не проведён'}
           {current && ' · неделя ещё идёт'}
         </p>
       </header>

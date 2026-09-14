@@ -2554,6 +2554,82 @@ async function polishScenario() {
     revealedHash === '#/inbox' && has(revealed, 'Складка давняя'),
     `${revealedHash}; ${line(revealed, 'Складка давняя')}`,
   )
+
+  // ─ Любая неделя и месяц (Р-77): неделя — полем даты, месяц и год — списком.
+  // Выбор в списке React слушает событием change, а не input.
+  const choose = (name, value) => `
+    const field = document.querySelector('select[name=${name}]');
+    set(field, ${JSON.stringify(value)});
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  `
+  await go('/review')
+  await act(`set(document.querySelector('input[name=week]'), '2026-08-12')`)
+  await sleep(700)
+  const weekHash = await run('location.hash')
+  await go('/month')
+  await act(choose('month', '2026-02'))
+  await sleep(700)
+  const monthHash = await run('location.hash')
+  const monthScreen = await screen()
+  await go('/year')
+  const years = await run(`[...document.querySelectorAll('select[name=year] option')].map((el) => el.value).join(',')`)
+  check(
+    'любая неделя — полем даты, её понедельник в адресе; месяц и год — списком — Р-77',
+    weekHash === '#/review?week=2026-08-10' &&
+      monthHash === '#/month?m=2026-02' &&
+      has(monthScreen, 'Учтено') &&
+      years.split(',').includes('2024'),
+    `${weekHash}; ${monthHash}; годы ${years}`,
+  )
+
+  // ─ Markdown на выбор (Р-79): без раздела обзоров, за февраль — в шапке сказано.
+  for (const name of readdirSync(profile)) {
+    if (/^deluvremya-.*\.md$/.test(name)) rmSync(join(profile, name))
+  }
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  await unfold('Markdown для чтения')
+  await act(
+    `const chip = [...document.querySelectorAll('[aria-label="Разделы markdown"] button')].find((el) => el.textContent.trim() === 'Обзоры недели'); chip?.click()`,
+  )
+  await sleep(300)
+  await act(choose('md-period', 'm:2026-02'))
+  await sleep(300)
+  await act(`byText('button', 'Сохранить markdown')?.click()`)
+  await sleep(1500)
+  const chosenName = readdirSync(profile).find((name) => /^deluvremya-.*\.md$/.test(name))
+  const chosen = chosenName ? readFileSync(join(profile, chosenName), 'utf8') : ''
+  check(
+    'markdown на выбор: без обзоров, за февраль — шапка называет разделы и период — Р-79',
+    chosen.includes('Разделы: Заметки и план, Учёт времени.') &&
+      chosen.includes('Период: февраль 2026.') &&
+      chosen.includes('## Учёт времени') &&
+      !chosen.includes('## Обзоры недели'),
+    chosenName ? `${chosenName}; ${chosen.length} знаков` : 'файла нет',
+  )
+
+  // ─ Порядок пунктов плана (Р-75): «↑ Выше» в карточке ставит пункт выше соседа.
+  await go('/')
+  await act(`
+    set(document.querySelector('input[name=plan-text]'), 'Порядок один');
+    document.querySelector('.plan__add button[type=submit]')?.click();
+  `)
+  await sleep(700)
+  await act(`
+    set(document.querySelector('input[name=plan-text]'), 'Порядок два');
+    document.querySelector('.plan__add button[type=submit]')?.click();
+  `)
+  await sleep(700)
+  await act(`startsWith('button.plan-item__text', 'Порядок два')?.click()`)
+  await sleep(400)
+  await act(`byText('button', '↑ Выше')?.click()`)
+  await sleep(700)
+  const ordered = await planText()
+  check(
+    '«↑ Выше» в карточке пункта ставит его выше соседа — Р-75',
+    ordered.indexOf('Порядок два') !== -1 && ordered.indexOf('Порядок два') < ordered.indexOf('Порядок один'),
+    `два на ${ordered.indexOf('Порядок два')}, один на ${ordered.indexOf('Порядок один')}`,
+  )
 }
 
 async function unfoldAll() {

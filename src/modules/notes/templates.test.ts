@@ -8,6 +8,7 @@ import {
   draftOf,
   itemsFromPlan,
   moveDraftItem,
+  moveTemplate,
   NAME_PROBLEM_TEXT,
   readDraft,
   templateNameProblem,
@@ -191,3 +192,23 @@ describe('тексты шаблонов', () => {
     expect(templateSavedLine('Рабочий', 3)).toBe('Шаблон «Рабочий» сохранён — 3 пункта')
   })
 })
+
+describe('порядок шаблонов — Р-75', () => {
+  const tpl = (id: string, order: number): DayTemplate => ({
+    id,
+    updatedAt: '2026-09-14T08:00:00.000Z',
+    name: id,
+    items: [],
+    order,
+  })
+
+  it('сдвиг нумерует живые подряд; крайний дальше не двигается', () => {
+    const list = [tpl('a', 0), tpl('b', 1), tpl('c', 5)]
+    expect(moveTemplate(list, 'c', -1).map((each) => [each.id, each.order])).toEqual([
+      ['c', 1],
+      ['b', 2],
+    ])
+    expect(moveTemplate(list, 'a', -1)).toEqual([])
+  })
+})
+

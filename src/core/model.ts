@@ -81,6 +81,8 @@ export type Note = Base & {
   plannedFor: string | null
   /** главное дело того дня, на который поставлена */
   main?: boolean
+  /** место пункта в своём дне; нет — после упорядоченных, по id (Р-75) */
+  order?: number
   /** оценка длительности, для реализма плана */
   estMin?: number
   status: NoteStatus

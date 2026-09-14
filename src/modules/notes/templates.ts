@@ -24,6 +24,21 @@ export function templatesOf(templates: readonly DayTemplate[]): DayTemplate[] {
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'ru'))
 }
 
+/**
+ * Сдвиг шаблона выше или ниже среди живых (Р-75). Порядок заново подряд
+ * с нуля: после удалений в нём бывают дыры. Возвращает изменённые.
+ */
+export function moveTemplate(templates: readonly DayTemplate[], id: string, step: -1 | 1): DayTemplate[] {
+  const list = templatesOf(templates)
+  const from = list.findIndex((template) => template.id === id)
+  const a = list[from]
+  const b = list[from + step]
+  if (from === -1 || !a || !b) return []
+  list[from] = b
+  list[from + step] = a
+  return list.flatMap((template, order) => (template.order === order ? [] : [{ ...template, order }]))
+}
+
 export type NameProblem = 'empty' | 'long' | 'taken'
 
 export const NAME_PROBLEM_TEXT: Record<NameProblem, string> = {

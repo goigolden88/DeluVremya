@@ -31,6 +31,16 @@ function byId(a: Note, b: Note): number {
 }
 
 /**
+ * Порядок пунктов дня (Р-75): с `order` — по нему, без — после, по времени
+ * добавления. Бесконечность минус бесконечность — NaN, ложна, и сравнение
+ * уходит к `id`.
+ */
+function byPlace(a: Note, b: Note): number {
+  const place = (note: Note) => note.order ?? Number.POSITIVE_INFINITY
+  return place(a) - place(b) || byId(a, b)
+}
+
+/**
  * Главное дело среди пунктов дня. Слот один (Р-07); если после обмена
  * устройств отмечено два — позднее по времени правки, при равенстве —
  * по id: на обоих устройствах ответ один (Р-40).
@@ -53,7 +63,7 @@ export function mainOf(items: readonly Note[]): Note | null {
 export type DayPlan = {
   /** Главное дело — открытое или уже сделанное. */
   main: Note | null
-  /** Открытые, кроме главного, в порядке добавления. */
+  /** Открытые, кроме главного, по порядку дня (Р-75). */
   open: Note[]
   /** Сделанные, кроме главного. */
   done: Note[]
@@ -62,7 +72,7 @@ export type DayPlan = {
 }
 
 export function dayPlan(notes: readonly Note[], day: DateStr): DayPlan {
-  const all = notes.filter((note) => isPlannedOn(note, day)).sort(byId)
+  const all = notes.filter((note) => isPlannedOn(note, day)).sort(byPlace)
   const main = mainOf(all)
   const rest = all.filter((note) => note !== main)
   return {
@@ -83,10 +93,27 @@ export function withoutMain(note: Note): Note {
 
 /**
  * Поставить на день или вернуть в неразобранное (`null`). Отметка главного
- * снимается: главное выбирается на свой день (Р-34).
+ * и место в дне снимаются: и то и другое выбирается на свой день (Р-34, Р-75).
  */
 export function withPlan(note: Note, day: DateStr | null): Note {
-  return { ...withoutMain(note), plannedFor: day }
+  const { order: _order, ...rest } = withoutMain(note)
+  return { ...rest, plannedFor: day }
+}
+
+/**
+ * Сдвиг пункта выше или ниже среди `list` — открытых пунктов дня в порядке
+ * экрана (Р-75). Нумерует список подряд с нуля, возвращает изменённые.
+ * Сдвигать некуда — пусто.
+ */
+export function movePlanItem(list: readonly Note[], id: string, step: -1 | 1): Note[] {
+  const items = [...list]
+  const from = items.findIndex((note) => note.id === id)
+  const a = items[from]
+  const b = items[from + step]
+  if (from === -1 || !a || !b) return []
+  items[from] = b
+  items[from + step] = a
+  return items.flatMap((note, order) => (note.order === order ? [] : [{ ...note, order }]))
 }
 
 /**
@@ -144,7 +171,7 @@ export function overdue(notes: readonly Note[], today: DateStr): Note[] {
         note.plannedFor !== null &&
         (!isDateStr(note.plannedFor) || note.plannedFor < today),
     )
-    .sort((a, b) => (a.plannedFor ?? '').localeCompare(b.plannedFor ?? '') || byId(a, b))
+    .sort((a, b) => (a.plannedFor ?? '').localeCompare(b.plannedFor ?? '') || byPlace(a, b))
 }
 
 export type DayGroup = { day: DateStr; notes: Note[] }
@@ -160,7 +187,7 @@ export function ahead(notes: readonly Note[], today: DateStr): DayGroup[] {
         isDateStr(note.plannedFor) &&
         note.plannedFor > today,
     )
-    .sort((a, b) => (a.plannedFor ?? '').localeCompare(b.plannedFor ?? '') || byId(a, b))
+    .sort((a, b) => (a.plannedFor ?? '').localeCompare(b.plannedFor ?? '') || byPlace(a, b))
 
   const groups: DayGroup[] = []
   for (const note of future) {

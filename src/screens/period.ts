@@ -10,6 +10,7 @@ import {
   addMonths,
   days,
   formatMonth,
+  isDateStr,
   isMonthStr,
   monthEndIn,
   monthName,
@@ -18,6 +19,7 @@ import {
   periodDays,
   plural,
   weekPeriod,
+  yearPeriod,
   type DateStr,
   type MonthStr,
   type Period,
@@ -76,4 +78,40 @@ export function runningText(period: Period, today: DateStr, what: string): strin
   const all = periodDays(period)
   const passed = all.filter((day) => day <= today).length
   return `${what} ещё идёт: ${plural(passed, ['прошёл', 'прошло', 'прошло'])} ${days(passed)} из ${all.length}`
+}
+
+// ─── Выбор месяца и года (Р-77), период выгрузки (Р-79) ───────────────────
+
+/**
+ * Месяцы для выбора: от первого месяца с записями до текущего, свежие сверху.
+ * `shown` — показанный сейчас: он в списке всегда, даже если листали раньше
+ * первой записи. Кривые и будущие даты не в счёт.
+ */
+export function monthChoices(dates: readonly string[], today: DateStr, shown?: MonthStr): MonthStr[] {
+  const last = monthOf(today)
+  let first = last
+  for (const date of dates) {
+    if (isDateStr(date) && date <= today && monthOf(date) < first) first = monthOf(date)
+  }
+  if (shown !== undefined && isMonthStr(shown) && shown < first) first = shown
+  const list: MonthStr[] = []
+  for (let month = first; month <= last; month = addMonths(month, 1)) list.push(month)
+  return list.reverse()
+}
+
+/** Годы тех же месяцев, свежие сверху. */
+export function yearChoices(months: readonly MonthStr[]): number[] {
+  return [...new Set(months.map((month) => Number(month.slice(0, 4))))]
+}
+
+/** Период выгрузки markdown и его название для шапки файла. Null — за всё время. */
+export type ExportSpan = { period: Period; label: string } | null
+
+/** Значение списка: `''` — всё время, `y:2026` — год, `m:2026-02` — месяц. Кривое — всё время. */
+export function exportSpan(value: string): ExportSpan {
+  const year = /^y:(\d{4})$/.exec(value)?.[1]
+  if (year !== undefined) return { period: yearPeriod(Number(year)), label: `${year} год` }
+  const month = /^m:(.+)$/.exec(value)?.[1]
+  if (month !== undefined && isMonthStr(month)) return { period: monthPeriod(month), label: formatMonth(month) }
+  return null
 }

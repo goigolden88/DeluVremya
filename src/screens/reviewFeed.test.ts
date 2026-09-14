@@ -61,3 +61,14 @@ describe('обзор в markdown — Р-63', () => {
     expect(reviewMarkdown([], [])).toBe('Записей нет.')
   })
 })
+
+describe('обзор в markdown за период — Р-79', () => {
+  it('только недели, чей понедельник в периоде', () => {
+    const text = reviewMarkdown([review('2026-08-31'), review('2026-09-07')], [], {
+      from: '2026-09-01',
+      to: '2026-09-30',
+    })
+    expect(text).toContain('7–13 сентября')
+    expect(text).not.toContain('31 августа')
+  })
+})

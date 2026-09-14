@@ -9,7 +9,7 @@
  * Чистые функции, без React и без базы.
  */
 
-import { formatDate, isDateStr } from '../../core/dates.ts'
+import { formatDate, inPeriod, isDateStr, type Period } from '../../core/dates.ts'
 import { dateWords, escapeMarkdown as md, type FeedItem } from '../../core/feed.ts'
 import type { Note } from '../../core/model.ts'
 import { goalOf, groupByMonth, isUnsorted } from './inbox.ts'
@@ -73,12 +73,18 @@ export function noteFeed(notes: readonly Note[]): FeedItem[] {
  * Раздел выгрузки — дневником: месяцы от старых к новым, внутри — по дню
  * записи; без даты — в конце (Р-63). Заголовок раздела ставит реестр.
  */
-export function noteMarkdown(notes: readonly Note[]): string {
+export function noteMarkdown(notes: readonly Note[], period: Period | null = null): string {
   const live = notes.filter((note) => !note.deleted)
-  if (live.length === 0) return 'Записей нет.'
+  // За период — по дню записи; без даты в период не попадает (Р-79). Замысел
+  // у дела ищется среди всех: он мог быть записан в другом месяце.
+  const shown =
+    period === null
+      ? live
+      : live.filter((note) => note.capturedOn !== null && isDateStr(note.capturedOn) && inPeriod(note.capturedOn, period))
+  if (shown.length === 0) return 'Записей нет.'
 
   // `groupByMonth` отдаёт свежие сверху и «без даты» последней группой.
-  const groups = groupByMonth(live)
+  const groups = groupByMonth(shown)
   const dated = groups.filter((group) => group.month !== null).reverse()
   const undated = groups.filter((group) => group.month === null)
 

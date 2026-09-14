@@ -85,6 +85,8 @@ function MoveButtons({
   )
 }
 
+type Place = { first: boolean; last: boolean; onMove: (step: -1 | 1) => void }
+
 type RowProps = {
   note: Note
   today: DateStr
@@ -102,6 +104,8 @@ type RowProps = {
   actions?: ReactNode
   /** Кнопка ↷ «Перенести» в строке — у открытых пунктов плана и «Впереди» (Р-80). */
   move?: boolean
+  /** Место среди открытых пунктов дня: «Выше» и «Ниже» в карточке (Р-75). */
+  place?: Place
 }
 
 /**
@@ -120,6 +124,7 @@ export function PlanRow({
   meta,
   actions,
   move = false,
+  place,
 }: RowProps) {
   const done = note.status === 'done'
   const name = shortText(note.text)
@@ -182,7 +187,7 @@ export function PlanRow({
       {movable && moving && (
         <MoveButtons note={note} today={today} onError={onError} onMoved={() => setMoving(false)} />
       )}
-      {open && <PlanCard note={note} today={today} withDone={!check} onError={onError} />}
+      {open && <PlanCard note={note} today={today} withDone={!check} place={place} onError={onError} />}
     </li>
   )
 }
@@ -195,11 +200,13 @@ function PlanCard({
   note,
   today,
   withDone,
+  place,
   onError,
 }: {
   note: Note
   today: DateStr
   withDone: boolean
+  place?: Place | undefined
   onError: (message: string) => void
 }) {
   const [text, setText] = useState(note.text)
@@ -289,6 +296,18 @@ function PlanCard({
         <button type="button" className="link-btn" onClick={() => void save(withEstimate(note, null))}>
           Без оценки
         </button>
+      )}
+
+      {/* Порядок пунктов дня (Р-75). */}
+      {place && (
+        <div className="row row--wrap">
+          <button type="button" className="btn" disabled={place.first} onClick={() => place.onMove(-1)}>
+            ↑ Выше
+          </button>
+          <button type="button" className="btn" disabled={place.last} onClick={() => place.onMove(1)}>
+            ↓ Ниже
+          </button>
+        </div>
       )}
 
       {isOpen && (

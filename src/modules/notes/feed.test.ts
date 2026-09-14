@@ -131,3 +131,21 @@ describe('заметки в markdown — Р-63', () => {
     expect(text).toContain('Билеты — дело · к замыслу «Байкал»')
   })
 })
+
+describe('заметки в markdown за период — Р-79', () => {
+  it('только записанные в периоде; без даты и с кривой датой — нет', () => {
+    const text = noteMarkdown(
+      [
+        note('a', { text: 'Мартовская', capturedOn: '2026-03-05' }),
+        note('b', { text: 'Апрельская', capturedOn: '2026-04-05' }),
+        note('c', { text: 'Недатированная', capturedOn: null }),
+        note('d', { text: 'Кривая', capturedOn: 'вчера' }),
+      ],
+      { from: '2026-03-01', to: '2026-03-31' },
+    )
+    expect(text).toContain('Мартовская')
+    expect(text).not.toContain('Апрельская')
+    expect(text).not.toContain('Недатированная')
+    expect(text).not.toContain('Кривая')
+  })
+})

@@ -8,7 +8,7 @@
  * Чистые функции, без React и без базы.
  */
 
-import { formatDate, isDateStr, monthPeriod, plural, type DateStr } from '../../core/dates.ts'
+import { formatDate, inPeriod, isDateStr, monthPeriod, plural, type DateStr, type Period } from '../../core/dates.ts'
 import { escapeMarkdown as md, feedHeading, type FeedItem } from '../../core/feed.ts'
 import type { Category, TimeBlock } from '../../core/model.ts'
 import { categoryName } from './day.ts'
@@ -102,8 +102,16 @@ export function timeFeed(blocks: readonly TimeBlock[], categories: readonly Cate
  * Месяцы от старых к новым; блоки с кривой датой — в конце (Р-63).
  * Заголовок раздела ставит реестр.
  */
-export function timeMarkdown(blocks: readonly TimeBlock[], categories: readonly Category[], today: DateStr): string {
-  const days = byDay(blocks)
+export function timeMarkdown(
+  blocks: readonly TimeBlock[],
+  categories: readonly Category[],
+  today: DateStr,
+  /** За период — по дню блока; кривая дата в период не попадает (Р-79). */
+  period: Period | null = null,
+): string {
+  const days = byDay(
+    period === null ? blocks : blocks.filter((block) => isDateStr(block.date) && inPeriod(block.date, period)),
+  )
   if (days.size === 0) return 'Записей нет.'
 
   const dated = [...days.keys()].filter(isDateStr).sort()

@@ -19,7 +19,18 @@ import {
   shortText,
   TO_UNSORTED,
 } from './labels.ts'
-import { ahead, dayPlan, doneOffPlan, makeMain, overdue, planNote, realism, withoutMain, withPlan } from './plan.ts'
+import {
+  ahead,
+  dayPlan,
+  doneOffPlan,
+  makeMain,
+  movePlanItem,
+  overdue,
+  planNote,
+  realism,
+  withoutMain,
+  withPlan,
+} from './plan.ts'
 import { PlanRow } from './PlanItem.tsx'
 import { PlanTemplates } from './PlanTemplates.tsx'
 import { useNotes } from './useNotes.ts'
@@ -180,8 +191,19 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
 
         {plan.open.length > 0 && (
           <ul className="plain">
-            {plan.open.map((note) => (
-              <PlanRow key={note.id} {...common(note)} check onMain={star(note)} move />
+            {plan.open.map((note, index) => (
+              <PlanRow
+                key={note.id}
+                {...common(note)}
+                check
+                onMain={star(note)}
+                move
+                place={{
+                  first: index === 0,
+                  last: index === plan.open.length - 1,
+                  onMove: (step) => void write(movePlanItem(plan.open, note.id, step)),
+                }}
+              />
             ))}
           </ul>
         )}

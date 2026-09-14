@@ -4,7 +4,8 @@ import { PlanPeriod } from '../modules/notes/PlanPeriod.tsx'
 import { PeriodNorms, PeriodTime } from '../modules/time/Period.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../ui/useToday.ts'
-import { monthLabel, monthTitle, runningText, viewedMonth } from './period.ts'
+import { monthChoices, monthLabel, monthTitle, runningText, viewedMonth } from './period.ts'
+import { useRecordDates } from './useRecordDates.ts'
 
 /**
  * Итоги месяца — экран `#/month?m=` (Р-54). Читает оба модуля и потому живёт
@@ -20,6 +21,7 @@ export function Month() {
   const period = monthPeriod(month)
   const previous = addMonths(month, -1)
   const running = runningText(period, today, 'Месяц')
+  const choices = monthChoices(useRecordDates(), today, month)
 
   return (
     <>
@@ -37,7 +39,20 @@ export function Month() {
           >
             ‹
           </button>
-          <span className="day-nav__date">{monthTitle(month)}</span>
+          {/* Любой месяц — списком (Р-77): поля месяца нет в Firefox на компьютере. */}
+          <select
+            name="month"
+            className="day-nav__date"
+            aria-label="Выбрать месяц"
+            value={month}
+            onChange={(event) => setParams({ m: event.target.value })}
+          >
+            {choices.map((each) => (
+              <option key={each} value={each}>
+                {monthTitle(each)}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             className="icon-btn"

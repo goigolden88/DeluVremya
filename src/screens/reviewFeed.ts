@@ -8,7 +8,7 @@
  * Чистые функции, без React и без базы.
  */
 
-import { formatDate, formatPeriod, isDateStr, toDateStr, weekPeriod, type DateStr } from '../core/dates.ts'
+import { formatDate, formatPeriod, inPeriod, isDateStr, toDateStr, weekPeriod, type DateStr, type Period } from '../core/dates.ts'
 import { escapeMarkdown as md, type FeedItem } from '../core/feed.ts'
 import type { Note, Review } from '../core/model.ts'
 
@@ -59,8 +59,11 @@ export function reviewFeed(reviews: readonly Review[], notes: readonly Note[]): 
 }
 
 /** Раздел выгрузки: неделя, когда проведён, наблюдения подпунктами. От старых к новым. */
-export function reviewMarkdown(reviews: readonly Review[], notes: readonly Note[]): string {
-  const live = reviews.filter((review) => !review.deleted).sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+export function reviewMarkdown(reviews: readonly Review[], notes: readonly Note[], period: Period | null = null): string {
+  // За период — по понедельнику недели (Р-79).
+  const live = reviews
+    .filter((review) => !review.deleted && (period === null || inPeriod(review.weekStart, period)))
+    .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
   if (live.length === 0) return 'Записей нет.'
 
   return live

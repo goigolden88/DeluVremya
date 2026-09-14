@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { RecordKind } from '../core/model.ts'
+import { exportSpan, monthChoices, monthTitle, yearChoices } from './period.ts'
+import { useRecordDates } from './useRecordDates.ts'
 import { Link } from 'react-router-dom'
 import { CHANGES } from '../changes.ts'
 import { db } from '../core/db.ts'
@@ -26,7 +29,7 @@ import { SyncSettings } from '../ui/SyncSettings.tsx'
 import { useSyncStatus } from '../ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
-import { markdownExport } from '../registry.ts'
+import { KIND_ORDER, KINDS, markdownExport } from '../registry.ts'
 import { isEmptyBase } from './firstRun.ts'
 import { ImportRecords } from './ImportRecords.tsx'
 import { ChangeList } from './WhatsNew.tsx'
@@ -220,6 +223,10 @@ function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
   const [error, setError] = useState('')
   const [lastSaved, setLastSaved] = useState<string | null | undefined>(undefined)
   const [sharable] = useState(canShareFiles)
+  /** Что выгружать в markdown (Р-79): разделы — все, период — всё время. */
+  const [kinds, setKinds] = useState<RecordKind[]>([...KIND_ORDER])
+  const [span, setSpan] = useState('')
+  const months = monthChoices(useRecordDates(), today())
 
   // Дата последней выгрузки лежит в настройках: они не синхронизируются,
   // и это правильно — «когда я забирал копию» у каждого устройства своё.
@@ -259,7 +266,7 @@ function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
     setError('')
     try {
       const snapshot = await db.exportAll()
-      const text = markdownExport(snapshot.data, today())
+      const text = markdownExport(snapshot.data, today(), { kinds, span: exportSpan(span) })
       if (!(await deliver(via, `deluvremya-${today()}.md`, text, 'text/markdown'))) return
       setNote(
         `Markdown ${via === 'share' ? 'отправлен' : 'сохранён'}. Он для чтения: обратно в приложение загружается только копия.`,
@@ -338,15 +345,56 @@ function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
       {/* Читать без приложения (Р-63): в одну сторону, не копия. */}
       <Fold id="settings:transfer:markdown" title="Markdown для чтения" sub folded>
         <p className="muted">
-          Все записи одним файлом: заметки, учёт по дням, обзоры — раздел на вид, внутри месяцы и дни.
-          Открывается где угодно; обратно в приложение не загружается — для этого копия.
+          Записи одним файлом: заметки, учёт по дням, обзоры — раздел на вид, внутри месяцы и дни.
+          Разделы и период — ниже, по умолчанию всё. Открывается где угодно; обратно в приложение не
+          загружается — для этого копия.
         </p>
+        {/* Что выгружать (Р-79): разделы и период; шапка файла это называет. */}
+        <div className="chips" role="group" aria-label="Разделы markdown">
+          {KIND_ORDER.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={kinds.includes(kind) ? 'chip chip--on' : 'chip'}
+              aria-pressed={kinds.includes(kind)}
+              onClick={() => setKinds(kinds.includes(kind) ? kinds.filter((each) => each !== kind) : [...kinds, kind])}
+            >
+              {KINDS[kind].label}
+            </button>
+          ))}
+        </div>
+        <label className="field">
+          <span>Период</span>
+          <select name="md-period" value={span} onChange={(event) => setSpan(event.target.value)}>
+            <option value="">За всё время</option>
+            {yearChoices(months).map((year) => (
+              <option key={`y:${year}`} value={`y:${year}`}>
+                {year} год
+              </option>
+            ))}
+            {months.map((month) => (
+              <option key={`m:${month}`} value={`m:${month}`}>
+                {monthTitle(month)}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="row row--wrap">
-          <button type="button" className="btn" onClick={() => void saveMarkdown('file')} disabled={busy}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void saveMarkdown('file')}
+            disabled={busy || kinds.length === 0}
+          >
             Сохранить markdown
           </button>
           {sharable && (
-            <button type="button" className="btn" onClick={() => void saveMarkdown('share')} disabled={busy}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => void saveMarkdown('share')}
+              disabled={busy || kinds.length === 0}
+            >
               Поделиться markdown
             </button>
           )}

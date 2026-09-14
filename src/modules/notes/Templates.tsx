@@ -8,6 +8,7 @@ import { durationText, itemsText } from './labels.ts'
 import {
   draftOf,
   moveDraftItem,
+  moveTemplate,
   readDraft,
   templatesOf,
   withDraftMain,
@@ -55,11 +56,13 @@ export function Templates() {
 
       <section className="block">
         <ul className="plain">
-          {list.map((template) => (
+          {list.map((template, index) => (
             <TemplateRow
               key={template.id}
               template={template}
               templates={list}
+              first={index === 0}
+              last={index === list.length - 1}
               open={openId === template.id}
               onToggle={() => setOpenId(openId === template.id ? null : template.id)}
             />
@@ -73,15 +76,30 @@ export function Templates() {
 function TemplateRow({
   template,
   templates,
+  first,
+  last,
   open,
   onToggle,
 }: {
   template: DayTemplate
   templates: DayTemplate[]
+  first: boolean
+  last: boolean
   open: boolean
   onToggle: () => void
 }) {
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  // Порядок шаблонов между собой — порядок кнопок на «Сегодня» (Р-75).
+  async function move(step: -1 | 1) {
+    setError('')
+    try {
+      await db.putMany('templates', moveTemplate(templates, template.id, step))
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
   const estimated = template.items.reduce((sum, each) => sum + (each.estMin ?? 0), 0)
 
   return (
@@ -94,8 +112,27 @@ function TemplateRow({
           {itemsText(template.items.length)}
           {estimated > 0 && ` · ${durationText(estimated)}`}
         </span>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={`${template.name} — выше`}
+          disabled={first}
+          onClick={() => void move(-1)}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={`${template.name} — ниже`}
+          disabled={last}
+          onClick={() => void move(1)}
+        >
+          ↓
+        </button>
       </div>
       {saved && <p className="muted">Сохранено</p>}
+      {error && <p className="error">Не записалось: {error}</p>}
       {/* Ключ — время правки: сохранённое или приехавшее с другого устройства
           пересобирает правку с нуля, а не держит старый черновик. */}
       {open && (

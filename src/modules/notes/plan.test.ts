@@ -7,6 +7,7 @@ import {
   doneOffPlan,
   mainOf,
   makeMain,
+  movePlanItem,
   MAX_ESTIMATE,
   overdue,
   planLoad,
@@ -219,3 +220,26 @@ describe('реализм (Р-35)', () => {
     expect(realism([note('01', { status: 'done', estMin: 30 })], 600)).toBeNull()
   })
 })
+
+describe('порядок пунктов дня — Р-75', () => {
+  it('с order — по нему, без — после, по времени добавления', () => {
+    const notes = [note('01'), note('02', { order: 1 }), note('03', { order: 0 }), note('04')]
+    expect(dayPlan(notes, TODAY).open.map((each) => each.id)).toEqual(['03', '02', '01', '04'])
+  })
+
+  it('сдвиг нумерует пункты дня подряд; крайний дальше не двигается', () => {
+    const list = [note('01'), note('02'), note('03')]
+    expect(movePlanItem(list, '03', -1).map((each) => [each.id, each.order])).toEqual([
+      ['01', 0],
+      ['03', 1],
+      ['02', 2],
+    ])
+    expect(movePlanItem(list, '01', -1)).toEqual([])
+  })
+
+  it('перенос и возврат снимают место в дне', () => {
+    expect(withPlan(note('01', { order: 2 }), TOMORROW)).not.toHaveProperty('order')
+    expect(withPlan(note('01', { order: 2 }), null)).not.toHaveProperty('order')
+  })
+})
+

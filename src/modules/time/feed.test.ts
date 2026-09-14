@@ -117,3 +117,16 @@ describe('учёт в markdown — Р-63', () => {
     expect(text).toContain('- «вчера» — 10 мин: Ютуб 10 мин')
   })
 })
+
+describe('учёт в markdown за период — Р-79', () => {
+  it('только блоки дней периода', () => {
+    const text = timeMarkdown(
+      [block('a', '2026-02-03', 'чтение', 30), block('b', '2026-03-03', 'ютуб', 60)],
+      categories,
+      '2026-09-14',
+      { from: '2026-02-01', to: '2026-02-28' },
+    )
+    expect(text).toContain('Февраль 2026')
+    expect(text).not.toContain('Март 2026')
+  })
+})

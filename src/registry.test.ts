@@ -149,3 +149,23 @@ describe('лента и выгрузка — Р-58…Р-60, Р-63', () => {
     expect(text.split('Записей нет.').length - 1).toBe(KIND_ORDER.length)
   })
 })
+
+describe('markdown на выбор — Р-79', () => {
+  it('без выбора — все разделы и без строк о выборке', () => {
+    const md = markdownExport(empty(), '2026-09-14')
+    for (const kind of KIND_ORDER) expect(md).toContain(`## ${KINDS[kind].label}`)
+    expect(md).not.toContain('Разделы:')
+    expect(md).not.toContain('Период:')
+  })
+
+  it('разделы и период — в шапке; не выбранный раздел не выгружается', () => {
+    const md = markdownExport(empty(), '2026-09-14', {
+      kinds: ['note'],
+      span: { period: { from: '2026-02-01', to: '2026-02-28' }, label: 'февраль 2026' },
+    })
+    expect(md).toContain(`## ${KINDS.note.label}`)
+    expect(md).not.toContain(`## ${KINDS.time.label}`)
+    expect(md).toContain(`Разделы: ${KINDS.note.label}.`)
+    expect(md).toContain('Период: февраль 2026. Записи без даты — только в выгрузке за всё время.')
+  })
+})

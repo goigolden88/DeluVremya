@@ -19,7 +19,7 @@
  */
 
 import type { Snapshot } from './core/db.ts'
-import { formatDate, type DateStr } from './core/dates.ts'
+import { formatDate, type DateStr, type Period } from './core/dates.ts'
 import type { FeedItem } from './core/feed.ts'
 import {
   buildPrompt,
@@ -50,8 +50,11 @@ type KindEntry = {
   label: string
   /** Строки ленты, без порядка: порядок — дело `core/feed.ts`. */
   feed: (data: Data, day: DateStr) => FeedItem[]
-  /** Раздел выгрузки без заголовка: заголовок — подпись вида. */
-  markdown: (data: Data, day: DateStr) => string
+  /**
+   * Раздел выгрузки без заголовка: заголовок — подпись вида. `period` — вид
+   * отбирает свои записи по своей дате; null — за всё время (Р-79).
+   */
+  markdown: (data: Data, day: DateStr, period: Period | null) => string
   /** Раздел импорта записей. Нет — вид не импортируется. */
   import?: ImportEntry
 }
@@ -60,19 +63,19 @@ export const KINDS: { readonly [K in RecordKind]: KindEntry } = {
   note: {
     label: 'Заметки и план',
     feed: (data) => noteFeed(data.notes),
-    markdown: (data) => noteMarkdown(data.notes),
+    markdown: (data, _day, period) => noteMarkdown(data.notes, period),
     import: { spec: notesImportSpec, run: importNotes },
   },
   time: {
     label: 'Учёт времени',
     feed: (data) => timeFeed(data.time, data.categories),
-    markdown: (data, day) => timeMarkdown(data.time, data.categories, day),
+    markdown: (data, day, period) => timeMarkdown(data.time, data.categories, day, period),
     import: { spec: timeImportSpec, run: importTime },
   },
   review: {
     label: 'Обзоры недели',
     feed: (data) => reviewFeed(data.reviews, data.notes),
-    markdown: (data) => reviewMarkdown(data.reviews, data.notes),
+    markdown: (data, _day, period) => reviewMarkdown(data.reviews, data.notes, period),
   },
 }
 
@@ -84,21 +87,35 @@ export function feedItems(data: Data, day: DateStr): FeedItem[] {
   return KIND_ORDER.flatMap((kind) => KINDS[kind].feed(data, day))
 }
 
+/** Что выгружать (Р-79): разделы и период с названием для шапки. Не задано — всё и за всё время. */
+export type MarkdownChoice = {
+  kinds?: readonly RecordKind[]
+  span?: { period: Period; label: string } | null
+}
+
 /**
- * Выгрузка в markdown одним файлом: раздел на вид записи (Р-63).
+ * Выгрузка в markdown одним файлом: раздел на вид записи (Р-63), разделы
+ * и период — на выбор (Р-79).
  *
  * Читать глазами, а не переносить: обратно файл не загружается, для
  * переноса — копия в JSON из тех же «Настроек».
  */
-export function markdownExport(data: Data, day: DateStr): string {
+export function markdownExport(data: Data, day: DateStr, choice: MarkdownChoice = {}): string {
+  const kinds = KIND_ORDER.filter((kind) => (choice.kinds ?? KIND_ORDER).includes(kind))
+  const span = choice.span ?? null
   const head = [
     '# Делу Время',
     '',
     `Выгрузка от ${formatDate(day)}. Для чтения: обратно в приложение этот файл не загружается,`,
     'для переноса данных есть копия в JSON — «Настройки» → «Экспорт и импорт».',
-  ].join('\n')
-  const sections = KIND_ORDER.map((kind) => `## ${KINDS[kind].label}\n\n${KINDS[kind].markdown(data, day)}`)
-  return `${[head, ...sections].join('\n\n')}\n`
+  ]
+  // Что выгружено — в шапке: выборка не прячет записи молча (Р-79).
+  if (kinds.length < KIND_ORDER.length) head.push('', `Разделы: ${kinds.map((kind) => KINDS[kind].label).join(', ')}.`)
+  if (span) head.push('', `Период: ${span.label}. Записи без даты — только в выгрузке за всё время.`)
+  const sections = kinds.map(
+    (kind) => `## ${KINDS[kind].label}\n\n${KINDS[kind].markdown(data, day, span?.period ?? null)}`,
+  )
+  return `${[head.join('\n'), ...sections].join('\n\n')}\n`
 }
 
 /** Разделы импорта в порядке таблицы. */
