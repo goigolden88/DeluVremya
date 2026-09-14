@@ -1,5 +1,6 @@
 /**
- * «Сообщить об ошибке» (Р-78): журнал ошибок и отчёт.
+ * «Сообщить об ошибке» (Р-66; механика «Дневников», их Р-78): журнал ошибок
+ * и отчёт.
  *
  * Отчёт — только техника: ни записей, ни имени репозитория данных. Он уходит
  * в публичный issue или в мессенджер, и человек видит его целиком до отправки.
@@ -142,11 +143,21 @@ export function issueUrl(
 /** Записи журнала идут очередью: две ошибки разом не должны затереть друг друга. */
 let writes: Promise<void> = Promise.resolve()
 
+/**
+ * Экран, на котором случилась ошибка, — путь без запроса (Р-66). В запросе
+ * здесь бывает текст из «Поделиться», `#/inbox?shared=…` (Р-16), а отчёт
+ * уходит в публичный issue.
+ */
+export function screenPath(hash: string): string {
+  const path = hash.split('?')[0] ?? ''
+  return path === '' || path === '#' ? '#/' : path
+}
+
 function record(message: string): void {
   const error: AppError = {
     at: new Date().toISOString(),
     message: shortMessage(message),
-    where: location.hash || '#/',
+    where: screenPath(location.hash),
   }
   writes = writes.then(async () => {
     try {

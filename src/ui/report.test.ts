@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { appendError, ERROR_LOG_SIZE, issueUrl, ISSUE_TITLE, reportText, shortMessage } from './report.ts'
+import { appendError, ERROR_LOG_SIZE, issueUrl, ISSUE_TITLE, reportText, screenPath, shortMessage } from './report.ts'
 import type { AppError, ReportFacts } from './report.ts'
 
 function error(minute: number, message = `ошибка ${minute}`): AppError {
   return {
     at: `2026-09-12T10:${String(minute).padStart(2, '0')}:00.000Z`,
     message,
-    where: '#/health',
+    where: '#/inbox',
   }
 }
 
@@ -39,6 +39,19 @@ describe('журнал ошибок', () => {
       error(3),
       error(2),
     ])
+  })
+})
+
+describe('экран ошибки — путь без запроса, Р-66', () => {
+  it('текст из «Поделиться» в отчёт не попадает', () => {
+    expect(screenPath('#/inbox?shared=%D0%BB%D0%B8%D1%87%D0%BD%D0%BE%D0%B5')).toBe('#/inbox')
+    expect(screenPath('#/time?day=2026-09-10')).toBe('#/time')
+  })
+
+  it('главный экран — «#/»', () => {
+    expect(screenPath('')).toBe('#/')
+    expect(screenPath('#')).toBe('#/')
+    expect(screenPath('#/?x=1')).toBe('#/')
   })
 })
 
@@ -82,28 +95,28 @@ describe('отчёт', () => {
   it('ошибки — списком: экран и текст', () => {
     const text = reportText({ ...FACTS, errors: [error(2, 'TypeError: сломалось'), error(1)] })
     expect(text).toContain('последние 2')
-    expect(text).toMatch(/- .+ · #\/health · TypeError: сломалось/)
+    expect(text).toMatch(/- .+ · #\/inbox · TypeError: сломалось/)
     expect(text).not.toContain('не записало')
   })
 })
 
 describe('адрес issue — из адреса сайта', () => {
   it('сайт проекта → его репозиторий', () => {
-    const url = issueUrl({ hostname: 'goigolden88.github.io', pathname: '/Dnevniki/' }, ISSUE_TITLE, 'тело')
-    expect(url?.startsWith('https://github.com/goigolden88/Dnevniki/issues/new?')).toBe(true)
+    const url = issueUrl({ hostname: 'goigolden88.github.io', pathname: '/DeluVremya/' }, ISSUE_TITLE, 'тело')
+    expect(url?.startsWith('https://github.com/goigolden88/DeluVremya/issues/new?')).toBe(true)
   })
 
   it('заголовок и отчёт доезжают целиком — кириллица, переносы, звёздочки', () => {
     const body = reportText({ ...FACTS, errors: [error(1, 'Ошибка: «кавычки» & амперсанд')] })
-    const url = issueUrl({ hostname: 'goigolden88.github.io', pathname: '/Dnevniki/' }, ISSUE_TITLE, body)
+    const url = issueUrl({ hostname: 'goigolden88.github.io', pathname: '/DeluVremya/' }, ISSUE_TITLE, body)
     const params = new URL(url ?? '').searchParams
     expect(params.get('title')).toBe(ISSUE_TITLE)
     expect(params.get('body')).toBe(body)
   })
 
   it('форк — в свой репозиторий', () => {
-    const url = issueUrl({ hostname: 'friend.github.io', pathname: '/Dnevniki/index.html' }, ISSUE_TITLE, '')
-    expect(url?.startsWith('https://github.com/friend/Dnevniki/issues/new?')).toBe(true)
+    const url = issueUrl({ hostname: 'friend.github.io', pathname: '/DeluVremya/index.html' }, ISSUE_TITLE, '')
+    expect(url?.startsWith('https://github.com/friend/DeluVremya/issues/new?')).toBe(true)
   })
 
   it('сайт пользователя в корне — репозиторий по адресу', () => {
@@ -116,7 +129,7 @@ describe('адрес issue — из адреса сайта', () => {
   })
 
   it('не GitHub Pages — адреса нет', () => {
-    expect(issueUrl({ hostname: 'localhost', pathname: '/Dnevniki/' }, ISSUE_TITLE, '')).toBeNull()
+    expect(issueUrl({ hostname: 'localhost', pathname: '/DeluVremya/' }, ISSUE_TITLE, '')).toBeNull()
     expect(issueUrl({ hostname: 'diary.example.com', pathname: '/' }, ISSUE_TITLE, '')).toBeNull()
     expect(issueUrl({ hostname: 'github.io', pathname: '/x/' }, ISSUE_TITLE, '')).toBeNull()
   })

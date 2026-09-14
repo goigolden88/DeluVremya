@@ -683,6 +683,19 @@ a.chart__col:focus-visible .chart__label {
   flex: none;
 }
 
+/* Отчёт об ошибке — целиком до отправки (Р-66). Из «Дневников»; перенос
+   длинных строк браузера — чтобы экран не раздвигало вбок. */
+.report {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ─── Мелочи, вернувшиеся с учётом времени ───────────────────────────────── */
 
 .back {

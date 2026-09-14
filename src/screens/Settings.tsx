@@ -20,6 +20,7 @@ import {
 import { backupNote, backupSummary } from '../ui/backup.ts'
 import { Fold } from '../ui/Fold.tsx'
 import { InstallNote } from '../ui/Install.tsx'
+import { ReportBug } from '../ui/Report.tsx'
 import { SyncSettings } from '../ui/SyncSettings.tsx'
 import { useSyncStatus } from '../ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
@@ -163,6 +164,11 @@ function About({ state }: { state: State }) {
           «что тогда поменялось» можно и потом. */}
       <Fold id="settings:about:changes" title="Что нового" sub folded>
         <ChangeList changes={CHANGES} />
+      </Fold>
+
+      {/* Отзыв доходит до кода, а не теряется в переписке (Р-66). */}
+      <Fold id="settings:about:report" title="Сообщить об ошибке" sub folded>
+        <ReportBug />
       </Fold>
 
       {state.status === 'loading' && <p className="muted">Открываю базу…</p>}

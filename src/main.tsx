@@ -5,6 +5,7 @@ import { App } from './app.tsx'
 import { db } from './core/db.ts'
 import { applyLaunch } from './launch.ts'
 import { listenInstall } from './ui/install.ts'
+import { listenErrors } from './ui/report.ts'
 import { loadScreenNames } from './ui/useScreenNames.ts'
 import './styles.css'
 
@@ -21,6 +22,9 @@ applyLaunch()
 
 // До первого экрана: Chrome присылает событие установки рано и один раз.
 listenInstall()
+
+// Тоже до первого экрана: ошибка при отрисовке должна попасть в журнал (Р-66).
+listenErrors()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Не найден #root')
