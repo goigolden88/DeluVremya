@@ -6,6 +6,7 @@ import {
   formatMinutes,
   historyText,
   kindLine,
+  lowerFirst,
   MARKS_BASIS,
   marksLine,
   normText,
@@ -28,11 +29,6 @@ export function Unready({
   if (catalog.status === 'failed') return <p className="error">Категории не прочитались: {catalog.error}</p>
   if (time.status === 'failed') return <p className="error">Блоки времени не прочитались: {time.error}</p>
   return null
-}
-
-/** «Учтено …» после подписи с двоеточием: «Август: учтено …». */
-function lowerFirst(text: string): string {
-  return text.charAt(0).toLowerCase() + text.slice(1)
 }
 
 /** Прежний промежуток для сравнения и подписи столбцов. */

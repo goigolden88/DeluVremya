@@ -11,6 +11,7 @@ import {
   weekNorms,
   weekProgress,
   withNorm,
+  yearTime,
 } from './period.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
@@ -96,6 +97,26 @@ describe('итог промежутка — Р-43', () => {
     expect(summary.byKind).toEqual([
       { kind: 'useful', minutes: 20 },
       { kind: null, minutes: 10 },
+    ])
+  })
+})
+
+describe('год по месяцам — Р-57', () => {
+  it('двенадцать месяцев; итог года без соседнего года; категории — по месяцам, фоновое отдельно', () => {
+    const categories = [cat('a', 'Чтение', 0), cat('b', 'Ютуб', 1)]
+    const blocks = [
+      block('1', 'a', '2026-02-03', 60),
+      block('2', 'a', '2026-02-10', 30),
+      block('3', 'b', '2026-09-01', 45, { bgCategoryId: 'a' }),
+      block('4', 'a', '2025-12-31', 100),
+    ]
+    const data = yearTime(blocks, categories, 2026, '2026-09-14')
+    expect(data.months.map((month) => month.summary.total)).toEqual([0, 90, 0, 0, 0, 0, 0, 0, 45, 0, 0, 0])
+    expect(data.months[0]?.month).toBe('2026-01')
+    expect(data.total.total).toBe(135)
+    expect(data.categories.map((row) => [row.name, row.minutes, row.background, row.byMonth[1], row.byMonth[8]])).toEqual([
+      ['Чтение', 90, 45, 90, 0],
+      ['Ютуб', 45, 0, 0, 45],
     ])
   })
 })

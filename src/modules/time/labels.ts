@@ -230,6 +230,11 @@ export function historyText(history: NormHistory): string {
 
 // ─── Итог промежутка (Р-43) ────────────────────────────────────────────────
 
+/** Строка итога после подписи с двоеточием: «Август: учтено …». */
+export function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1)
+}
+
 /** Итог промежутка — с основанием: сколько блоков и в скольких днях из наступивших. */
 export function periodLine(summary: PeriodSummary): string {
   if (summary.count === 0) return 'Ничего не учтено'

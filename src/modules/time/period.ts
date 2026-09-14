@@ -12,11 +12,15 @@ import {
   addDays,
   inPeriod,
   isDateStr,
+  monthPeriod,
+  monthsOf,
   periodDays,
   toDateStr,
   weekPeriod,
   weeksEndingIn,
+  yearPeriod,
   type DateStr,
+  type MonthStr,
   type Period,
 } from '../../core/dates.ts'
 import type { Category, TimeBlock } from '../../core/model.ts'
@@ -153,6 +157,44 @@ export function compareRows(
     rows.push({ ...row, minutes: 0, count: 0, days: 0, background: 0, before: row.minutes })
   }
   return rows.sort(categoryOrder(categories))
+}
+
+// ─── Год по месяцам (Р-57) ─────────────────────────────────────────────────
+
+export type MonthTime = { month: MonthStr; summary: PeriodSummary }
+
+/** Категория за год: итог и минуты по каждому месяцу, по основной (Р-43). */
+export type YearCategory = PeriodCategory & { byMonth: number[] }
+
+export type YearTime = {
+  months: MonthTime[]
+  /** Год целиком — сумма и основание. */
+  total: PeriodSummary
+  categories: YearCategory[]
+}
+
+/** Год по месяцам: итог каждого месяца и строки категорий с их месяцами. */
+export function yearTime(
+  blocks: readonly TimeBlock[],
+  categories: readonly Category[],
+  year: number,
+  today: DateStr,
+): YearTime {
+  const months = monthsOf(year).map((month) => ({
+    month,
+    summary: periodSummary(blocks, categories, monthPeriod(month), today),
+  }))
+  const total = periodSummary(blocks, categories, yearPeriod(year), today)
+  return {
+    months,
+    total,
+    categories: total.byCategory.map((row) => ({
+      ...row,
+      byMonth: months.map(
+        ({ summary }) => summary.byCategory.find((each) => each.categoryId === row.categoryId)?.minutes ?? 0,
+      ),
+    })),
+  }
 }
 
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────

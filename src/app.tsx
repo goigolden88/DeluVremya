@@ -7,6 +7,7 @@ import { Inbox } from './screens/Inbox.tsx'
 import { Month } from './screens/Month.tsx'
 import { Review } from './screens/Review.tsx'
 import { Settings } from './screens/Settings.tsx'
+import { Year } from './screens/Year.tsx'
 import { Templates } from './modules/notes/Templates.tsx'
 import { Categories } from './modules/time/Categories.tsx'
 import { TimeScreen } from './modules/time/TimeScreen.tsx'
@@ -42,6 +43,8 @@ export function App() {
           <Route path="review" element={<Review />} />
           {/* Итоги месяца (Р-54): месяц — в `?m=ГГГГ-ММ`, без него — месяц по умолчанию. */}
           <Route path="month" element={<Month />} />
+          {/* Итоги года (Р-57): год — в `?y=ГГГГ`. */}
+          <Route path="year" element={<Year />} />
           {/* Незнакомый адрес — на главный. Так и ярлык на экран, которого
               ещё нет, открывает приложение, а не пустоту. */}
           <Route path="*" element={<Navigate to="/" replace />} />
