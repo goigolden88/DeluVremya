@@ -24,6 +24,7 @@ import { useSyncStatus } from '../ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
 import { UNSORTED_TITLE } from '../modules/notes/labels.ts'
+import { markdownExport } from '../registry.ts'
 import { isEmptyBase } from './firstRun.ts'
 import { ImportRecords } from './ImportRecords.tsx'
 import { DEFAULT_THRESHOLDS, readThreshold, THRESHOLD_PROBLEM, type Thresholds } from './review.ts'
@@ -220,6 +221,29 @@ function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
     }
   }
 
+  /**
+   * Markdown — для чтения глазами и на случай отказа от приложения (Р-63):
+   * записи остаются текстом, который открывается где угодно. Отметку
+   * о выгрузке не ставит — из markdown не восстановиться.
+   */
+  async function saveMarkdown(via: Via) {
+    setBusy(true)
+    setNote('')
+    setError('')
+    try {
+      const snapshot = await db.exportAll()
+      const text = markdownExport(snapshot.data, today())
+      if (!(await deliver(via, `deluvremya-${today()}.md`, text, 'text/markdown'))) return
+      setNote(
+        `Markdown ${via === 'share' ? 'отправлен' : 'сохранён'}. Он для чтения: обратно в приложение загружается только копия.`,
+      )
+    } catch (failure) {
+      setError(describe(failure))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function open(file: File) {
     setBusy(true)
     setNote('')
@@ -282,6 +306,24 @@ function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
           Восстановление не стирает то, что уже есть: записи сливаются по времени правки,
           побеждает более поздняя.
         </p>
+      </Fold>
+
+      {/* Читать без приложения (Р-63): в одну сторону, не копия. */}
+      <Fold id="settings:transfer:markdown" title="Markdown для чтения" sub folded>
+        <p className="muted">
+          Все записи одним файлом: заметки, учёт по дням, обзоры — раздел на вид, внутри месяцы и дни.
+          Открывается где угодно; обратно в приложение не загружается — для этого копия.
+        </p>
+        <div className="row row--wrap">
+          <button type="button" className="btn" onClick={() => void saveMarkdown('file')} disabled={busy}>
+            Сохранить markdown
+          </button>
+          {sharable && (
+            <button type="button" className="btn" onClick={() => void saveMarkdown('share')} disabled={busy}>
+              Поделиться markdown
+            </button>
+          )}
+        </div>
       </Fold>
 
       {/* Чужие записи — свой вход: копия приложения сюда не принимается (Р-08). */}
