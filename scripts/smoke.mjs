@@ -581,6 +581,11 @@ async function scenario() {
     has(start, 'С чего начать') && has(start, 'Установка'),
     start.replace(/\s+/g, ' ').slice(0, 160),
   )
+  check(
+    'приветствие зовёт в справку и не обещает обзор «следующими обновлениями» — Р-64',
+    has(start, 'справка') && !has(start, 'появится следующими'),
+    line(start, 'Обзор недели'),
+  )
   await act(`byText('button', 'Понятно')?.click()`)
   await sleep(400)
   await send('Page.reload')
@@ -1122,6 +1127,8 @@ async function scenario() {
 
   await monthScenario()
 
+  await stageSixScenario()
+
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
     navigator.serviceWorker.ready.then((r) => r.active?.state ?? 'нет'),
@@ -1145,6 +1152,175 @@ async function scenario() {
   const offlineShare = await captureField()
   check('«Поделиться» без сети тоже доезжает — Р-16', offlineShare === 'без сети', `в поле «${offlineShare}»`)
   await offline(false)
+}
+
+/**
+ * Лента, выгрузка, справка (Этап 6): лента со «Сегодня» (Р-62), «Без даты»
+ * внизу (Р-59), поиск датой словами (Р-61) и строка дня учёта (Р-58), чип
+ * обзоров с наблюдением (Р-60), карточка на «Заметках» по `?open=` и строка
+ * сделанного без перехода (Р-59); markdown — файлом (Р-63); «Что нового»
+ * на копии без прочитанного (Р-65); отчёт об ошибке без текста из
+ * «Поделиться» (Р-66); справка с числами из констант (Р-64).
+ *
+ * Идёт после всех сценариев с данными: в ленте уже есть и запись без даты,
+ * и февраль импорта, и проведённый обзор с наблюдением.
+ */
+async function stageSixScenario() {
+  const rows = () => run(`[...document.querySelectorAll('.feed__row')].map((el) => el.innerText.replace(/\\s+/g, ' ')).join(' | ')`)
+
+  // ─ Вход — ссылкой внизу «Сегодня»; без даты — внизу ленты, не наверху.
+  await go('/')
+  await act(`byText('a', 'Лента →')?.click()`)
+  await sleep(1000)
+  const feedHash = await run('location.hash')
+  const feed = await screen()
+  const lastGroup = await run(`[...document.querySelectorAll('.month-group')].at(-1)?.innerText ?? ''`)
+  check(
+    'лента открывается ссылкой внизу «Сегодня»; без даты — последней группой — Р-59, Р-62',
+    feedHash === '#/feed' &&
+      /\d+ запис/.test(feed) &&
+      has(lastGroup, 'Без даты') &&
+      has(lastGroup, 'Мысль с другого устройства'),
+    `${feedHash}; ${lastGroup.replace(/\s+/g, ' ').slice(0, 80)}`,
+  )
+
+  // ─ Поиск датой словами и категорией: день импорта — одной строкой, тап — в этот день.
+  await act(`set(document.querySelector('input[name=search]'), 'февраль 2026 бег')`)
+  await sleep(500)
+  const found = await screen()
+  const foundRows = await rows()
+  await act(`document.querySelector('a.feed__row')?.click()`)
+  await sleep(1000)
+  const dayHash = await run('location.hash')
+  check(
+    'поиск «февраль 2026 бег» находит день учёта строкой с итогом; тап — этот день — Р-58, Р-61',
+    has(found, 'Февраль 2026') && has(foundRows, 'Учтено') && has(foundRows, 'Бег') && dayHash === '#/time?day=2026-02-03',
+    `${foundRows.slice(0, 120)}; ${dayHash}`,
+  )
+
+  // ─ Чип обзоров: строка обзора с наблюдением недели, ведёт в обзор.
+  await go('/feed')
+  await act(`byText('button', 'Обзоры недели')?.click()`)
+  await sleep(500)
+  const reviewRows = await rows()
+  const reviewLink = await run(`document.querySelector('a.feed__row')?.getAttribute('href') ?? ''`)
+  check(
+    'чип «Обзоры недели» — только обзоры, с наблюдением недели и переходом в обзор — Р-60',
+    has(reviewRows, 'Обзор недели') &&
+      has(reviewRows, 'Наблюдение прогона') &&
+      !has(reviewRows, 'Купить фильтр') &&
+      reviewLink.includes('/review?week='),
+    `${reviewRows.slice(0, 120)}; ${reviewLink}`,
+  )
+
+  // ─ Сделанное видно, но без перехода; неразобранное — карточкой на «Заметках».
+  await act(`byText('button', 'Всё')?.click()`)
+  await sleep(400)
+  const doneStill = await run(
+    `[...document.querySelectorAll('div.feed__row')].some((el) => /сделано/.test(el.innerText))`,
+  )
+  await act(`set(document.querySelector('input[name=search]'), 'фильтр для воды')`)
+  await sleep(500)
+  await act(`document.querySelector('a.feed__row')?.click()`)
+  await sleep(1200)
+  const openedHash = await run('location.hash')
+  const openedCard = await run(`document.querySelector('.note__main[aria-expanded="true"]')?.textContent ?? ''`)
+  check(
+    'сделанное — строкой без перехода; неразобранное — карточкой на «Заметках», ?open из адреса ушёл — Р-59',
+    doneStill === true && openedHash === '#/inbox' && openedCard.includes('Купить фильтр для воды'),
+    `сделанное без перехода: ${doneStill}; ${openedHash}; раскрыто «${openedCard}»`,
+  )
+
+  // ─ Markdown файлом: шапка, раздел на вид, февраль, без даты, наблюдение.
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  await unfold('Markdown для чтения')
+  await act(`byText('button', 'Сохранить markdown')?.click()`)
+  await sleep(1500)
+  const mdNote = await screen()
+  const mdName = readdirSync(profile).find((name) => /^deluvremya-\d{4}-\d{2}-\d{2}\.md$/.test(name))
+  const md = mdName ? readFileSync(join(profile, mdName), 'utf8') : ''
+  const order = ['## Заметки и план', '## Учёт времени', '## Обзоры недели'].map((head) => md.indexOf(head))
+  check(
+    'markdown — файлом: раздел на вид по порядку, месяцы, «Без даты», наблюдение недели — Р-63',
+    has(mdNote, 'Markdown сохранён') &&
+      md.startsWith('# Делу Время') &&
+      order.every((place, index) => place > 0 && (index === 0 || place > (order[index - 1] ?? 0))) &&
+      md.includes('### Февраль 2026') &&
+      md.includes('### Без даты') &&
+      md.includes('Купить фильтр для воды') &&
+      md.includes('Наблюдение прогона'),
+    mdName ? `${mdName}; ${md.length} знаков; разделы ${order.join(', ')}` : 'файла нет',
+  )
+
+  // ─ «Что нового»: копия, обновившаяся с версии без окна, — ключа нет, база не пуста.
+  await run(`new Promise((done, fail) => {
+    const request = indexedDB.open('deluvremya')
+    request.onerror = () => fail(request.error)
+    request.onsuccess = () => {
+      const tx = request.result.transaction('settings', 'readwrite')
+      tx.objectStore('settings').delete('seenChanges')
+      tx.oncomplete = () => { request.result.close(); done(true) }
+      tx.onerror = () => fail(tx.error)
+    }
+  })`)
+  await go('/')
+  await send('Page.reload')
+  await sleep(2000)
+  const news = await screen()
+  await act(`byText('button', 'Понятно')?.click()`)
+  await sleep(500)
+  await send('Page.reload')
+  await sleep(2000)
+  const newsAfter = await screen()
+  check(
+    '«Что нового» — последняя запись на копии без прочитанного; «Понятно» убирает и после перезапуска — Р-65',
+    has(news, 'Что нового') && has(news, 'Лента — ссылка внизу') && !has(newsAfter, 'Лента — ссылка внизу'),
+    line(news, 'Что нового'),
+  )
+
+  // ─ Отчёт об ошибке: ошибка страницы — в журнал с экраном, без текста из «Поделиться».
+  // Событие, а не настоящее исключение: исключение валит прогон само по себе.
+  await go(`/inbox?shared=${encodeURIComponent('личное из поделиться')}`)
+  await act(`window.dispatchEvent(new ErrorEvent('error', { error: new Error('проверка журнала'), message: 'проверка журнала' }))`)
+  await sleep(700)
+  await go('/settings')
+  await unfold('О приложении')
+  await unfold('Сообщить об ошибке')
+  const report = await run(`document.querySelector('pre.report')?.innerText ?? ''`)
+  await act(`byText('button', 'Очистить журнал ошибок')?.click()`)
+  await sleep(700)
+  const cleared = await run(`document.querySelector('pre.report')?.innerText ?? ''`)
+  check(
+    'отчёт об ошибке: ошибка с экраном, без текста из «Поделиться»; журнал очищается — Р-66',
+    has(report, 'Error: проверка журнала') &&
+      has(report, ' · #/inbox · ') &&
+      // Текст в адресе закодирован: ищется не он, а сам параметр.
+      !has(report, 'shared') &&
+      has(report, 'Схема данных: 1') &&
+      has(cleared, 'Ошибок приложение не записало'),
+    line(report, 'проверка журнала') || report.slice(0, 120),
+  )
+
+  // ─ Справка: «?» на «Сегодня», вопросы свёрнуты, числа — из констант.
+  await go('/')
+  await act(`document.querySelector('[aria-label="Справка"]')?.click()`)
+  await sleep(700)
+  const helpHash = await run('location.hash')
+  const folded = await screen()
+  await unfold('План дня')
+  await unfold('Обзор недели')
+  const help = await screen()
+  check(
+    'справка — «?» на «Сегодня», вопросы свёрнуты, окно дня и разбор обзора — числами из констант — Р-64',
+    helpHash === '#/help' &&
+      has(folded, 'Что где') &&
+      !has(folded, 'Галочка — сделано') &&
+      has(help, 'с 8 до 24') &&
+      has(help, 'не больше 5') &&
+      has(help, '4 недели и 13 недель назад'),
+    `${helpHash}; ${line(help, 'окна дня')}`,
+  )
 }
 
 /** День со сдвигом от сегодняшнего, `ГГГГ-ММ-ДД`, по часам этого компьютера — как `today()`. */
@@ -2184,7 +2360,7 @@ async function dataScenario(file) {
   const loaded = /Загружено записей: (\d+)/.exec(restored.replace(/ /g, ' '))
   check('копия загрузилась через «Восстановить из копии»', loaded !== null, loaded?.[0] ?? restored.slice(0, 160))
 
-  const routes = ['/', '/time', '/inbox', '/time/categories', '/templates', '/review', '/settings']
+  const routes = ['/', '/time', '/inbox', '/time/categories', '/templates', '/review', '/feed', '/help', '/settings']
 
   for (const route of routes) {
     await go(route)
