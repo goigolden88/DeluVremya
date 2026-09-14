@@ -964,18 +964,24 @@ async function scenario() {
     about.replace(/\s+/g, ' ').slice(0, 200),
   )
 
-  // ─ Напоминание о незаполненном дне (Р-24). Фоновую проверку браузер
-  // вне установленного приложения не даёт; «Проверить сейчас» — тот же
-  // расчёт, что у service worker. За сегодня блоки есть — напоминать не о чем.
+  // ─ Напоминания (Р-24, Р-51). Фоновую проверку браузер вне установленного
+  // приложения не даёт; «Проверить сейчас» — тот же расчёт, что у service
+  // worker. За сегодня блоки есть — о дне напоминать не о чем. В воскресенье
+  // и понедельник обзор недели ещё не проведён — о нём напоминание есть.
   const granted = await grantNotifications()
   await unfold('Напоминания')
   await act(`byText('button', 'Проверить сейчас')?.click()`)
   await sleep(1500)
   const reminders = await screen()
   check(
-    'напоминания: «Проверить сейчас» доходит, за учтённый день напоминать не о чем — Р-24',
-    granted && has(reminders, 'Напоминать не о чем — за сегодня время уже учтено'),
-    line(reminders, 'Напомина'),
+    reviewCallDay()
+      ? 'напоминания: «Проверить сейчас» доходит; сегодня зовёт обзор недели — показано — Р-51'
+      : 'напоминания: «Проверить сейчас» доходит, за учтённый день напоминать не о чем — Р-24',
+    granted &&
+      (reviewCallDay()
+        ? has(reminders, 'Уведомление показано')
+        : has(reminders, 'Напоминать не о чем — за сегодня время уже учтено')),
+    line(reminders, reviewCallDay() ? 'Уведомление' : 'Напомина'),
   )
 
   // ─ Названия экранов (Р-26): по умолчанию «Учёт», своё — из настроек,
@@ -1111,6 +1117,8 @@ async function scenario() {
   await syncScenario()
 
   await planScenario()
+
+  await reviewScenario()
 
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
@@ -1454,6 +1462,189 @@ async function templatesScenario() {
     '«Отменить» снимает поставленное шаблоном; занятое название — с причиной',
     !has(undone, 'Зарядка') && has(undone, 'не выбрано') && has(taken, 'Шаблон с таким названием уже есть'),
     `${undone.replace(/\s+/g, ' ')}; ${line(taken, 'Шаблон с')}`,
+  )
+}
+
+/** Зовёт ли сегодня обзор недели (Р-41, Р-51): воскресенье и понедельник, по часам этого компьютера. */
+function reviewCallDay() {
+  const day = new Date().getDay()
+  return day === 0 || day === 1
+}
+
+/**
+ * Обзор недели (Этап 5): карточка на «Сегодня» только в дни зова (Р-41),
+ * пороги (Р-48), норма в карточке категории и блок «Неделя» на учёте (Р-45),
+ * время и план против факта идущей недели (Р-43, Р-44), висяк —
+ * «Когда-нибудь» и обратно (Р-46), возврат мысли месячной давности (Р-49),
+ * наблюдение и «Обзор проведён» (Р-42), после — об обзоре напоминать не о чем
+ * (Р-51). Своё — дело и мысль нужной давности — заводится импортом: сценарий
+ * не зависит от дня недели, в который идёт прогон.
+ */
+async function reviewScenario() {
+  const section = (title) =>
+    run(`[...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === ${JSON.stringify(title)})?.closest('section')?.innerText ?? ''`)
+  const flat = (text) => text.replace(/ /g, ' ')
+
+  // ─ Карточка на «Сегодня» — только в воскресенье и понедельник; ссылка — всегда.
+  await go('/')
+  const home = await screen()
+  const calling = reviewCallDay()
+  check(
+    calling
+      ? 'в воскресенье и понедельник «Сегодня» зовёт к обзору, ссылка — внизу — Р-41'
+      : 'не в день обзора карточки на «Сегодня» нет, ссылка — внизу — Р-41',
+    (calling ? has(home, 'Обзор недели ждёт') : !has(home, 'Обзор недели ждёт')) && has(home, 'Обзор недели →'),
+    line(home, 'Обзор недели'),
+  )
+
+  // ─ Своё: дело двухмесячной давности и мысль из той же недели месяц назад.
+  const monday = -((new Date().getDay() + 6) % 7)
+  const file = JSON.stringify({
+    format: 'deluvremya-import',
+    version: 1,
+    notes: [
+      { text: 'Разобрать антресоль', date: localDay(-60) },
+      // Среда недели, которая была четыре недели назад.
+      { text: 'Мысль месячной давности', kind: 'thought', date: localDay(monday - 28 + 2) },
+    ],
+  })
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  await unfold('Импорт записей')
+  await act(`
+    set(document.querySelector('.import__text'), ${JSON.stringify(file)});
+    byText('button', 'Разобрать')?.click();
+  `)
+  await sleep(700)
+  await act(`startsWith('button', 'Загрузить')?.click()`)
+  await sleep(1000)
+  const imported = await screen()
+
+  // ─ Пороги (Р-48): кривой — причиной с пределами, свой — в итоге раздела.
+  await unfold('Обзор недели')
+  const staleField = `document.querySelector('input[name=review-stale]')`
+  await act(`set(${staleField}, '0'); ${staleField}.form.querySelector('button[type=submit]').click();`)
+  await sleep(500)
+  const badThreshold = await screen()
+  await act(`set(${staleField}, '45'); ${staleField}.form.querySelector('button[type=submit]').click();`)
+  await sleep(700)
+  const savedThreshold = await screen()
+  check(
+    'пороги обзора: кривой — причиной с пределами, свой — в итоге раздела — Р-48',
+    has(imported, 'Загружено записей: 2') &&
+      has(badThreshold, 'Порог — целым числом дней, от 1 до 365') &&
+      has(savedThreshold, 'висяки — 45 дней, замыслы — 28 дней'),
+    `${line(imported, 'Загружено')}; ${line(badThreshold, 'Порог')}; ${line(savedThreshold, 'висяки')}`,
+  )
+
+  // ─ Норма в карточке категории (Р-45): кривая — причиной; «не меньше» — блоком «Неделя».
+  await go('/time/categories')
+  const firstCat = await run(`document.querySelector('button.cat__name')?.textContent.trim() ?? ''`)
+  await act(`document.querySelector('button.cat__name')?.click()`)
+  await sleep(400)
+  const daysField = `document.querySelector('input[name=norm-minDays]')`
+  await act(`set(${daysField}, '8'); byText('button', 'Сохранить норму')?.click();`)
+  await sleep(500)
+  const badNorm = await screen()
+  await act(`set(${daysField}, '1'); byText('button', 'Сохранить норму')?.click();`)
+  await sleep(700)
+  const savedNorm = await screen()
+  await go('/time')
+  await unfold('Неделя')
+  const week = await run(
+    `[...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Неделя')?.closest('section')?.innerText ?? ''`,
+  )
+  check(
+    'норма недели — в карточке категории, кривая — причиной; «не меньше» — блоком «Неделя» на учёте — Р-45',
+    firstCat !== '' &&
+      has(badNorm, 'Дней — целым числом, от одного до 7') &&
+      has(savedNorm, 'Норма недели: не меньше 1 дня') &&
+      has(week, firstCat) &&
+      has(week, 'из 1 дня'),
+    `${line(badNorm, 'Дней —')}; ${line(savedNorm, 'Норма недели')}; ${line(week, 'из 1 дня')}`,
+  )
+
+  // ─ Идущая неделя: время, план против факта, нормы (Р-43, Р-44, Р-45).
+  await go(`/review?week=${localDay()}`)
+  const time = await section('Время недели')
+  const plan = await section('План против факта')
+  const norms = await section('Нормы')
+  check(
+    'обзор идущей недели: время с основанием, план против факта с правилом счёта — Р-43, Р-44',
+    has(time, 'Учтено') && has(time, 'учёт был в') && /сделано \d+ из \d+/i.test(flat(plan)) && has(plan, 'удалённые не считаются'),
+    `${line(time, 'Учтено')}; ${line(plan, 'Сделано')}`,
+  )
+  check('нормы в обзоре — правило с основанием — Р-45', has(norms, firstCat) && has(norms, 'из 1 дня'), line(norms, 'из 1 дня'))
+
+  // ─ Висяк (Р-46): старше порога — в разборе; «Когда-нибудь» с «Отменить».
+  const staleBlock = await section('Висяки и замыслы')
+  await act(`document.querySelector('[aria-label="Когда-нибудь: Разобрать антресоль"]')?.click()`)
+  await sleep(700)
+  const later = await section('Висяки и замыслы')
+  check(
+    'висяк старше порога — в разборе; «Когда-нибудь» уводит его с «Отменить» — Р-46',
+    has(staleBlock, 'Разобрать антресоль') &&
+      has(staleBlock, 'Висят 45 дней и дольше') &&
+      has(later, 'Отложено в «Когда-нибудь»') &&
+      !has(later, 'Разобрать антресоль'),
+    `${line(staleBlock, 'Висят')}; ${line(later, 'Отложено')}`,
+  )
+
+  // ─ Возврат (Р-49): мысль той же недели четыре недели назад.
+  const recall = await section('Возврат')
+  check(
+    'возврат — мысль той же недели четыре недели назад — Р-49',
+    has(recall, '4 недели назад') && has(recall, 'Мысль месячной давности'),
+    line(recall, 'назад'),
+  )
+
+  // ─ Отложенное — на «Заметках» блоком «Когда-нибудь»; «Вернуть» — обратно.
+  await go('/inbox')
+  await unfold('Когда-нибудь')
+  const someday = await run(
+    `[...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Когда-нибудь')?.closest('section')?.innerText ?? ''`,
+  )
+  await act(`document.querySelector('[aria-label="Вернуть в «Неразобранное»: Разобрать антресоль"]')?.click()`)
+  await sleep(700)
+  const unsorted = await section('Неразобранное')
+  check(
+    'отложенное — блоком «Когда-нибудь» на «Заметках»; «Вернуть» — в неразобранное — Р-46',
+    has(someday, 'Разобрать антресоль') && has(unsorted, 'Разобрать антресоль'),
+    `${someday.replace(/\s+/g, ' ').slice(0, 80)}`,
+  )
+
+  // ─ Неделя к обзору: наблюдение и «Обзор проведён» (Р-41, Р-42, Р-49).
+  await go('/review')
+  await act(`
+    set(document.querySelector('textarea[name=observation]'), 'Наблюдение прогона');
+    byText('button', 'Обзор проведён')?.click();
+  `)
+  await sleep(1000)
+  const finished = await screen()
+  await go('/')
+  const after = await screen()
+  await go('/inbox')
+  const inbox = await screen()
+  check(
+    '«Обзор проведён» — запись обзора, наблюдение — мыслью на «Заметках»; карточка на «Сегодня» уходит — Р-42, Р-49',
+    has(finished, 'Обзор записан · занял') &&
+      /обзор проведён \d/i.test(flat(finished)) &&
+      has(finished, 'Наблюдение прогона') &&
+      !has(after, 'Обзор недели ждёт') &&
+      has(inbox, 'Наблюдение прогона'),
+    `${line(finished, 'Обзор записан')}; ${line(finished, 'Обзор проведён')}`,
+  )
+
+  // ─ После обзора напоминать о нём не о чем — в любой день (Р-51).
+  await go('/settings')
+  await unfold('Напоминания')
+  await act(`byText('button', 'Проверить сейчас')?.click()`)
+  await sleep(1500)
+  const quiet = await screen()
+  check(
+    'после обзора «Проверить сейчас»: напоминать не о чем, обзор недели не ждёт — Р-51',
+    has(quiet, 'обзор недели не ждёт'),
+    line(quiet, 'Напомина'),
   )
 }
 
@@ -1876,7 +2067,7 @@ async function dataScenario(file) {
   const loaded = /Загружено записей: (\d+)/.exec(restored.replace(/ /g, ' '))
   check('копия загрузилась через «Восстановить из копии»', loaded !== null, loaded?.[0] ?? restored.slice(0, 160))
 
-  const routes = ['/', '/time', '/inbox', '/time/categories', '/templates', '/settings']
+  const routes = ['/', '/time', '/inbox', '/time/categories', '/templates', '/review', '/settings']
 
   for (const route of routes) {
     await go(route)
