@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDays,
+  addMonths,
   lastDayOf,
+  monthEndIn,
+  monthOf,
+  monthPeriod,
+  monthsOf,
+  weeksEndingIn,
+  yearPeriod,
   days,
   daysAgo,
   daysBetween,
@@ -287,5 +294,71 @@ describe('недели и промежутки — Р-41, Р-52', () => {
     expect(formatPeriod({ from: '2026-08-31', to: '2026-09-06' })).toBe('31 августа – 6 сентября 2026')
     expect(formatPeriod({ from: '2025-12-29', to: '2026-01-04' })).toBe('29 декабря 2025 – 4 января 2026')
     expect(formatPeriod({ from: '2026-09-07', to: '2026-09-07' })).toBe('7 сентября 2026')
+  })
+})
+
+describe('месяцы и годы — Р-54, Р-55, Р-57', () => {
+  it('месяц дня; кривая строка кидает', () => {
+    expect(monthOf('2026-09-14')).toBe('2026-09')
+    expect(monthOf('2026-12-31')).toBe('2026-12')
+    expect(() => monthOf('2026-02-30')).toThrow()
+  })
+
+  it('промежуток месяца: февраль обычный и високосный, декабрь', () => {
+    expect(monthPeriod('2026-02')).toEqual({ from: '2026-02-01', to: '2026-02-28' })
+    expect(monthPeriod('2028-02')).toEqual({ from: '2028-02-01', to: '2028-02-29' })
+    expect(monthPeriod('2026-12')).toEqual({ from: '2026-12-01', to: '2026-12-31' })
+    expect(() => monthPeriod('2026-13')).toThrow()
+  })
+
+  it('сдвиг на месяцы через границу года в обе стороны', () => {
+    expect(addMonths('2026-01', -1)).toBe('2025-12')
+    expect(addMonths('2026-12', 1)).toBe('2027-01')
+    expect(addMonths('2026-09', 0)).toBe('2026-09')
+    expect(addMonths('2026-09', 13)).toBe('2027-10')
+    expect(addMonths('2026-03', -14)).toBe('2025-01')
+  })
+
+  it('месяцы года и год целиком', () => {
+    const months = monthsOf(2026)
+    expect(months).toHaveLength(12)
+    expect(months[0]).toBe('2026-01')
+    expect(months[11]).toBe('2026-12')
+    expect(yearPeriod(2026)).toEqual({ from: '2026-01-01', to: '2026-12-31' })
+  })
+
+  it('недели месяца — по воскресенью: сентябрь с вторника, июнь с понедельника, май до воскресенья', () => {
+    // 01.09.2026 — вторник: первая неделя кончается 6-го и вся — сентябрьская.
+    const september = weeksEndingIn(monthPeriod('2026-09'))
+    expect(september.map((week) => week.to)).toEqual(['2026-09-06', '2026-09-13', '2026-09-20', '2026-09-27'])
+    expect(september[0]).toEqual({ from: '2026-08-31', to: '2026-09-06' })
+    // 01.06.2026 — понедельник; 29–30 июня — неделя июля.
+    expect(weeksEndingIn(monthPeriod('2026-06')).map((week) => week.from)).toEqual([
+      '2026-06-01',
+      '2026-06-08',
+      '2026-06-15',
+      '2026-06-22',
+    ])
+    // 31.05.2026 — воскресенье: пять недель.
+    expect(weeksEndingIn(monthPeriod('2026-05'))).toHaveLength(5)
+  })
+
+  it('каждая неделя года — ровно в одном месяце', () => {
+    const byMonths = monthsOf(2026).flatMap((month) => weeksEndingIn(monthPeriod(month)))
+    const year = weeksEndingIn(yearPeriod(2026))
+    expect(byMonths).toEqual(year)
+    // 04.01.2026 — первое воскресенье года, 27.12.2026 — последнее.
+    expect(year).toHaveLength(52)
+    expect(year[0]?.to).toBe('2026-01-04')
+    expect(year.at(-1)?.to).toBe('2026-12-27')
+  })
+
+  it('неделя, закрывающая месяц: конец внутри, на воскресенье, через год; нет конца — null', () => {
+    expect(monthEndIn({ from: '2026-09-28', to: '2026-10-04' })).toBe('2026-09')
+    expect(monthEndIn({ from: '2026-05-25', to: '2026-05-31' })).toBe('2026-05')
+    expect(monthEndIn({ from: '2026-12-28', to: '2027-01-03' })).toBe('2026-12')
+    expect(monthEndIn({ from: '2026-09-07', to: '2026-09-13' })).toBeNull()
+    // 31 мая — накануне понедельника 1 июня: неделя 1–7 июня май не закрывает.
+    expect(monthEndIn({ from: '2026-06-01', to: '2026-06-07' })).toBeNull()
   })
 })

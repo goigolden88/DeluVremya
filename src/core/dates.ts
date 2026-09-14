@@ -281,6 +281,70 @@ export function lastDayOf(month: MonthStr): DateStr {
   return toDateStr(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0))
 }
 
+// ─── Месяцы и годы ─────────────────────────────────────────────────────────
+// Своё «Делу Время»: итоги месяца и года (Р-54, Р-57).
+
+function assertMonth(month: MonthStr): void {
+  if (!isMonthStr(month)) throw new Error(`Не месяц: ${month}`)
+}
+
+/** Месяц дня: `2026-09-14` → `2026-09`. Кривая строка кидает, как вся арифметика дней. */
+export function monthOf(d: DateStr): MonthStr {
+  toDate(d)
+  return d.slice(0, 7)
+}
+
+/** Промежуток месяца: с первого числа по последнее. */
+export function monthPeriod(month: MonthStr): Period {
+  assertMonth(month)
+  return { from: `${month}-01`, to: lastDayOf(month) }
+}
+
+/** Сдвиг на месяцы: `2026-01` и −1 → `2025-12`. */
+export function addMonths(month: MonthStr, n: number): MonthStr {
+  assertMonth(month)
+  const date = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1)
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`
+}
+
+/** Месяцев в году. */
+export const MONTHS_PER_YEAR = 12
+
+/** Месяцы года по порядку. */
+export function monthsOf(year: number): MonthStr[] {
+  return Array.from({ length: MONTHS_PER_YEAR }, (_, index) => `${year}-${pad2(index + 1)}`)
+}
+
+/** Год целиком. */
+export function yearPeriod(year: number): Period {
+  return { from: `${year}-01-01`, to: `${year}-12-31` }
+}
+
+/**
+ * Недели, чьё воскресенье лежит в промежутке, по порядку. Неделя принадлежит
+ * месяцу своего воскресенья (Р-55): каждая попадает ровно в один месяц, и к
+ * концу месяца все его недели закончились.
+ */
+export function weeksEndingIn(period: Period): Period[] {
+  const list: Period[] = []
+  // Первое воскресенье не раньше начала промежутка — конец его недели.
+  for (let sunday = weekPeriod(period.from).to; sunday <= period.to; sunday = addDays(sunday, 7)) {
+    list.push({ from: addDays(sunday, -6), to: sunday })
+  }
+  return list
+}
+
+/**
+ * Месяц, чей последний день лежит в промежутке не длиннее месяца: неделя его
+ * закрывает (Р-54). Null — ни один месяц в нём не кончается.
+ */
+export function monthEndIn(period: Period): MonthStr | null {
+  const month = monthOf(period.to)
+  if (lastDayOf(month) === period.to) return month
+  const before = addMonths(month, -1)
+  return lastDayOf(before) >= period.from ? before : null
+}
+
 /**
  * Русское склонение по числу.
  *
