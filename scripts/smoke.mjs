@@ -43,6 +43,20 @@ const DATA_AT = process.argv.indexOf('--data')
 const DATA =
   DATA_AT === -1 ? null : resolve(process.env.INIT_CWD ?? process.cwd(), process.argv[DATA_AT + 1] ?? '')
 
+/**
+ * Начала первых строк двух последних записей «Что нового» — из исходника:
+ * проверка «копия без прочитанного видит только последнюю» не устаревает
+ * с каждой новой записью.
+ */
+const [PREVIOUS_CHANGE, LATEST_CHANGE] = (() => {
+  const source = readFileSync(join(ROOT, 'src/changes.ts'), 'utf8')
+  const firsts = source
+    .split('lines: [')
+    .slice(1)
+    .map((block) => /'([^']+)'/.exec(block)?.[1] ?? '')
+  return firsts.slice(-2).map((text) => text.slice(0, 40))
+})()
+
 /** Адрес собранного приложения. Заполняется, когда поднимется сервер. */
 let APP = ''
 
@@ -1277,7 +1291,10 @@ async function stageSixScenario() {
   const newsAfter = await screen()
   check(
     '«Что нового» — последняя запись на копии без прочитанного; «Понятно» убирает и после перезапуска — Р-65',
-    has(news, 'Что нового') && has(news, 'Лента — ссылка внизу') && !has(newsAfter, 'Лента — ссылка внизу'),
+    has(news, 'Что нового') &&
+      has(news, LATEST_CHANGE) &&
+      !has(news, PREVIOUS_CHANGE) &&
+      !has(newsAfter, LATEST_CHANGE),
     line(news, 'Что нового'),
   )
 
@@ -2413,8 +2430,9 @@ async function polishScenario() {
   await press('Перенести: Пункт доведения')
   await sleep(400)
   const strip = await planText()
+  // Шаг — с `const`: начатый со скобки склеивается с помощниками (Журнал, Этап 3).
   await act(
-    `[...document.querySelectorAll('.plan-move button')].find((el) => el.textContent.trim() === 'На завтра')?.click()`,
+    `const later = [...document.querySelectorAll('.plan-move button')].find((el) => el.textContent.trim() === 'На завтра'); later?.click()`,
   )
   await sleep(700)
   const moved = await planText()
@@ -2447,6 +2465,33 @@ async function polishScenario() {
     'дело при записи — «На сегодня»: сразу в плане, с «Отменить»; у мысли чипов нет — Р-73',
     has(captured, 'Поставлено на сегодня') && has(inPlan, 'Дело сразу в план') && asThought === true,
     `${line(captured, 'Поставлено')}; мысль без чипов: ${asThought}`,
+  )
+
+  // ─ Группы категорий (Р-81): новая установка — со стартовыми группами; новая
+  //   группа — из карточки; итог дня — строкой группы.
+  await go('/time/categories')
+  const groupsScreen = await screen()
+  await act(`byText('button.cat__name', 'Чтение')?.click()`)
+  await sleep(400)
+  await act(`
+    set(document.querySelector('input[name=new-group]'), 'Книги');
+    byText('button', 'В новую группу')?.click();
+  `)
+  await sleep(700)
+  const regrouped = await screen()
+  await go('/time')
+  await act(`byText('button', 'Чтение +30')?.click()`)
+  await sleep(700)
+  const dayGroups = await run(
+    `[...document.querySelectorAll('.stats__group')].map((el) => el.innerText.replace(/\\s+/g, ' ')).join(' | ')`,
+  )
+  check(
+    'группы: стартовые на новой установке, новая — из карточки; итог дня — строкой группы — Р-81',
+    has(groupsScreen, 'Развитие') &&
+      has(groupsScreen, 'Без группы') &&
+      has(regrouped, 'Книги') &&
+      has(dayGroups, 'Книги'),
+    `${line(regrouped, 'Книги')}; итог: ${dayGroups}`,
   )
 }
 

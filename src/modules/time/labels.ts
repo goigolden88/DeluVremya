@@ -72,6 +72,10 @@ export function formatMinutes(total: number): string {
 /** Категория блока, которой нет ни живой, ни в надгробиях. */
 export const UNKNOWN_CATEGORY = 'без категории'
 
+/** Категории без группы — последней группой (Р-81). */
+export const NO_GROUP = 'Без группы'
+export const GROUP_EMPTY = 'Название группы — хотя бы одно слово'
+
 export function blocksWord(count: number): string {
   return plural(count, ['блок', 'блока', 'блоков'])
 }

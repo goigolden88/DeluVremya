@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CHANGES } from '../changes.ts'
 import { db } from '../core/db.ts'
 import { days, today } from '../core/dates.ts'
@@ -100,6 +101,19 @@ export function Settings() {
       <ReviewSection />
 
       <ScreenNamesSection />
+
+      {/* Категории, кнопки, группы и нормы живут у учёта; сюда — ссылкой (Р-81). */}
+      <section className="block">
+        <Link className="link-card" to="/time/categories">
+          <span className="link-card__main">
+            <span className="link-card__title">Категории и группы</span>
+            <span className="link-card__sub">кнопки, группы, нормы, архив</span>
+          </span>
+          <span className="link-card__go" aria-hidden="true">
+            ›
+          </span>
+        </Link>
+      </section>
 
       <About state={state} />
     </>

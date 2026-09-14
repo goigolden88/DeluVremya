@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { db } from '../../core/db.ts'
 import type { Category, Preset, TimeBlock } from '../../core/model.ts'
 import { Fold } from '../../ui/Fold.tsx'
 import { BlockForm } from './BlockForm.tsx'
 import { presetRow, type PresetButton } from './categories.ts'
+import { byGroup, hasGroups } from './groups.ts'
 import { blockFromPreset, blocksOn, categoryName, daySummary, type DaySummary } from './day.ts'
 import {
   addedLine,
   blocksWord,
   formatMinutes,
+  NO_GROUP,
   presetLabel,
   savedLine,
   summaryLine,
@@ -90,6 +92,20 @@ export function TimeDay({
       if (last?.block.id === block.id) setLast(null)
     })
 
+  // По группам (Р-81), если они есть; у группы — сколько в ней учтено за день.
+  const grouped = hasGroups(catalog.categories)
+    ? byGroup(buttons, catalog.categories, (button) => button.category.id)
+    : null
+  const spentIn = (list: readonly PresetButton[]) => {
+    const ids = new Set(list.map((button) => button.category.id))
+    return summary.byCategory.reduce((sum, row) => sum + (ids.has(row.categoryId) ? row.minutes : 0), 0)
+  }
+  const presetButton = (button: PresetButton) => (
+    <button key={button.preset.id} type="button" className="preset" onClick={() => void add(button)}>
+      {button.category.name} {presetLabel(button.preset.minutes)}
+    </button>
+  )
+
   return (
     <>
       <section className="block">
@@ -100,14 +116,23 @@ export function TimeDay({
           <p className="stub">
             Кнопок нет — заведите их в <Link to="/time/categories">категориях</Link>.
           </p>
+        ) : grouped ? (
+          grouped.map((group) => {
+            const spent = spentIn(group.items)
+            return (
+              <Fold
+                key={group.key ?? ''}
+                id={`${compact ? 'today' : 'time'}:group:${group.key ?? ''}`}
+                title={group.name ?? NO_GROUP}
+                summary={spent > 0 ? formatMinutes(spent) : undefined}
+                sub
+              >
+                <div className="presets">{group.items.map(presetButton)}</div>
+              </Fold>
+            )
+          })
         ) : (
-          <div className="presets">
-            {buttons.map((button) => (
-              <button key={button.preset.id} type="button" className="preset" onClick={() => void add(button)}>
-                {button.category.name} {presetLabel(button.preset.minutes)}
-              </button>
-            ))}
-          </div>
+          <div className="presets">{buttons.map(presetButton)}</div>
         )}
 
         {last && undoable && (
@@ -120,7 +145,7 @@ export function TimeDay({
         )}
         {error && <p className="error">Не записалось: {error}</p>}
 
-        <Summary summary={summary} />
+        <Summary summary={summary} categories={catalog.categories} />
       </section>
 
       {!compact && (
@@ -163,7 +188,15 @@ export function TimeDay({
   )
 }
 
-function Summary({ summary }: { summary: DaySummary }) {
+function Summary({ summary, categories }: { summary: DaySummary; categories: Category[] }) {
+  // По группам (Р-81): строка группы с суммой, под ней её категории.
+  const groups = hasGroups(categories) ? byGroup(summary.byCategory, categories, (row) => row.categoryId) : null
+  const row = (each: DaySummary['byCategory'][number], sub: boolean) => (
+    <tr key={each.categoryId}>
+      <td className={sub ? 'stats__sub' : undefined}>{each.name ?? UNKNOWN_CATEGORY}</td>
+      <td className="num">{formatMinutes(each.minutes)}</td>
+    </tr>
+  )
   return (
     <div className="day-sum">
       <p className="lead">{summaryLine(summary.total, summary.count)}</p>
@@ -171,12 +204,17 @@ function Summary({ summary }: { summary: DaySummary }) {
       {summary.byCategory.length > 0 && (
         <table className="stats">
           <tbody>
-            {summary.byCategory.map((row) => (
-              <tr key={row.categoryId}>
-                <td>{row.name ?? UNKNOWN_CATEGORY}</td>
-                <td className="num">{formatMinutes(row.minutes)}</td>
-              </tr>
-            ))}
+            {groups
+              ? groups.map((group) => (
+                  <Fragment key={group.key ?? ''}>
+                    <tr className="stats__group">
+                      <td>{group.name ?? NO_GROUP}</td>
+                      <td className="num">{formatMinutes(group.items.reduce((sum, each) => sum + each.minutes, 0))}</td>
+                    </tr>
+                    {group.items.map((each) => row(each, true))}
+                  </Fragment>
+                ))
+              : summary.byCategory.map((each) => row(each, false))}
           </tbody>
         </table>
       )}

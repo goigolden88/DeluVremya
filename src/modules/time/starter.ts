@@ -15,11 +15,12 @@
 import type { SeedCategory } from './categories.ts'
 
 export const STARTER: readonly SeedCategory[] = [
-  { name: 'Зарядка', kind: 'useful', presets: [15, 30] },
-  { name: 'Шахматы', kind: 'neutral', presets: [30, 60] },
-  { name: 'Чтение', kind: 'useful', presets: [30, 60] },
-  { name: 'Ютуб', kind: 'idle', presets: [30, 60] },
-  { name: 'Прогулка', kind: 'useful', presets: [30, 60] },
+  // Группы (Р-81) — только у новой установки: заведённому набору их ставит человек.
+  { name: 'Зарядка', kind: 'useful', presets: [15, 30], group: 'Движение' },
+  { name: 'Шахматы', kind: 'neutral', presets: [30, 60], group: 'Развитие' },
+  { name: 'Чтение', kind: 'useful', presets: [30, 60], group: 'Развитие' },
+  { name: 'Ютуб', kind: 'idle', presets: [30, 60], group: 'Развлечения' },
+  { name: 'Прогулка', kind: 'useful', presets: [30, 60], group: 'Движение' },
   // Остаточная: полное покрытие суток не требуется, но то, что не легло
   // ни в одну категорию, должно куда-то лечь (01-Проект, модуль 3).
   { name: 'Прочее', kind: 'neutral', presets: [30] },

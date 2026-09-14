@@ -12,7 +12,6 @@ import {
   createCategory,
   createPreset,
   MINUTES_PER_DAY,
-  moveCategory,
   nameProblem,
   presetProblem,
   presetsOf,
@@ -22,10 +21,24 @@ import {
   type RemovePlan,
 } from './categories.ts'
 import {
+  byGroup,
+  groupKey,
+  groupNames,
+  hasGroups,
+  moveGroup,
+  moveInGroup,
+  renameGroup,
+  setGroup,
+  ungroup,
+  type Group,
+} from './groups.ts'
+import {
   deleteConfirm,
+  GROUP_EMPTY,
   KIND_LABELS,
   moveLine,
   NAME_PROBLEMS,
+  NO_GROUP,
   NORM_PROBLEMS,
   normSinceText,
   normText,
@@ -82,6 +95,25 @@ export function Categories() {
 
   const active = activeCategories(catalog.categories)
   const archived = archivedCategories(catalog.categories)
+  // По группам (Р-81), если они есть; иначе — одним списком, как прежде.
+  const grouped = hasGroups(catalog.categories)
+  const groups = byGroup(active, catalog.categories, (category) => category.id)
+  const named = groups.filter((group) => group.key !== null).length
+
+  const row = (category: Category, index: number, list: readonly Category[], blocks: TimeBlock[]) => (
+    <CategoryRow
+      key={category.id}
+      category={category}
+      categories={catalog.categories}
+      presets={catalog.presets}
+      blocks={blocks}
+      open={open === category.id}
+      first={index === 0}
+      last={index === list.length - 1}
+      onToggle={() => setOpen(open === category.id ? null : category.id)}
+      save={save}
+    />
+  )
 
   return (
     <>
@@ -91,7 +123,8 @@ export function Categories() {
         </Link>
         <h1>Категории</h1>
         <p className="muted">
-          Порядок здесь — порядок кнопок на экране дня. Признак категории нужен только обзору недели:
+          Порядок здесь — порядок кнопок на экране дня. Группа ставится в карточке категории: кнопки и итоги
+          встают по группам. Признак категории нужен только обзору недели:
           на экране дня он ничего не красит. Норма недели «не меньше» видна на экране {quoted(names.time)},
           «не больше» — только в обзоре недели.
         </p>
@@ -104,24 +137,26 @@ export function Categories() {
       {/* Без блоков не посчитать, что удаление перенесёт: ждём и их. */}
       {catalog.status === 'ready' && time.status === 'ready' && (
         <>
-          <section className="block">
-            <ul className="plain">
-              {active.map((category, index) => (
-                <CategoryRow
-                  key={category.id}
-                  category={category}
+          {grouped ? (
+            groups.map((group, index) => (
+              <section className="block" key={group.key ?? ''}>
+                <GroupHead
+                  group={group}
                   categories={catalog.categories}
-                  presets={catalog.presets}
-                  blocks={time.blocks}
-                  open={open === category.id}
                   first={index === 0}
-                  last={index === active.length - 1}
-                  onToggle={() => setOpen(open === category.id ? null : category.id)}
+                  last={index >= named - 1}
                   save={save}
                 />
-              ))}
-            </ul>
-          </section>
+                <ul className="plain">
+                  {group.items.map((category, place) => row(category, place, group.items, time.blocks))}
+                </ul>
+              </section>
+            ))
+          ) : (
+            <section className="block">
+              <ul className="plain">{active.map((category, place) => row(category, place, active, time.blocks))}</ul>
+            </section>
+          )}
 
           <NewCategory categories={catalog.categories} save={save} />
 
@@ -210,7 +245,7 @@ function CategoryRow({
   }
 
   function move(step: -1 | 1) {
-    void save(() => db.putMany('categories', moveCategory(categories, category.id, step)))
+    void save(() => db.putMany('categories', moveInGroup(categories, category.id, step)))
   }
 
   return (
@@ -254,6 +289,8 @@ function CategoryRow({
               Переименовать
             </button>
           </form>
+
+          <GroupPicker category={category} categories={categories} save={save} />
 
           <label className="field">
             <span>Для обзора недели</span>
@@ -507,5 +544,158 @@ function NewCategory({ categories, save }: { categories: Category[]; save: Save 
         </button>
       </div>
     </form>
+  )
+}
+
+/**
+ * Группа категории (Р-81): чипами из тех, что есть, или новой; «Без группы» —
+ * тоже чип. Категория встаёт в конец выбранной группы.
+ */
+function GroupPicker({ category, categories, save }: { category: Category; categories: Category[]; save: Save }) {
+  const [fresh, setFresh] = useState('')
+  const current = category.group?.trim() ? groupKey(category.group) : null
+
+  function choose(name: string | null) {
+    void save(() => db.putMany('categories', setGroup(categories, category.id, name)))
+  }
+
+  return (
+    <div className="field">
+      <span>Группа — где кнопка и строка в итогах</span>
+      <div className="chips" role="group" aria-label="Группа">
+        {groupNames(categories).map((name) => (
+          <button
+            key={name}
+            type="button"
+            className={groupKey(name) === current ? 'chip chip--on' : 'chip'}
+            aria-pressed={groupKey(name) === current}
+            onClick={() => choose(name)}
+          >
+            {name}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={current === null ? 'chip chip--on' : 'chip'}
+          aria-pressed={current === null}
+          onClick={() => choose(null)}
+        >
+          {NO_GROUP}
+        </button>
+      </div>
+      <form
+        className="row"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!fresh.trim()) return
+          choose(fresh)
+          setFresh('')
+        }}
+      >
+        <input
+          name="new-group"
+          aria-label="Новая группа"
+          placeholder="Новая группа"
+          value={fresh}
+          onChange={(event) => setFresh(event.target.value)}
+        />
+        <button type="submit" className="btn" disabled={!fresh.trim()}>
+          В новую группу
+        </button>
+      </form>
+    </div>
+  )
+}
+
+/**
+ * Заголовок группы на экране категорий (Р-81): порядок групп, переименование,
+ * «Убрать группу» — её категории уходят в «Без группы». У «Без группы» —
+ * только заголовок: она всегда последняя.
+ */
+function GroupHead({
+  group,
+  categories,
+  first,
+  last,
+  save,
+}: {
+  group: Group<Category>
+  categories: Category[]
+  first: boolean
+  last: boolean
+  save: Save
+}) {
+  const [renaming, setRenaming] = useState(false)
+  const [name, setName] = useState(group.name ?? '')
+  const [problem, setProblem] = useState('')
+  const key = group.key
+  if (key === null) return <h2 className="cat-group__name">{NO_GROUP}</h2>
+
+  function rename(target: string) {
+    if (!name.trim()) {
+      setProblem(GROUP_EMPTY)
+      return
+    }
+    setProblem('')
+    setRenaming(false)
+    void save(() => db.putMany('categories', renameGroup(categories, target, name)))
+  }
+
+  return (
+    <>
+      <div className="cat-group__head">
+        <h2 className="cat-group__name">{group.name}</h2>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={`Группа «${group.name}» — выше`}
+          disabled={first}
+          onClick={() => void save(() => db.putMany('categories', moveGroup(categories, key, -1)))}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={`Группа «${group.name}» — ниже`}
+          disabled={last}
+          onClick={() => void save(() => db.putMany('categories', moveGroup(categories, key, 1)))}
+        >
+          ↓
+        </button>
+      </div>
+      <div className="row row--wrap">
+        <button type="button" className="link-btn" aria-expanded={renaming} onClick={() => setRenaming(!renaming)}>
+          Переименовать группу
+        </button>
+        <button
+          type="button"
+          className="link-btn"
+          onClick={() => void save(() => db.putMany('categories', ungroup(categories, key)))}
+        >
+          Убрать группу
+        </button>
+      </div>
+      {renaming && (
+        <form
+          className="row"
+          onSubmit={(event) => {
+            event.preventDefault()
+            rename(key)
+          }}
+        >
+          <input
+            name="group-name"
+            aria-label="Название группы"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <button type="submit" className="btn">
+            Сохранить
+          </button>
+        </form>
+      )}
+      {problem && <p className="error">{problem}</p>}
+    </>
   )
 }

@@ -1267,3 +1267,26 @@ span.plan-item__text {
   box-shadow: 0 2px 6px rgb(0 0 0 / 0.15);
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Группы категорий (Р-81): строка группы в итогах — жирнее, её категории —
+   с отступом; заголовок группы на экране категорий — со стрелками. */
+.stats__group td {
+  padding-top: 10px;
+  font-weight: 600;
+}
+
+.stats td.stats__sub {
+  padding-left: 16px;
+}
+
+.cat-group__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cat-group__name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}

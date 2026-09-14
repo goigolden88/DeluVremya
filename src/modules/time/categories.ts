@@ -25,7 +25,7 @@ export const MINUTES_PER_DAY = 24 * 60
 export const SEED_STAMP = '2000-01-01T00:00:00.000Z'
 
 /** Категория стартового набора: название, признак, кнопки в минутах. */
-export type SeedCategory = { name: string; kind: CategoryKind; presets: readonly number[] }
+export type SeedCategory = { name: string; kind: CategoryKind; presets: readonly number[]; group?: string }
 
 export function normName(name: string): string {
   return name.trim().toLocaleLowerCase('ru')
@@ -225,6 +225,9 @@ function withContent(survivor: Category, latest: Category): Category | null {
   const next: Category = { ...survivor, name: latest.name, kind: latest.kind, order: latest.order }
   if (latest.archived) next.archived = true
   else delete next.archived
+  // Группа — тоже содержимое (Р-81).
+  if (latest.group !== undefined) next.group = latest.group
+  else delete next.group
   delete next.movedTo
 
   const same =
@@ -232,6 +235,7 @@ function withContent(survivor: Category, latest: Category): Category | null {
     next.kind === survivor.kind &&
     next.order === survivor.order &&
     Boolean(next.archived) === Boolean(survivor.archived) &&
+    next.group === survivor.group &&
     survivor.movedTo === undefined
   return same ? null : next
 }
@@ -241,7 +245,7 @@ function withContent(survivor: Category, latest: Category): Category | null {
  *
  * Живые категории с одним названием — регистр и пробелы по краям не
  * различаются — сливаются в одну: остаётся `survivorOf`, название, признак,
- * порядок и архив берутся у поздней правки, остальные уходят надгробием
+ * порядок, архив и группа берутся у поздней правки, остальные уходят надгробием
  * с `movedTo`. Одноимённые заводятся только встречными правками на двух
  * устройствах: форма занятое название не пропускает.
  *
@@ -410,6 +414,7 @@ export function initialCategories(seed: readonly SeedCategory[]): Category[] {
     name: each.name.trim(),
     order,
     kind: each.kind,
+    ...(each.group ? { group: each.group } : {}),
   }))
 }
 

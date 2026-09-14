@@ -36,6 +36,17 @@ function apply<T extends { id: string }>(list: readonly T[], written: readonly T
   return [...map.values()]
 }
 
+describe('группа при слиянии одноимённых — Р-81', () => {
+  it('у оставшейся — группа поздней правки', () => {
+    const plan = reconcilePlan(
+      [cat('cat:игры', 'Игры', { group: 'Развлечения' }), cat('cat:шахматы', 'Игры', { updatedAt: NEW, group: 'Развитие' })],
+      [],
+      [],
+    )
+    expect(plan.categories.find((each) => each.id === 'cat:игры')?.group).toBe('Развитие')
+  })
+})
+
 describe('одноимённые категории — Р-29', () => {
   // Телефон переименовал «Шахматы» в «Игры» — id остался прежним; компьютер
   // в это время завёл «Игры» заново. После обмена — две «Игры».

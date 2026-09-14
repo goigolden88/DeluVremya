@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { DateStr, Period } from '../../core/dates.ts'
 import { quoted } from '../../ui/screenNames.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
@@ -9,11 +10,13 @@ import {
   lowerFirst,
   MARKS_BASIS,
   marksLine,
+  NO_GROUP,
   normText,
   periodLine,
   UNKNOWN_CATEGORY,
   YEAR_NORMS_BASIS,
 } from './labels.ts'
+import { byGroup, hasGroups } from './groups.ts'
 import { compareRows, periodNorms, periodSummary } from './period.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
@@ -54,6 +57,19 @@ export function PeriodTime({ period, today, compare }: { period: Period; today: 
     ? compareRows(summary, before, catalog.categories)
     : summary.byCategory.map((row) => ({ ...row, before: 0 }))
   const withBackground = rows.some((row) => row.background > 0)
+  // По группам (Р-81): строка группы с суммой в каждом столбце, под ней её категории.
+  const groups = hasGroups(catalog.categories) ? byGroup(rows, catalog.categories, (row) => row.categoryId) : null
+  const dash = (minutes: number) => (minutes > 0 ? formatMinutes(minutes) : '—')
+  const line = (row: (typeof rows)[number], sub: boolean) => (
+    <tr key={row.categoryId}>
+      <td className={sub ? 'stats__sub' : undefined}>
+        {row.name ?? UNKNOWN_CATEGORY}
+        {row.background > 0 && <span className="muted"> · {backgroundText(row.background)}</span>}
+      </td>
+      <td className="num">{dash(row.minutes)}</td>
+      {compare && <td className="num muted">{dash(row.before)}</td>}
+    </tr>
+  )
 
   return (
     <div className="day-sum">
@@ -75,16 +91,20 @@ export function PeriodTime({ period, today, compare }: { period: Period; today: 
             </thead>
           )}
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.categoryId}>
-                <td>
-                  {row.name ?? UNKNOWN_CATEGORY}
-                  {row.background > 0 && <span className="muted"> · {backgroundText(row.background)}</span>}
-                </td>
-                <td className="num">{row.minutes > 0 ? formatMinutes(row.minutes) : '—'}</td>
-                {compare && <td className="num muted">{row.before > 0 ? formatMinutes(row.before) : '—'}</td>}
-              </tr>
-            ))}
+            {groups
+              ? groups.map((group) => (
+                  <Fragment key={group.key ?? ''}>
+                    <tr className="stats__group">
+                      <td>{group.name ?? NO_GROUP}</td>
+                      <td className="num">{dash(group.items.reduce((sum, row) => sum + row.minutes, 0))}</td>
+                      {compare && (
+                        <td className="num muted">{dash(group.items.reduce((sum, row) => sum + row.before, 0))}</td>
+                      )}
+                    </tr>
+                    {group.items.map((row) => line(row, true))}
+                  </Fragment>
+                ))
+              : rows.map((row) => line(row, false))}
           </tbody>
         </table>
       )}

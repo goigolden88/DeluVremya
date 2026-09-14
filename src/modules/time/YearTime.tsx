@@ -1,7 +1,9 @@
+import { Fragment } from 'react'
 import { formatMonth, monthName, monthPeriod, MONTHS_SHORT, type DateStr, type MonthStr } from '../../core/dates.ts'
 import { BarChart, MiniBars } from '../../ui/BarChart.tsx'
 import { Fold } from '../../ui/Fold.tsx'
-import { backgroundText, formatMinutes, kindLine, lowerFirst, periodLine, UNKNOWN_CATEGORY } from './labels.ts'
+import { byGroup, hasGroups } from './groups.ts'
+import { backgroundText, formatMinutes, kindLine, lowerFirst, NO_GROUP, periodLine, UNKNOWN_CATEGORY } from './labels.ts'
 import { yearTime } from './period.ts'
 import { Unready } from './Period.tsx'
 import { useBlocks } from './useBlocks.ts'
@@ -48,6 +50,29 @@ export function YearTime({
     }
   })
 
+  // По группам (Р-81): у группы — сумма за год и столбики сложенных месяцев.
+  const groups = hasGroups(catalog.categories)
+    ? byGroup(data.categories, catalog.categories, (row) => row.categoryId)
+    : null
+  const bars = (values: number[]) => (
+    <td className="minibars-cell">
+      <MiniBars
+        values={values}
+        titles={values.map((minutes, index) => `${MONTHS_SHORT[index] ?? ''}: ${formatMinutes(minutes)}`)}
+      />
+    </td>
+  )
+  const line = (row: (typeof data.categories)[number], sub: boolean) => (
+    <tr key={row.categoryId}>
+      <td className={sub ? 'stats__sub' : undefined}>
+        {row.name ?? UNKNOWN_CATEGORY}
+        {row.background > 0 && <span className="muted"> · {backgroundText(row.background)}</span>}
+      </td>
+      {bars(row.byMonth)}
+      <td className="num">{row.minutes > 0 ? formatMinutes(row.minutes) : '—'}</td>
+    </tr>
+  )
+
   return (
     <div className="day-sum">
       <p className="lead">{periodLine(data.total)}</p>
@@ -90,23 +115,24 @@ export function YearTime({
           <h3 className="unit__name">По категориям</h3>
           <table className="stats">
             <tbody>
-              {data.categories.map((row) => (
-                <tr key={row.categoryId}>
-                  <td>
-                    {row.name ?? UNKNOWN_CATEGORY}
-                    {row.background > 0 && <span className="muted"> · {backgroundText(row.background)}</span>}
-                  </td>
-                  <td className="minibars-cell">
-                    <MiniBars
-                      values={row.byMonth}
-                      titles={row.byMonth.map(
-                        (minutes, index) => `${MONTHS_SHORT[index] ?? ''}: ${formatMinutes(minutes)}`,
-                      )}
-                    />
-                  </td>
-                  <td className="num">{row.minutes > 0 ? formatMinutes(row.minutes) : '—'}</td>
-                </tr>
-              ))}
+              {groups
+                ? groups.map((group) => {
+                    const total = group.items.reduce((sum, row) => sum + row.minutes, 0)
+                    const months = data.months.map((_, index) =>
+                      group.items.reduce((sum, row) => sum + (row.byMonth[index] ?? 0), 0),
+                    )
+                    return (
+                      <Fragment key={group.key ?? ''}>
+                        <tr className="stats__group">
+                          <td>{group.name ?? NO_GROUP}</td>
+                          {bars(months)}
+                          <td className="num">{total > 0 ? formatMinutes(total) : '—'}</td>
+                        </tr>
+                        {group.items.map((row) => line(row, true))}
+                      </Fragment>
+                    )
+                  })
+                : data.categories.map((row) => line(row, false))}
             </tbody>
           </table>
           <p className="muted">
