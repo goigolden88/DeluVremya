@@ -12,6 +12,9 @@
   --error: #c02626;
   --ok: #3f8f4a;
   --due: #b07708;
+  /* Цвет столбцов графика (Р-57). В светлой теме — акцент; проверен
+     на контраст и светлоту против фона скриптом палитры. */
+  --chart: #b3620b;
 
   --tabs-height: 56px;
 
@@ -30,6 +33,9 @@
     --error: #ff7b7b;
     --ok: #6fbf7c;
     --due: #e3a83a;
+    /* Тёмный акцент для столбцов слишком светел: ступень темнее, та же
+       янтарная гамма, проверена против тёмного фона. */
+    --chart: #c9822b;
   }
 }
 
@@ -218,6 +224,80 @@ a {
 .norm-marks {
   font-variant-numeric: tabular-nums;
   margin: 2px 0;
+}
+
+/* ─── График столбцами (Р-57) ────────────────────────────────────────────── */
+
+.chart {
+  width: 100%;
+  margin: 4px 0 8px;
+}
+
+.chart__svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Сетка — волосяная и сплошная, на ступень от фона: данные громче. */
+.chart__grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart__grid text,
+.chart__label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__label--muted {
+  opacity: 0.55;
+}
+
+.chart__value {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chart__bar {
+  fill: var(--chart);
+}
+
+/* Цель тапа — весь слот: прозрачна, пока на неё не навели. */
+.chart__hit {
+  fill: transparent;
+}
+
+a.chart__col {
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a.chart__col:hover .chart__hit,
+a.chart__col:focus-visible .chart__hit {
+  fill: var(--surface);
+}
+
+a.chart__col:focus-visible .chart__label {
+  fill: var(--text);
+}
+
+.minibars {
+  display: block;
+}
+
+.minibars__base {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.stats .minibars-cell {
+  width: 96px;
+  padding-left: 12px;
 }
 
 .stats .num {
