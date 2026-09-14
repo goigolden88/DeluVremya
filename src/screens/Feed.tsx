@@ -1,24 +1,25 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { feedDateText, feedHeading, filterFeed, groupFeed, recordsText } from '../core/feed.ts'
-import type { EventKind } from '../core/model.ts'
+import { feedDateText, feedHeading, filterFeed, groupFeed, recordsText, type FeedItem } from '../core/feed.ts'
+import type { RecordKind } from '../core/model.ts'
 import { KIND_ORDER, KINDS } from '../registry.ts'
 import { useFeed } from './useFeed.ts'
 
 /**
- * Лента: все записи всех дневников, новые сверху (Р-48, Р-52).
+ * Лента `#/feed` (Р-62): все записи одной хроникой, новые сверху. Взято
+ * из «Дневников».
  *
- * «Сейчас» отвечает на вопрос «что делать сегодня», лента — на «что было»:
- * когда в последний раз, что за август, доехало ли с телефона. Отсюда и
- * устройство: хроника за всё время и поиск по всему сразу, без выбора
- * периода — «стрижка» имеет смысл искать именно по всем годам.
+ * «Сегодня» отвечает на вопрос «что делать сегодня», лента — на «что было»:
+ * что сделано в августе, когда записана мысль, доехало ли с телефона. Отсюда
+ * и устройство: хроника за всё время и поиск по всему сразу, без выбора
+ * периода.
  *
- * Списка «к просмотру» здесь нет: это планы, а не события. Об этом сказано
- * под лентой словами, чтобы его отсутствие не читалось как потеря.
+ * Лента только читает (Р-59): строка ведёт туда, где запись правится, а у
+ * сделанного и прошлого такого места нет — там строка без перехода.
  */
 export function Feed() {
   const feed = useFeed()
-  const [kind, setKind] = useState<EventKind | null>(null)
+  const [kind, setKind] = useState<RecordKind | null>(null)
   const [query, setQuery] = useState('')
 
   if (feed.status === 'loading') return <p className="muted">Открываю базу…</p>
@@ -26,24 +27,40 @@ export function Feed() {
 
   const total = feed.items.length
   // Чипы только тех видов, что есть: чип на пустой вид — тап, ведущий
-  // к «ничего не нашлось» (то же правило, что у месяцев в контенте, Р-45).
+  // к «ничего не нашлось».
   const present = KIND_ORDER.filter((each) => feed.items.some((item) => item.kind === each))
   const shown = filterFeed(feed.items, { kind, query })
-  const groups = groupFeed(shown)
+  const groups = groupFeed(shown, KIND_ORDER)
+
+  const row = (item: FeedItem) => (
+    <>
+      <span className="feed__date">{feedDateText(item.date)}</span>
+      <span className="feed__main">
+        <span className="feed__title">{item.title}</span>
+        {item.detail && <span className="feed__detail muted">{item.detail}</span>}
+      </span>
+      {kind === null && <span className="feed__kind muted">{KINDS[item.kind].label}</span>}
+      {item.link && (
+        <span className="feed__go muted" aria-hidden="true">
+          ›
+        </span>
+      )}
+    </>
+  )
 
   return (
     <>
       <header className="screen-head">
         <h1>Лента</h1>
-        <p className="muted">Все записи всех дневников, новые сверху.</p>
+        <p className="muted">Заметки, план, учёт и обзоры — одной хроникой, новые сверху.</p>
       </header>
 
       {total === 0 ? (
-        <p className="stub">Записей пока нет. Отметки, болезни, измерения и просмотренное появятся здесь сами.</p>
+        <p className="stub">Записей пока нет. Заметки, учтённое время и обзоры появятся здесь сами.</p>
       ) : (
         <>
           {present.length > 1 && (
-            <div className="chips">
+            <div className="chips" role="group" aria-label="Отбор по виду">
               <button
                 type="button"
                 className={kind === null ? 'chip chip--on' : 'chip'}
@@ -67,9 +84,11 @@ export function Feed() {
           )}
 
           <input
+            type="search"
+            name="search"
             className="search"
             value={query}
-            placeholder="Поиск: название, заметка, симптом, дата"
+            placeholder="Поиск: слова в любом порядке, «март», 12.03.2026"
             onChange={(event) => setQuery(event.target.value)}
           />
 
@@ -77,15 +96,11 @@ export function Feed() {
             {shown.length === total ? recordsText(total) : `Показано ${shown.length} из ${total}`}
           </p>
 
-          {shown.length === 0 && <p className="muted">Под фильтры ничего не подошло.</p>}
+          {shown.length === 0 && <p className="muted">Под поиск и отбор ничего не подошло.</p>}
 
           {groups.map((group) => (
-            <div className="month-group" key={group.month ?? 'нет даты'}>
-              <h3
-                className={
-                  group.month === null ? 'month-group__head month-group__head--warn' : 'month-group__head'
-                }
-              >
+            <div className="month-group" key={group.month ?? 'без даты'}>
+              <h3 className="unit__name">
                 {feedHeading(group.month)}
                 <span className="muted"> · {group.items.length}</span>
               </h3>
@@ -93,21 +108,23 @@ export function Feed() {
               <ul className="feed">
                 {group.items.map((item) => (
                   <li key={`${item.kind}:${item.id}`}>
-                    <Link className="feed__row" to={item.link}>
-                      <span className="feed__date">{feedDateText(item.date)}</span>
-                      <span className="feed__main">
-                        <span className="feed__title">{item.title}</span>
-                        {item.detail && <span className="feed__detail muted">{item.detail}</span>}
-                      </span>
-                      {kind === null && <span className="feed__kind muted">{KINDS[item.kind].label}</span>}
-                    </Link>
+                    {item.link ? (
+                      <Link className="feed__row" to={item.link}>
+                        {row(item)}
+                      </Link>
+                    ) : (
+                      <div className="feed__row">{row(item)}</div>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
           ))}
 
-          <p className="muted">Список «к просмотру» в ленту не входит: это планы, а не события.</p>
+          <p className="muted">
+            Учёт — строкой на день, тап открывает день. Лента только показывает: правится запись на своём
+            экране, а у сделанного и прошлого строка без перехода.
+          </p>
         </>
       )}
     </>

@@ -31,7 +31,7 @@ import {
   SOMEDAY_TITLE,
   UNSORTED_TITLE,
 } from '../modules/notes/labels.ts'
-import { NoteItem } from '../modules/notes/NoteItem.tsx'
+import { noteAnchor, NoteItem } from '../modules/notes/NoteItem.tsx'
 import { plannedCount, withPlan } from '../modules/notes/plan.ts'
 import { fromSomeday, somedayOf } from '../modules/notes/review.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
@@ -97,6 +97,31 @@ export function Inbox() {
       { replace: true },
     )
   }, [write, setParams])
+
+  // Из ленты (Р-59): `?open=<id>` раскрывает карточку записи. Параметр
+  // снимается, как `write`; к строке экран прокручивает, когда записи прочтены.
+  const opened = params.get('open')
+  const [scrollTo, setScrollTo] = useState<string | null>(null)
+  useEffect(() => {
+    if (!opened) return
+    setOpenId(opened)
+    setScrollTo(opened)
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('open')
+        return next
+      },
+      { replace: true },
+    )
+  }, [opened, setParams])
+
+  const loaded = read.notes !== null
+  useEffect(() => {
+    if (scrollTo === null || !loaded) return
+    document.getElementById(noteAnchor(scrollTo))?.scrollIntoView({ block: 'center' })
+    setScrollTo(null)
+  }, [scrollTo, loaded])
 
   async function save() {
     const draft = captureNote(text, today, kind)

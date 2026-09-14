@@ -26,6 +26,11 @@ type Props = {
   onError: (message: string) => void
 }
 
+/** Якорь строки записи: к нему экран прокручивает карточку, открытую из ленты (Р-59). */
+export function noteAnchor(id: string): string {
+  return `note-${id}`
+}
+
 /**
  * Строка записи: текст, вид и возраст серым. Тап раскрывает карточку
  * на месте (Р-30), а не уводит на другой экран.
@@ -37,7 +42,7 @@ export function NoteItem({ note, notes, goals, today, open, onToggle, onDone, on
   if (note.kind === 'goal') meta.push(progressText(goalProgress(note.id, notes)))
 
   return (
-    <li className="note">
+    <li className="note" id={noteAnchor(note.id)}>
       <button type="button" className="plain-btn note__main" aria-expanded={open} onClick={onToggle}>
         <span className="note__text">{note.text}</span>
       </button>
