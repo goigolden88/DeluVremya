@@ -49,6 +49,8 @@ export type PlanFact = {
   late: number
   /** Открытые, чей день прошёл: ждут решения в хвосте (Р-34). */
   waiting: number
+  /** Открытые сегодняшнего дня: он не кончился, это не хвост и не «впереди» (Р-76). */
+  today: number
   /** Открытые, чей день ещё не настал. */
   ahead: number
   /** В скольких днях главное было выбрано (Р-40) и в скольких сделано. */
@@ -105,7 +107,8 @@ export function planFact(notes: readonly Note[], period: Period, today: DateStr)
     late: done.filter((note) => note.doneOn !== undefined && note.plannedFor !== null && note.doneOn > note.plannedFor)
       .length,
     waiting: open.filter((note) => (note.plannedFor ?? '') < today).length,
-    ahead: open.filter((note) => (note.plannedFor ?? '') >= today).length,
+    today: open.filter((note) => note.plannedFor === today).length,
+    ahead: open.filter((note) => (note.plannedFor ?? '') > today).length,
     mainDays,
     mainDone,
     estimated: estimated.length,

@@ -380,7 +380,7 @@ export function Inbox() {
                       <button
                         type="button"
                         className="link-btn"
-                        aria-label={`Вернуть в «${UNSORTED_TITLE}»: ${shortText(note.text)}`}
+                        aria-label={`Вернуть в неразобранное: ${shortText(note.text)}`}
                         onClick={() => void back(note)}
                       >
                         Вернуть

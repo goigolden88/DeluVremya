@@ -18,7 +18,6 @@ import {
   realismText,
   shortText,
   TO_UNSORTED,
-  UNSORTED_TITLE,
 } from './labels.ts'
 import { ahead, dayPlan, doneOffPlan, makeMain, overdue, planNote, realism, withoutMain, withPlan } from './plan.ts'
 import { PlanRow } from './PlanItem.tsx'
@@ -141,12 +140,19 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
       <section className="block">
         <h2>{PLAN_TITLE}</h2>
 
+        {/* Реализм — первым, плашкой: видно до пунктов, а не после (Р-72). */}
+        {verdict && (
+          <p className={verdict.over > 0 ? 'plan__realism plan__realism--over' : 'plan__realism'}>
+            {realismText(verdict)}
+          </p>
+        )}
+
         {plan.all.length > 0 && (
           <div className="plan__main">
             <span className="plan__label">{MAIN_TITLE}</span>
             {plan.main ? (
               <ul className="plain">
-                <PlanRow {...common(plan.main)} check main onMain={star(plan.main)} />
+                <PlanRow {...common(plan.main)} check main onMain={star(plan.main)} move />
               </ul>
             ) : (
               <p className="muted">Главное не выбрано — ☆ у пункта плана.</p>
@@ -175,15 +181,9 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
         {plan.open.length > 0 && (
           <ul className="plain">
             {plan.open.map((note) => (
-              <PlanRow key={note.id} {...common(note)} check onMain={star(note)} />
+              <PlanRow key={note.id} {...common(note)} check onMain={star(note)} move />
             ))}
           </ul>
-        )}
-
-        {verdict && (
-          <p className={verdict.over > 0 ? 'plan__realism plan__realism--over' : 'plan__realism muted'}>
-            {realismText(verdict)}
-          </p>
         )}
 
         {plan.done.length > 0 && (
@@ -195,7 +195,7 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
         )}
 
         {plan.all.length === 0 && (
-          <p className="muted">В плане пусто — дела из «{UNSORTED_TITLE}» ниже или полем выше.</p>
+          <p className="muted">В плане пусто — дела из неразобранного ниже или полем выше.</p>
         )}
         {error && <p className="error">Не записалось: {error}</p>}
       </section>
@@ -233,7 +233,7 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
               <h3 className="unit__name">{dayText(group.day, today)}</h3>
               <ul className="plain">
                 {group.notes.map((note) => (
-                  <PlanRow key={note.id} {...common(note)} />
+                  <PlanRow key={note.id} {...common(note)} move />
                 ))}
               </ul>
             </div>

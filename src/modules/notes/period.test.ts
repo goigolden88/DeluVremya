@@ -50,7 +50,8 @@ describe('план против факта — Р-44', () => {
       WEEK,
       WEDNESDAY,
     )
-    expect(fact).toMatchObject({ planned: 5, done: 2, late: 1, waiting: 1, ahead: 2 })
+    // Среда — сегодня: её открытый пункт «на сегодня», а не «впереди» (Р-76).
+    expect(fact).toMatchObject({ planned: 5, done: 2, late: 1, waiting: 1, today: 1, ahead: 1 })
   })
 
   it('главное — по дням, где выбрано; при двух отметках — позднее (Р-40)', () => {

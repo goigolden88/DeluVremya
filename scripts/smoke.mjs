@@ -1172,7 +1172,7 @@ async function stageSixScenario() {
 
   // ─ Вход — ссылкой внизу «Сегодня»; без даты — внизу ленты, не наверху.
   await go('/')
-  await act(`byText('a', 'Лента →')?.click()`)
+  await act(`document.querySelector('a.link-card[href="#/feed"]')?.click()`)
   await sleep(1000)
   const feedHash = await run('location.hash')
   const feed = await screen()
@@ -1384,7 +1384,7 @@ async function planScenario() {
   await sleep(300)
 
   // ─ Дело из неразобранного — одним тапом «+».
-  await unfold('Из «Неразобранное»')
+  await unfold('Дела из неразобранного')
   await press('В план на сегодня: Починить полку')
   await sleep(700)
   const picked = await block('План')
@@ -1532,7 +1532,7 @@ async function planScenario() {
     has(tail, '3 пункта ждут решения') && has(tail, 'Вчерашний пункт') && has(tail, 'вчера'),
     line(tail, 'ждут'),
   )
-  await press('В «Неразобранное»: Позавчерашний пункт')
+  await press('В неразобранное: Позавчерашний пункт')
   await sleep(700)
   const fewer = await block('С прошлых дней')
   await act(`byText('button', 'Всё — на сегодня')?.click()`)
@@ -1542,7 +1542,7 @@ async function planScenario() {
   await go('/inbox')
   const returned = await screen()
   check(
-    'хвост: «В «Неразобранное»» и «Всё — на сегодня» — пункты там, куда решено',
+    'хвост: «В неразобранное» и «Всё — на сегодня» — пункты там, куда решено',
     has(fewer, '2 пункта ждут решения') &&
       !has(carried, 'С прошлых дней') &&
       has(plan, 'Вчерашний пункт') &&
@@ -1668,12 +1668,13 @@ async function reviewScenario() {
   // ─ Карточка на «Сегодня» — только в воскресенье и понедельник; ссылка — всегда.
   await go('/')
   const home = await screen()
+  const reviewLink = await run(`document.querySelector('a.link-card[href="#/review"]') !== null`)
   const calling = reviewCallDay()
   check(
     calling
       ? 'в воскресенье и понедельник «Сегодня» зовёт к обзору, ссылка — внизу — Р-41'
       : 'не в день обзора карточки на «Сегодня» нет, ссылка — внизу — Р-41',
-    (calling ? has(home, 'Обзор недели ждёт') : !has(home, 'Обзор недели ждёт')) && has(home, 'Обзор недели →'),
+    (calling ? has(home, 'Обзор недели ждёт') : !has(home, 'Обзор недели ждёт')) && reviewLink === true,
     line(home, 'Обзор недели'),
   )
 
@@ -1792,7 +1793,7 @@ async function reviewScenario() {
   const someday = await run(
     `[...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Когда-нибудь')?.closest('section')?.innerText ?? ''`,
   )
-  await act(`document.querySelector('[aria-label="Вернуть в «Неразобранное»: Разобрать антресоль"]')?.click()`)
+  await act(`document.querySelector('[aria-label="Вернуть в неразобранное: Разобрать антресоль"]')?.click()`)
   await sleep(700)
   const unsorted = await section('Неразобранное')
   check(
@@ -1850,6 +1851,7 @@ async function monthScenario() {
   // ─ Вход — ссылкой внизу «Сегодня»; без адреса — в первые семь дней прошлый месяц.
   await go('/')
   const home = await screen()
+  const monthLink = await run(`document.querySelector('a.link-card[href="#/month"]') !== null`)
   await go('/month')
   const now = new Date()
   const shown = now.getDate() <= 7 ? new Date(now.getFullYear(), now.getMonth() - 1, 1) : now
@@ -1857,7 +1859,7 @@ async function monthScenario() {
   const opened = await screen()
   check(
     'итоги месяца — ссылкой внизу «Сегодня»; без адреса — месяц по умолчанию — Р-54',
-    has(home, 'Итоги месяца →') && has(opened, 'Итоги месяца') && has(opened, byDefault),
+    monthLink === true && has(opened, 'Итоги месяца') && has(opened, byDefault),
     `${line(home, 'Итоги месяца')}; ${line(opened, byDefault)}`,
   )
 
@@ -2045,7 +2047,7 @@ async function notesScenario() {
   const finished = await screen()
   check(
     '«Сделано» убирает дело из неразобранного и засчитывается замыслу — Р-30',
-    has(finished, 'Сделано — убрано из «Неразобранное»') && has(finished, '1 дело, сделано 1') && has(finished, '3 записи'),
+    has(finished, 'Сделано — убрано из неразобранного') && has(finished, '1 дело, сделано 1') && has(finished, '3 записи'),
     `${line(finished, 'убрано')}; ${line(finished, 'дело,')}`,
   )
   await act(`byText('button', 'Отменить')?.click()`)
@@ -2365,6 +2367,66 @@ async function polishScenario() {
     `${awake}; потом idle ${idle}`,
   )
   await run('window.scrollTo(0, 0)')
+
+  // ─ Итоги и история (Р-71): четыре карточки, каждая на свой экран; итоги года — тоже.
+  await go('/')
+  const cards = await run(
+    `JSON.stringify([...document.querySelectorAll('a.link-card')].map((a) => a.getAttribute('href')))`,
+  )
+  check(
+    'внизу «Сегодня» — карточки обзора, месяца, года и ленты — Р-71',
+    cards === JSON.stringify(['#/review', '#/month', '#/year', '#/feed']),
+    cards,
+  )
+  await act(`document.querySelector('a.link-card[href="#/year"]')?.click()`)
+  await sleep(800)
+  const yearHash = await run('location.hash')
+  const year = await screen()
+  check(
+    'карточка «Итоги года» открывает итоги года — Р-71',
+    yearHash === '#/year' && has(year, 'Итоги года'),
+    `${yearHash}; ${line(year, 'Итоги года')}`,
+  )
+
+  // ─ Реализм (Р-72): плашкой над пунктами плана, а не серой строкой под ними.
+  const planText = () =>
+    run(
+      `[...document.querySelectorAll('section')].find((el) => el.querySelector(':scope > h2')?.textContent.trim() === 'План')?.innerText ?? ''`,
+    )
+  const press = (label) => act(`document.querySelector(${JSON.stringify(`[aria-label="${label}"]`)})?.click()`)
+  await go('/')
+  await act(`
+    set(document.querySelector('input[name=plan-text]'), 'Пункт доведения');
+    document.querySelector('.plan__add button[type=submit]')?.click();
+  `)
+  await sleep(700)
+  const placed = await run(`(() => {
+    const realism = document.querySelector('.plan__realism')
+    const add = document.querySelector('.plan__add')
+    return realism !== null && add !== null &&
+      Boolean(realism.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+      !realism.classList.contains('muted')
+  })()`)
+  check('реализм — плашкой над пунктами плана — Р-72', placed === true, `плашка ${placed ? 'над пунктами' : 'не там'}`)
+
+  // ─ Перенос (Р-80): ↷ в строке → «На завтра» — пункт ушёл из плана во «Впереди».
+  await press('Перенести: Пункт доведения')
+  await sleep(400)
+  const strip = await planText()
+  await act(
+    `[...document.querySelectorAll('.plan-move button')].find((el) => el.textContent.trim() === 'На завтра')?.click()`,
+  )
+  await sleep(700)
+  const moved = await planText()
+  await unfold('Впереди')
+  const ahead = await run(
+    `[...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Впереди')?.closest('section')?.innerText ?? ''`,
+  )
+  check(
+    '↷ у пункта плана: «На завтра» — пункт ушёл из плана во «Впереди» — Р-80',
+    has(strip, 'На завтра') && has(strip, 'В неразобранное') && !has(moved, 'Пункт доведения') && has(ahead, 'Пункт доведения'),
+    `${line(strip, 'На завтра')}; впереди: ${line(ahead, 'Пункт доведения')}`,
+  )
 }
 
 async function unfoldAll() {

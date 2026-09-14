@@ -3,7 +3,7 @@ import { addDays, isDateStr, type DateStr } from '../../core/dates.ts'
 import { db } from '../../core/db.ts'
 import type { Note } from '../../core/model.ts'
 import { markDone, reopen, withText } from './inbox.ts'
-import { deleteConfirm, durationText, shortText, TO_UNSORTED } from './labels.ts'
+import { deleteConfirm, durationText, MOVE_TITLE, shortText, TO_UNSORTED } from './labels.ts'
 import { ESTIMATE_CHOICES, readEstimate, withEstimate, withPlan } from './plan.ts'
 
 function describe(error: unknown): string {
@@ -49,6 +49,42 @@ export function PlanButtons({ note, today, onMove }: { note: Note; today: DateSt
   )
 }
 
+/**
+ * Перенос пункта (Р-80): на завтра, любой день или обратно в неразобранное.
+ * Одни и те же кнопки — под ↷ в строке и в карточке пункта.
+ */
+function MoveButtons({
+  note,
+  today,
+  onError,
+  onMoved,
+}: {
+  note: Note
+  today: DateStr
+  onError: (message: string) => void
+  onMoved?: () => void
+}) {
+  async function move(day: DateStr | null) {
+    try {
+      await db.put('notes', withPlan(note, day))
+      onMoved?.()
+    } catch (failure) {
+      onError(describe(failure))
+    }
+  }
+
+  return (
+    <div className="plan-move">
+      <PlanButtons note={note} today={today} onMove={(day) => void move(day)} />
+      <div className="row row--wrap">
+        <button type="button" className="btn" onClick={() => void move(null)}>
+          {TO_UNSORTED}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 type RowProps = {
   note: Note
   today: DateStr
@@ -64,15 +100,31 @@ type RowProps = {
   meta?: string
   /** Кнопки прямо в строке — у хвоста прошлых дней (Р-34). */
   actions?: ReactNode
+  /** Кнопка ↷ «Перенести» в строке — у открытых пунктов плана и «Впереди» (Р-80). */
+  move?: boolean
 }
 
 /**
  * Строка пункта плана: галочка, текст, оценка, звезда главного. Тап по
  * тексту раскрывает карточку на месте, как у заметки (Р-30).
  */
-export function PlanRow({ note, today, open, onToggle, onError, check = false, main = false, onMain, meta, actions }: RowProps) {
+export function PlanRow({
+  note,
+  today,
+  open,
+  onToggle,
+  onError,
+  check = false,
+  main = false,
+  onMain,
+  meta,
+  actions,
+  move = false,
+}: RowProps) {
   const done = note.status === 'done'
   const name = shortText(note.text)
+  const [moving, setMoving] = useState(false)
+  const movable = move && note.status === 'open'
 
   async function toggleDone() {
     try {
@@ -102,6 +154,17 @@ export function PlanRow({ note, today, open, onToggle, onError, check = false, m
           {note.text}
         </button>
         {note.estMin !== undefined && <span className="muted plan-item__est">{durationText(note.estMin)}</span>}
+        {movable && (
+          <button
+            type="button"
+            className="move-btn"
+            aria-expanded={moving}
+            aria-label={`Перенести: ${name}`}
+            onClick={() => setMoving(!moving)}
+          >
+            ↷
+          </button>
+        )}
         {onMain && (
           <button
             type="button"
@@ -116,6 +179,9 @@ export function PlanRow({ note, today, open, onToggle, onError, check = false, m
       </div>
       {meta && <span className="muted note__meta">{meta}</span>}
       {actions}
+      {movable && moving && (
+        <MoveButtons note={note} today={today} onError={onError} onMoved={() => setMoving(false)} />
+      )}
       {open && <PlanCard note={note} today={today} withDone={!check} onError={onError} />}
     </li>
   )
@@ -225,14 +291,14 @@ function PlanCard({
         </button>
       )}
 
-      {isOpen && <PlanButtons note={note} today={today} onMove={(day) => void save(withPlan(note, day))} />}
+      {isOpen && (
+        <>
+          <span className="plan__label">{MOVE_TITLE}</span>
+          <MoveButtons note={note} today={today} onError={onError} />
+        </>
+      )}
 
       <div className="row row--wrap">
-        {isOpen && (
-          <button type="button" className="btn" onClick={() => void save(withPlan(note, null))}>
-            {TO_UNSORTED}
-          </button>
-        )}
         {withDone && isOpen && (
           <button type="button" className="btn" onClick={() => void save(markDone(note, today))}>
             Сделано

@@ -25,7 +25,6 @@ import { SyncSettings } from '../ui/SyncSettings.tsx'
 import { useSyncStatus } from '../ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
-import { UNSORTED_TITLE } from '../modules/notes/labels.ts'
 import { markdownExport } from '../registry.ts'
 import { isEmptyBase } from './firstRun.ts'
 import { ImportRecords } from './ImportRecords.tsx'
@@ -535,7 +534,7 @@ function ReviewSection() {
           }}
         >
           <label className="field">
-            <span>Висяк — дело лежит в «{UNSORTED_TITLE}» столько дней и дольше</span>
+            <span>Висяк — дело лежит в неразобранном столько дней и дольше</span>
             <input
               name="review-stale"
               inputMode="numeric"

@@ -13,7 +13,7 @@ import { WeekNorms } from '../modules/time/Week.tsx'
 import { quoted } from '../ui/screenNames.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../ui/useToday.ts'
-import { doneText, markReviewed, reviewCall, reviewOf, viewedWeek } from './review.ts'
+import { doneText, markReviewed, REVIEW_MINUTES, reviewCall, reviewOf, viewedWeek } from './review.ts'
 import { closedMonth, monthLabel } from './period.ts'
 import { useReviews, useThresholds } from './useReview.ts'
 
@@ -197,7 +197,7 @@ export function ReviewCall({ today }: { today: DateStr }) {
   return (
     <section className="block">
       <h2>Обзор недели ждёт</h2>
-      <p className="muted">{formatPeriod(weekPeriod(week))} — шаги по порядку, минут на десять.</p>
+      <p className="muted">{formatPeriod(weekPeriod(week))} — шаги по порядку, минут на {REVIEW_MINUTES}.</p>
       <p>
         <Link className="btn btn--primary" to="/review">
           Провести обзор

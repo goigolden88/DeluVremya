@@ -1059,14 +1059,96 @@ span.plan-item__text {
   margin-bottom: 8px;
 }
 
+/* Реализм — плашкой под заголовком плана (Р-72): серой строкой под списком
+   его не замечали. */
 .plan__realism {
-  margin: 10px 0;
-  font-size: 14px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 15px;
+}
+
+/* Перенос (Р-80): тихая кнопка в строке, как звезда. */
+.move-btn {
+  flex: none;
+  width: 40px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.move-btn[aria-expanded='true'] {
+  color: var(--accent);
+}
+
+.plan-move {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+/* Итоги и история (Р-71): каждая ссылка — своя карточка, видно, что это
+   разные экраны. */
+.link-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.link-card__icon {
+  flex: none;
+  display: flex;
+  color: var(--accent);
+}
+
+.link-card__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.link-card__title {
+  font-weight: 600;
+}
+
+.link-card__sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.link-card__go {
+  flex: none;
+  color: var(--muted);
+  font-size: 20px;
 }
 
 /* Не влезает — акцентом, а не красным: это предупреждение до начала дня,
    а не провал (тот же довод, что в Р-05). */
 .plan__realism--over {
+  border-color: var(--accent);
   color: var(--accent);
   font-weight: 600;
 }

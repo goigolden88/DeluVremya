@@ -34,7 +34,10 @@ export const KIND_PLURALS: Record<NoteKind, string> = {
   goal: 'Замыслы',
 }
 
-/** Что ещё не разобрано — заголовок списка на экране заметок (Р-32). */
+/**
+ * Что ещё не разобрано — заголовок списка на экране заметок (Р-32). Это не
+ * название вкладки, и в тексте оно склоняется как обычное слово (Р-74).
+ */
 export const UNSORTED_TITLE = 'Неразобранное'
 
 /** С какого возраста он называется неделями, месяцами и годами. */
@@ -102,7 +105,7 @@ export const DONE_LABELS: Partial<Record<NoteKind, string>> = {
 
 /** Отклик после «Сделано»: запись уходит из списка, и это сказано (Р-30). */
 export function doneLine(kind: NoteKind): string {
-  return kind === 'goal' ? 'Замысел достигнут — убран из замыслов' : `Сделано — убрано из «${UNSORTED_TITLE}»`
+  return kind === 'goal' ? 'Замысел достигнут — убран из замыслов' : 'Сделано — убрано из неразобранного'
 }
 
 /** Сколько знаков текста называют запись в вопросе и в отчёте. */
@@ -137,9 +140,11 @@ export const PLAN_TITLE = 'План'
 export const OVERDUE_TITLE = 'С прошлых дней'
 export const AHEAD_TITLE = 'Впереди'
 export const DONE_OFF_PLAN_TITLE = 'Сделано вне плана'
-export const FROM_UNSORTED_TITLE = `Из «${UNSORTED_TITLE}»`
+export const FROM_UNSORTED_TITLE = 'Дела из неразобранного'
 /** Кнопка возврата пункта из плана. */
-export const TO_UNSORTED = `В «${UNSORTED_TITLE}»`
+export const TO_UNSORTED = 'В неразобранное'
+/** Заголовок кнопок переноса в карточке пункта (Р-80). */
+export const MOVE_TITLE = 'Перенести'
 
 const MINUTES_PER_HOUR = 60
 
@@ -155,15 +160,20 @@ export function durationText(total: number): string {
   return minutes === 0 ? `${hours} ч` : `${hours} ч ${minutes} мин`
 }
 
+/** Где поставить оценку — строка реализма без оценок говорит это сама (Р-72). */
+export const ESTIMATE_HINT = 'Оценка — тап по пункту'
+
 /**
  * Влезает ли план в остаток дня (Р-35) — число с основанием: по скольким
  * пунктам из скольких посчитано. Без оценок — так и сказано, а не ноль.
  */
 export function realismText(realism: Realism): string {
   if (realism.estimated === 0) {
-    return realism.total === 1
-      ? 'Влезает ли в день — не посчитать: у пункта нет оценки'
-      : `Влезает ли в день — не посчитать: оценки нет ни у одного из ${realism.total} ${plural(realism.total, ['пункта', 'пунктов', 'пунктов'])}`
+    const none =
+      realism.total === 1
+        ? 'у пункта нет оценки'
+        : `оценки нет ни у одного из ${realism.total} ${plural(realism.total, ['пункта', 'пунктов', 'пунктов'])}`
+    return `Влезает ли в день — не посчитать: ${none}. ${ESTIMATE_HINT}`
   }
   const basis =
     `по ${realism.estimated} ${plural(realism.estimated, ['пункту', 'пунктам', 'пунктам'])}` +
@@ -246,7 +256,9 @@ export function planFactText(fact: PlanFact): string {
   if (fact.waiting > 0) {
     parts.push(`${fact.waiting} ${plural(fact.waiting, ['ждёт', 'ждут', 'ждут'])} решения в «${OVERDUE_TITLE}»`)
   }
-  if (fact.ahead > 0) parts.push(`${fact.ahead} ещё впереди`)
+  // Сегодняшний день не кончился: его открытые — «на сегодня», а не «впереди» (Р-76).
+  if (fact.today > 0) parts.push(`${fact.today} на сегодня`)
+  if (fact.ahead > 0) parts.push(`${fact.ahead} впереди`)
   return parts.join('; ')
 }
 
@@ -280,7 +292,7 @@ export function staleLead(count: number, threshold: number): string {
 
 /** Висяков нет — сказано, от какого порога. */
 export function staleNone(threshold: number): string {
-  return `Висяков нет: ни одно дело не лежит в «${UNSORTED_TITLE}» ${days(threshold)} и дольше`
+  return `Висяков нет: ни одно дело не лежит в неразобранном ${days(threshold)} и дольше`
 }
 
 /** Остальные висяки — числом, а не молча (Р-46). */
