@@ -1152,3 +1152,36 @@ span.plan-item__text {
   white-space: pre-wrap;
   padding-block: 4px;
 }
+
+/* Кнопки «в начало» и «в конец» — справа над нижней панелью, где их
+   достаёт большой палец и где они не закрывают кнопки отметок. */
+.scroll-btns {
+  position: fixed;
+  right: 12px;
+  bottom: calc(var(--tabs-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 200ms ease-out;
+}
+
+/* Экран не листают — кнопки прячутся и не закрывают текст под собой (Р-73). */
+.scroll-btns--idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scroll-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  opacity: 0.85;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.15);
+  -webkit-tap-highlight-color: transparent;
+}
