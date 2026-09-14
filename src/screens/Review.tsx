@@ -14,6 +14,7 @@ import { quoted } from '../ui/screenNames.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../ui/useToday.ts'
 import { doneText, markReviewed, reviewCall, reviewOf, viewedWeek } from './review.ts'
+import { closedMonth, monthLabel } from './period.ts'
 import { useReviews, useThresholds } from './useReview.ts'
 
 const MINUTE = 60 * 1000
@@ -34,6 +35,7 @@ export function Review() {
   const [params, setParams] = useSearchParams()
   const week = viewedWeek(params.get('week'), today)
   const current = week === weekStart(today)
+  const closed = closedMonth(week, today)
   const reviews = useReviews()
   const thresholds = useThresholds()
   const notes = useNotes()
@@ -100,6 +102,18 @@ export function Review() {
           {current && ' · неделя ещё идёт'}
         </p>
       </header>
+
+      {/* Неделя закрыла месяц — итоги месяца отсюда (Р-54): отдельного зова у них нет. */}
+      {closed && (
+        <section className="block">
+          <h2>{monthLabel(closed)} закончился</h2>
+          <p>
+            <Link className="btn" to={`/month?m=${closed}`}>
+              Итоги месяца
+            </Link>
+          </p>
+        </section>
+      )}
 
       {reviews.error && <p className="error">Обзоры не прочитались: {reviews.error}</p>}
 

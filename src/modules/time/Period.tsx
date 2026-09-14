@@ -30,6 +30,11 @@ export function Unready({
   return null
 }
 
+/** «Учтено …» после подписи с двоеточием: «Август: учтено …». */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1)
+}
+
 /** Прежний промежуток для сравнения и подписи столбцов. */
 export type Compare = { period: Period; label: string; own: string }
 
@@ -59,7 +64,7 @@ export function PeriodTime({ period, today, compare }: { period: Period; today: 
       <p className="lead">{periodLine(summary)}</p>
       {compare && before && (
         <p className="muted">
-          {compare.label}: {periodLine(before)}
+          {compare.label}: {lowerFirst(periodLine(before))}
         </p>
       )}
       {rows.length > 0 && (
