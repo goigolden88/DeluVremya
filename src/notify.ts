@@ -1,5 +1,5 @@
 /**
- * Напоминания: о незаполненном дне (Р-14, Р-24).
+ * Напоминания: о незаполненном дне (Р-14, Р-24) и об обзоре недели (Р-51).
  *
  * Механика — «Дневников», их `notify.ts` с коммита `a913dcb`: окно со
  * звуком, тихое вне окна, со звуком не чаще раза в день, журнал
@@ -21,6 +21,7 @@
 import { db } from './core/db.ts'
 import { toDateStr } from './core/dates.ts'
 import { unfilledNotice } from './modules/time/remind.ts'
+import { reviewNotice } from './screens/review.ts'
 import { readScreenNames } from './ui/screenNames.ts'
 
 /**
@@ -41,6 +42,9 @@ const QUIET_DAY = 'reminderQuietDay'
 const WINDOW = 'reminderWindow'
 /** Последние фоновые пробуждения. */
 const LOG = 'reminderLog'
+/** То же для напоминания об обзоре недели (Р-51): свои дни, прежние ключи смысла не меняют. */
+const REVIEW_LOUD_DAY = 'reminderReviewDay'
+const REVIEW_QUIET_DAY = 'reminderReviewQuietDay'
 
 /** Чаще раза в полсуток браузер будить не станет, и просить незачем. */
 const MIN_INTERVAL = 12 * 60 * 60 * 1000
@@ -149,59 +153,117 @@ export async function remind(
   return result
 }
 
+/** О чём напоминать: текст, тема уведомления, куда ведёт тап, в какие ключи пишется день. */
+type Topic = {
+  /** Null — напоминать не о чем. */
+  notice: { title: string; body: string } | null
+  tag: string
+  target: string
+  loudKey: string
+  quietKey: string
+}
+
 async function decide(
   registration: ServiceWorkerRegistration,
   force: boolean,
   now: Date,
 ): Promise<RemindResult> {
   const day = toDateStr(now)
-  let loud = true
-
-  if (!force) {
-    const [loudDay, quietDay, window] = await Promise.all([
-      db.settings.get<string>(LOUD_DAY),
-      db.settings.get<string>(QUIET_DAY),
-      db.settings.get<unknown>(WINDOW),
-    ])
-    const plan = planWake({
-      day,
-      hour: now.getHours(),
-      window: parseWindow(window),
-      loudDay: loudDay ?? null,
-      quietDay: quietDay ?? null,
-    })
-    if (plan === 'already') return 'already'
-    loud = plan === 'loud'
-  }
-
   // Экран в тексте — своим именем этого устройства (Р-26).
-  const names = await readScreenNames()
-  const unfilled = unfilledNotice(await db.getAll('time'), day, names.time)
+  const [names, blocks, reviews] = await Promise.all([readScreenNames(), db.getAll('time'), db.getAll('reviews')])
+  const topics: Topic[] = [
+    {
+      notice: unfilledNotice(blocks, day, names.time),
+      tag: 'day',
+      target: '/time',
+      loudKey: LOUD_DAY,
+      quietKey: QUIET_DAY,
+    },
+    {
+      notice: reviewNotice(reviews, day),
+      tag: 'review',
+      target: '/review',
+      loudKey: REVIEW_LOUD_DAY,
+      quietKey: REVIEW_QUIET_DAY,
+    },
+  ]
 
+  if (force) return showAll(registration, topics)
+
+  const window = parseWindow(await db.settings.get<unknown>(WINDOW))
+  const results: RemindResult[] = []
+  // По очереди: у каждого напоминания свои дни в настройках.
+  for (const topic of topics) results.push(await remindTopic(registration, topic, day, now.getHours(), window))
+  return combineResults(results)
+}
+
+/**
+ * Одно напоминание при пробуждении — со своими днями громкого и тихого:
+ * громкое о дне не глушит напоминание об обзоре (Р-51). Окно — общее.
+ */
+async function remindTopic(
+  registration: ServiceWorkerRegistration,
+  topic: Topic,
+  day: string,
+  hour: number,
+  window: ReminderWindow,
+): Promise<RemindResult> {
+  if (!topic.notice) return 'nothing'
+  const [loudDay, quietDay] = await Promise.all([
+    db.settings.get<string>(topic.loudKey),
+    db.settings.get<string>(topic.quietKey),
+  ])
+  const plan = planWake({ day, hour, window, loudDay: loudDay ?? null, quietDay: quietDay ?? null })
+  if (plan === 'already') return 'already'
+
+  const loud = plan === 'loud'
   try {
-    if (!unfilled) {
-      if (force) {
-        await show(
-          registration,
-          {
-            title: 'Напоминать не о чем',
-            body: 'За сегодня время уже учтено. Уведомление пришло, чтобы было видно: они доходят.',
-            tag: 'day',
-            target: '/time',
-          },
-          true,
-        )
-      }
-      return 'nothing'
-    }
-
-    await show(registration, { ...unfilled, tag: 'day', target: '/time' }, loud)
+    await show(registration, { ...topic.notice, tag: topic.tag, target: topic.target }, loud)
   } catch {
     return 'failed'
   }
-
-  if (!force) await db.settings.set(loud ? LOUD_DAY : QUIET_DAY, day)
+  await db.settings.set(loud ? topic.loudKey : topic.quietKey, day)
   return loud ? 'shown' : 'quiet'
+}
+
+/**
+ * «Проверить сейчас»: всё, о чём есть напомнить, — со звуком. Не о чем —
+ * пустое уведомление, иначе не понять, дошло оно или сломалось.
+ */
+async function showAll(registration: ServiceWorkerRegistration, topics: readonly Topic[]): Promise<RemindResult> {
+  try {
+    let shown = false
+    for (const topic of topics) {
+      if (!topic.notice) continue
+      await show(registration, { ...topic.notice, tag: topic.tag, target: topic.target }, true)
+      shown = true
+    }
+    if (shown) return 'shown'
+    await show(
+      registration,
+      {
+        title: 'Напоминать не о чем',
+        body: 'За сегодня время уже учтено, обзор недели не ждёт. Уведомление пришло, чтобы было видно: они доходят.',
+        tag: 'day',
+        target: '/time',
+      },
+      true,
+    )
+    return 'nothing'
+  } catch {
+    return 'failed'
+  }
+}
+
+/** Порядок важности итогов: у пробуждения одна строка журнала. */
+const RESULT_ORDER: readonly RemindResult[] = ['failed', 'shown', 'quiet', 'already', 'nothing']
+
+/**
+ * Итог пробуждения по нескольким напоминаниям. Сбой — первым: его надо
+ * увидеть; «не о чем» — только если не о чем ни по одному.
+ */
+export function combineResults(results: readonly RemindResult[]): RemindResult {
+  return RESULT_ORDER.find((result) => results.includes(result)) ?? 'nothing'
 }
 
 function show(registration: ServiceWorkerRegistration, notice: Notice, loud: boolean): Promise<void> {

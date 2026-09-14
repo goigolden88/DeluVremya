@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { appendWake, DEFAULT_WINDOW, inWindow, LOG_SIZE, parseWindow, planWake, REMINDER_TAG, type Wake } from './notify.ts'
+import {
+  appendWake,
+  combineResults,
+  DEFAULT_WINDOW,
+  inWindow,
+  LOG_SIZE,
+  parseWindow,
+  planWake,
+  REMINDER_TAG,
+  type Wake,
+} from './notify.ts'
 
 // Правила — «Дневников», и тесты их же: механика перенесена без изменений.
 
@@ -69,6 +79,16 @@ describe('что делать при пробуждении', () => {
 
   it('вчерашнее громкое сегодня не мешает', () => {
     expect(planWake({ ...base, hour: 15, loudDay: '2026-09-12' })).toBe('loud')
+  })
+})
+
+describe('два напоминания в одно пробуждение — Р-51', () => {
+  it('сбой — первым, потом показанное; «не о чем» — только если не о чем ни по одному', () => {
+    expect(combineResults(['nothing', 'shown'])).toBe('shown')
+    expect(combineResults(['quiet', 'already'])).toBe('quiet')
+    expect(combineResults(['shown', 'failed'])).toBe('failed')
+    expect(combineResults(['already', 'nothing'])).toBe('already')
+    expect(combineResults(['nothing', 'nothing'])).toBe('nothing')
   })
 })
 
