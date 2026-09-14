@@ -1190,6 +1190,11 @@ async function stageSixScenario() {
   await sleep(1000)
   const feedHash = await run('location.hash')
   const feed = await screen()
+  // В длинной ленте старые месяцы свёрнуты (Р-82) — последний раскрывается, чтобы его прочитать.
+  await act(
+    `const last = [...document.querySelectorAll('.month-group')].at(-1)?.querySelector('.fold__btn[aria-expanded="false"]'); last?.click()`,
+  )
+  await sleep(400)
   const lastGroup = await run(`[...document.querySelectorAll('.month-group')].at(-1)?.innerText ?? ''`)
   check(
     'лента открывается ссылкой внизу «Сегодня»; без даты — последней группой — Р-59, Р-62',
@@ -2492,6 +2497,62 @@ async function polishScenario() {
       has(regrouped, 'Книги') &&
       has(dayGroups, 'Книги'),
     `${line(regrouped, 'Книги')}; итог: ${dayGroups}`,
+  )
+
+  // ─ Месяцы длинного списка (Р-78, Р-82): свежий развёрнут, старые свёрнуты;
+  //   поиск раскрывает всё; запись из ленты раскрывает свой месяц.
+  const pile = JSON.stringify({
+    format: 'deluvremya-import',
+    version: 1,
+    notes: [
+      ...Array.from({ length: 23 }, (_, index) => ({ text: `Складка ${index + 1}`, date: localDay(index < 12 ? -40 : -75) })),
+      { text: 'Складка давняя', date: localDay(-75) },
+    ],
+  })
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  await unfold('Импорт записей')
+  await act(`
+    set(document.querySelector('.import__text'), ${JSON.stringify(pile)});
+    byText('button', 'Разобрать')?.click();
+  `)
+  await sleep(700)
+  await act(`startsWith('button', 'Загрузить')?.click()`)
+  await sleep(1000)
+  const monthsState = async () =>
+    JSON.parse(
+      await run(
+        `JSON.stringify([...document.querySelectorAll('.month-group')].map((el) => el.querySelector('.fold__btn')?.getAttribute('aria-expanded') ?? 'plain'))`,
+      ),
+    )
+  await go('/inbox')
+  const inboxFolds = await monthsState()
+  await act(`set(document.querySelector('input[name=search]'), 'Складка')`)
+  await sleep(500)
+  const searched = await monthsState()
+  const found = await screen()
+  await go('/feed')
+  const feedFolds = await monthsState()
+  check(
+    'длинный список: свежий месяц развёрнут, старые свёрнуты; поиск раскрывает всё — Р-78, Р-82',
+    inboxFolds[0] === 'true' &&
+      inboxFolds.slice(1).includes('false') &&
+      searched.every((state) => state === 'plain') &&
+      has(found, 'Складка давняя') &&
+      feedFolds[0] === 'true' &&
+      feedFolds.slice(1).includes('false'),
+    `заметки ${inboxFolds.join(',')}; поиск ${searched.join(',')}; лента ${feedFolds.join(',')}`,
+  )
+  await act(`set(document.querySelector('input[name=search]'), 'давняя')`)
+  await sleep(500)
+  await act(`document.querySelector('a.feed__row')?.click()`)
+  await sleep(1200)
+  const revealedHash = await run('location.hash')
+  const revealed = await screen()
+  check(
+    'запись из ленты раскрывает свой свёрнутый месяц на «Заметках» — Р-78',
+    revealedHash === '#/inbox' && has(revealed, 'Складка давняя'),
+    `${revealedHash}; ${line(revealed, 'Складка давняя')}`,
   )
 }
 

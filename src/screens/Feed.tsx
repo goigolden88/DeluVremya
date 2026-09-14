@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { feedDateText, feedHeading, filterFeed, groupFeed, recordsText, type FeedItem } from '../core/feed.ts'
 import type { RecordKind } from '../core/model.ts'
 import { KIND_ORDER, KINDS } from '../registry.ts'
+import { Fold } from '../ui/Fold.tsx'
+import { monthFoldedByDefault } from '../ui/monthFold.ts'
 import { useFeed } from './useFeed.ts'
 
 /**
@@ -31,6 +33,8 @@ export function Feed() {
   const present = KIND_ORDER.filter((each) => feed.items.some((item) => item.kind === each))
   const shown = filterFeed(feed.items, { kind, query })
   const groups = groupFeed(shown, KIND_ORDER)
+  // Поиск и отбор раскрывают все месяцы: найденное не прячется (Р-78).
+  const filtering = kind !== null || query.trim() !== ''
 
   const row = (item: FeedItem) => (
     <>
@@ -98,13 +102,8 @@ export function Feed() {
 
           {shown.length === 0 && <p className="muted">Под поиск и отбор ничего не подошло.</p>}
 
-          {groups.map((group) => (
-            <div className="month-group" key={group.month ?? 'без даты'}>
-              <h3 className="unit__name">
-                {feedHeading(group.month)}
-                <span className="muted"> · {group.items.length}</span>
-              </h3>
-
+          {groups.map((group, index) => {
+            const list = (
               <ul className="feed">
                 {group.items.map((item) => (
                   <li key={`${item.kind}:${item.id}`}>
@@ -118,8 +117,32 @@ export function Feed() {
                   </li>
                 ))}
               </ul>
-            </div>
-          ))}
+            )
+            return (
+              <div className="month-group" key={group.month ?? 'без даты'}>
+                {filtering ? (
+                  <>
+                    <h3 className="unit__name">
+                      {feedHeading(group.month)}
+                      <span className="muted"> · {group.items.length}</span>
+                    </h3>
+                    {list}
+                  </>
+                ) : (
+                  // Месяц — сворачиваемым блоком (Р-78, Р-82); свёрнутый не рисуется.
+                  <Fold
+                    id={`feed:month:${group.month ?? 'undated'}`}
+                    title={feedHeading(group.month)}
+                    summary={group.items.length}
+                    folded={monthFoldedByDefault(index, total)}
+                    sub
+                  >
+                    {list}
+                  </Fold>
+                )}
+              </div>
+            )
+          })}
 
           <p className="muted">
             Учёт — строкой на день, тап открывает день. Лента только показывает: правится запись на своём

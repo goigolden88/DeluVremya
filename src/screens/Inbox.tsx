@@ -36,6 +36,7 @@ import { plannedCount, withPlan } from '../modules/notes/plan.ts'
 import { fromSomeday, somedayOf } from '../modules/notes/review.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../ui/Fold.tsx'
+import { monthFoldedByDefault } from '../ui/monthFold.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../ui/useToday.ts'
 
@@ -121,8 +122,13 @@ export function Inbox() {
   const loaded = read.notes !== null
   useEffect(() => {
     if (scrollTo === null || !loaded) return
-    document.getElementById(noteAnchor(scrollTo))?.scrollIntoView({ block: 'center' })
+    const target = scrollTo
     setScrollTo(null)
+    // Свёрнутый месяц или «Замыслы» раскрываются своим эффектом (Р-78) —
+    // прокрутка двумя кадрами позже, когда карточка уже нарисована.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => document.getElementById(noteAnchor(target))?.scrollIntoView({ block: 'center' })),
+    )
   }, [scrollTo, loaded])
 
   async function save() {
@@ -218,6 +224,8 @@ export function Inbox() {
   const shown = unsorted.filter(
     (note) => (only === null || note.kind === only) && matchesQuery(note, words, goalOf(note, all)?.text),
   )
+  // Поиск и отбор раскрывают все месяцы: найденное не прячется (Р-78).
+  const filtering = words.length > 0 || only !== null
 
   const item = (note: Note) => (
     <NoteItem
@@ -339,6 +347,7 @@ export function Inbox() {
               id="notes:goals"
               title={KIND_PLURALS.goal}
               summary={words.length > 0 ? `${shownGoals.length} из ${goals.length}` : goals.length}
+              reveal={goals.some((goal) => goal.id === openId)}
             >
               {shownGoals.length === 0 ? (
                 <p className="muted">Под поиск ни один замысел не подошёл.</p>
@@ -379,10 +388,26 @@ export function Inbox() {
                 {shown.length === 0 ? (
                   <p className="muted">Под поиск и отбор ничего не подошло.</p>
                 ) : (
-                  groupByMonth(shown).map((group) => (
+                  groupByMonth(shown).map((group, index) => (
                     <div key={group.month ?? 'без даты'} className="month-group">
-                      <h3 className="unit__name">{monthHeading(group.month)}</h3>
-                      <ul className="plain">{group.notes.map(item)}</ul>
+                      {filtering ? (
+                        <>
+                          <h3 className="unit__name">{monthHeading(group.month)}</h3>
+                          <ul className="plain">{group.notes.map(item)}</ul>
+                        </>
+                      ) : (
+                        // Месяц — сворачиваемым блоком (Р-78, Р-82); запись из ленты его раскрывает.
+                        <Fold
+                          id={`inbox:month:${group.month ?? 'undated'}`}
+                          title={monthHeading(group.month)}
+                          summary={group.notes.length}
+                          folded={monthFoldedByDefault(index, unsorted.length)}
+                          reveal={group.notes.some((note) => note.id === openId)}
+                          sub
+                        >
+                          <ul className="plain">{group.notes.map(item)}</ul>
+                        </Fold>
+                      )}
                     </div>
                   ))
                 )}
