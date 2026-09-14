@@ -1120,6 +1120,8 @@ async function scenario() {
 
   await reviewScenario()
 
+  await monthScenario()
+
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
     navigator.serviceWorker.ready.then((r) => r.active?.state ?? 'нет'),
@@ -1575,6 +1577,14 @@ async function reviewScenario() {
     `${line(time, 'Учтено')}; ${line(plan, 'Сделано')}`,
   )
   check('нормы в обзоре — правило с основанием — Р-45', has(norms, firstCat) && has(norms, 'из 1 дня'), line(norms, 'из 1 дня'))
+  // Норма заведена сегодня: полных недель с её дня в счёт ещё нет.
+  check(
+    'история нормы — с дня заведения; пока недель мало — с какого дня норма и сколько набралось — Р-53, Р-56',
+    has(norms, 'история — с 3 полных недель, пока 0') &&
+      has(norms, 'норма с ') &&
+      has(savedNorm, 'Норма недели: не меньше 1 дня, с '),
+    `${line(norms, 'история')}; ${line(savedNorm, 'Норма недели')}`,
+  )
 
   // ─ Висяк (Р-46): старше порога — в разборе; «Когда-нибудь» с «Отменить».
   const staleBlock = await section('Висяки и замыслы')
@@ -1646,6 +1656,110 @@ async function reviewScenario() {
     has(quiet, 'обзор недели не ждёт'),
     line(quiet, 'Напомина'),
   )
+}
+
+/**
+ * Итоги месяца и года (Этап 8): вход со «Сегодня» и месяц по умолчанию
+ * (Р-54), стык месяцев в сумме и в сравнении с прошлым (Р-55), карточка
+ * «… закончился» в обзоре недели, закрывшей месяц (Р-54), двенадцать
+ * столбцов года со ссылками на месяцы (Р-57). Свои блоки — импортом
+ * в 2024 год, куда остальной сценарий не попадает: 31 июля, 1 и 31 августа.
+ */
+async function monthScenario() {
+  const section = (title) =>
+    run(`[...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === ${JSON.stringify(title)})?.closest('section')?.innerText ?? ''`)
+
+  // ─ Вход — ссылкой внизу «Сегодня»; без адреса — в первые семь дней прошлый месяц.
+  await go('/')
+  const home = await screen()
+  await go('/month')
+  const now = new Date()
+  const shown = now.getDate() <= 7 ? new Date(now.getFullYear(), now.getMonth() - 1, 1) : now
+  const byDefault = `${MONTH_WORDS[shown.getMonth()]} ${shown.getFullYear()}`
+  const opened = await screen()
+  check(
+    'итоги месяца — ссылкой внизу «Сегодня»; без адреса — месяц по умолчанию — Р-54',
+    has(home, 'Итоги месяца →') && has(opened, 'Итоги месяца') && has(opened, byDefault),
+    `${line(home, 'Итоги месяца')}; ${line(opened, byDefault)}`,
+  )
+
+  // ─ Своё: стык июля и августа 2024 года.
+  const file = JSON.stringify({
+    format: 'deluvremya-import',
+    version: 1,
+    time: [
+      { date: '2024-07-31', category: 'Стык', minutes: 50 },
+      { date: '2024-08-01', category: 'Стык', minutes: 70 },
+      { date: '2024-08-31', category: 'Стык', minutes: 15 },
+    ],
+  })
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  await unfold('Импорт записей')
+  await act(`
+    set(document.querySelector('.import__text'), ${JSON.stringify(file)});
+    byText('button', 'Разобрать')?.click();
+  `)
+  await sleep(700)
+  await act(`startsWith('button', 'Загрузить')?.click()`)
+  await sleep(1000)
+  const imported = await screen()
+
+  // ─ Август: 1-е и 31-е — в сумме, 31 июля — нет; июль — вторым столбцом со своим основанием (Р-55).
+  await go('/month?m=2024-08')
+  const august = await section('Время месяца')
+  check(
+    'стык месяцев: 1-е и 31-е — в августе, 31 июля — в июле, рядом со своим основанием — Р-55',
+    has(imported, 'Загружено') &&
+      has(august, 'Учтено 1 ч 25 мин · 2 блока · учёт был в 2 днях из 31') &&
+      has(august, 'Июль: учтено 50 мин · 1 блок · учёт был в 1 дне из 31'),
+    `${line(imported, 'Загружено')}; ${line(august, 'Учтено')}; ${line(august, 'Июль:')}`,
+  )
+
+  // ─ Неделя, закрывшая июль: карточка в обзоре ведёт к итогам июля; другая неделя — без неё (Р-54).
+  await go('/review?week=2024-08-05')
+  const plainWeek = await screen()
+  await go('/review?week=2024-07-29')
+  const closing = await screen()
+  await act(`byText('a', 'Итоги месяца')?.click()`)
+  await sleep(700)
+  const july = await screen()
+  check(
+    'обзор недели, закрывшей месяц, — карточка «Июль закончился» ведёт к итогам июля; другая неделя — без неё — Р-54',
+    !has(plainWeek, 'закончился') && has(closing, 'Июль закончился') && has(july, 'Июль 2024') && has(july, 'Учтено 50 мин'),
+    `${line(closing, 'закончился')}; ${line(july, 'Учтено')}`,
+  )
+
+  // ─ Год: двенадцать столбцов со ссылками на месяцы, наибольший подписан (Р-57).
+  await act(`startsWith('a', 'Итоги года')?.click()`)
+  await sleep(1000)
+  const year = await screen()
+  const bars = await run(`JSON.stringify({
+    columns: document.querySelectorAll('svg.chart__svg .chart__col').length,
+    links: document.querySelectorAll('svg.chart__svg a.chart__col').length,
+    august: document.querySelector('svg.chart__svg a[href="#/month?m=2024-08"] .chart__bar') !== null,
+    peak: document.querySelector('svg.chart__svg .chart__value')?.textContent ?? '',
+  })`)
+  const chart = JSON.parse(bars ?? '{}')
+  check(
+    'итоги года: двенадцать столбцов со ссылками на месяцы, у августа — столбец, наибольший подписан — Р-57',
+    has(year, 'Итоги года') &&
+      has(year, 'Учтено 2 ч 15 мин · 3 блока') &&
+      chart.columns === 12 &&
+      chart.links === 12 &&
+      chart.august === true &&
+      chart.peak === '1 ч 25 мин',
+    `${line(year, 'Учтено')}; ${bars}`,
+  )
+
+  // ─ Тап по столбцу — итоги этого месяца.
+  await act(`
+    document.querySelector('svg.chart__svg a[href="#/month?m=2024-08"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  `)
+  await sleep(900)
+  const tapped = await screen()
+  check('тап по столбцу года открывает итоги месяца — Р-57', has(tapped, 'Август 2024') && has(tapped, 'Учтено 1 ч 25 мин'), line(tapped, 'Учтено'))
 }
 
 /** Месяц словом, как его ищут: «сентябрь». По часам этого компьютера — как `today()`. */
