@@ -20,7 +20,13 @@ export const NOTE_KINDS: readonly NoteKind[] = ['task', 'thought', 'goal']
  * дата записи — сегодня, в план не поставлена, открыта, вид — дело,
  * если другой не выбрали. Null — текста нет, записывать нечего.
  */
-export function captureNote(text: string, today: string, kind: NoteKind = DEFAULT_KIND): Note | null {
+export function captureNote(
+  text: string,
+  today: string,
+  kind: NoteKind = DEFAULT_KIND,
+  /** Сразу в план на этот день — только дело и только по желанию (Р-73). */
+  plannedFor: string | null = null,
+): Note | null {
   const trimmed = text.trim()
   if (!trimmed) return null
   return {
@@ -29,7 +35,7 @@ export function captureNote(text: string, today: string, kind: NoteKind = DEFAUL
     text: trimmed,
     kind,
     capturedOn: today,
-    plannedFor: null,
+    plannedFor: kind === 'task' ? plannedFor : null,
     status: 'open',
   }
 }

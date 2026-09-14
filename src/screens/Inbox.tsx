@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import type { DateStr } from '../core/dates.ts'
+import { addDays, type DateStr } from '../core/dates.ts'
 import { db } from '../core/db.ts'
 import type { Note, NoteKind } from '../core/model.ts'
 import {
@@ -62,6 +62,8 @@ export function Inbox() {
   const field = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState(shared)
   const [kind, setKind] = useState<NoteKind>(DEFAULT_KIND)
+  /** В план при записи (Р-73): день или null — во входящие. */
+  const [when, setWhen] = useState<DateStr | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState('')
   const [error, setError] = useState('')
@@ -124,15 +126,19 @@ export function Inbox() {
   }, [scrollTo, loaded])
 
   async function save() {
-    const draft = captureNote(text, today, kind)
+    const draft = captureNote(text, today, kind, when)
     if (!draft) return
     setBusy(true)
     setSaved('')
     setError('')
     try {
-      await db.put('notes', draft)
+      const stored = await db.put('notes', draft)
       setText('')
       setSaved(savedLine(kind))
+      // Поставленное в план — с «Отменить», как «В план» из карточки.
+      setPlanned(stored.plannedFor !== null ? stored : null)
+      setFinished(null)
+      setWhen(null)
       // Вид — на каждую запись свой: выбранная раз «Мысль» не должна
       // молча лечь и на следующую (Р-13).
       setKind(DEFAULT_KIND)
@@ -260,12 +266,34 @@ export function Inbox() {
               type="button"
               className={each === kind ? 'chip chip--on' : 'chip'}
               aria-pressed={each === kind}
-              onClick={() => setKind(each)}
+              onClick={() => {
+                setKind(each)
+                if (each !== 'task') setWhen(null)
+              }}
             >
               {KIND_NAMES[each]}
             </button>
           ))}
         </div>
+        {/* В план сразу — только дело и только по желанию: не выбрал — во входящие (Р-73). */}
+        {kind === 'task' && (
+          <div className="chips" role="group" aria-label="В план при записи">
+            {[
+              { day: today, label: 'На сегодня' },
+              { day: addDays(today, 1), label: 'На завтра' },
+            ].map((each) => (
+              <button
+                key={each.label}
+                type="button"
+                className={when === each.day ? 'chip chip--on' : 'chip'}
+                aria-pressed={when === each.day}
+                onClick={() => setWhen(when === each.day ? null : each.day)}
+              >
+                {each.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="form__actions">
           <button type="submit" className="btn btn--primary" disabled={busy || !text.trim()}>
             Записать

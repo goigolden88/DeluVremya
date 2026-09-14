@@ -2427,6 +2427,27 @@ async function polishScenario() {
     has(strip, 'На завтра') && has(strip, 'В неразобранное') && !has(moved, 'Пункт доведения') && has(ahead, 'Пункт доведения'),
     `${line(strip, 'На завтра')}; впереди: ${line(ahead, 'Пункт доведения')}`,
   )
+
+  // ─ В план при записи (Р-73): чипы только у дела; «На сегодня» — дело сразу в плане.
+  await go('/inbox')
+  await act(`
+    set(document.querySelector('textarea[name=text]'), 'Дело сразу в план');
+    [...document.querySelectorAll('[aria-label="В план при записи"] button')].find((el) => el.textContent.trim() === 'На сегодня')?.click();
+  `)
+  await sleep(400)
+  await act(`byText('button', 'Записать')?.click()`)
+  await sleep(700)
+  const captured = await screen()
+  await act(`byText('button', 'Мысль')?.click()`)
+  await sleep(400)
+  const asThought = await run(`document.querySelector('[aria-label="В план при записи"]') === null`)
+  await go('/')
+  const inPlan = await planText()
+  check(
+    'дело при записи — «На сегодня»: сразу в плане, с «Отменить»; у мысли чипов нет — Р-73',
+    has(captured, 'Поставлено на сегодня') && has(inPlan, 'Дело сразу в план') && asThought === true,
+    `${line(captured, 'Поставлено')}; мысль без чипов: ${asThought}`,
+  )
 }
 
 async function unfoldAll() {

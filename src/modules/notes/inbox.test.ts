@@ -61,6 +61,12 @@ describe('захват одной строкой — Р-09, Р-13', () => {
     expect(captureNote('Статья\nhttps://example.com', '2026-09-13')?.text).toBe('Статья\nhttps://example.com')
   })
 
+  it('в план при записи — только дело; без выбора — во входящие (Р-73)', () => {
+    expect(captureNote('Позвонить в сервис', '2026-09-13', 'task', '2026-09-14')?.plannedFor).toBe('2026-09-14')
+    expect(captureNote('Позвонить в сервис', '2026-09-13', 'task')?.plannedFor).toBeNull()
+    expect(captureNote('Мысль про сервис', '2026-09-13', 'thought', '2026-09-14')?.plannedFor).toBeNull()
+  })
+
   it('пустое и пробелы не записываются', () => {
     expect(captureNote('', '2026-09-13')).toBeNull()
     expect(captureNote('   \n ', '2026-09-13')).toBeNull()
