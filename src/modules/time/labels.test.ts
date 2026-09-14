@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { DAY_WINDOW } from './day.ts'
-import { MAX_NORM_DAYS, MAX_NORM_MINUTES } from './period.ts'
+import { MAX_NORM_DAYS, MAX_NORM_MINUTES, NORM_MIN_WEEKS } from './period.ts'
 import {
   addedLine,
   blocksWord,
   checkText,
+  historyText,
+  historyWaitText,
   keptText,
   NORM_PROBLEMS,
   normText,
@@ -79,6 +81,16 @@ describe('тексты норм недели — Р-45', () => {
   it('вместо серии — из скольких недель', () => {
     expect(keptText(3, 4)).toBe('выполнена в 3 из 4 недель')
     expect(keptText(1, 1)).toBe('выполнена в 1 из 1 недели')
+  })
+
+  it('истории ещё нет — с какого дня норма и сколько недель набралось, порог из константы (Р-56)', () => {
+    expect(historyWaitText('2026-09-14', 1)).toBe(
+      `норма с 14 сентября 2026 · история — с ${NORM_MIN_WEEKS} полных недель, пока 1`,
+    )
+    expect(historyWaitText(null, 0)).toBe(`история — с ${NORM_MIN_WEEKS} полных недель, пока 0`)
+    const history = { since: '2026-08-03', marks: [], kept: 2, weeks: NORM_MIN_WEEKS }
+    expect(historyText({ ...history, enough: true })).toBe(`выполнена в 2 из ${NORM_MIN_WEEKS} недель`)
+    expect(historyText({ ...history, enough: false })).toContain('норма с 3 августа 2026')
   })
 
   it('пределы в причинах — из констант', () => {

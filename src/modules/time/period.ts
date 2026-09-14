@@ -8,7 +8,17 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { addDays, inPeriod, periodDays, weekPeriod, type DateStr, type Period } from '../../core/dates.ts'
+import {
+  addDays,
+  inPeriod,
+  isDateStr,
+  periodDays,
+  toDateStr,
+  weekPeriod,
+  weeksEndingIn,
+  type DateStr,
+  type Period,
+} from '../../core/dates.ts'
 import type { Category, TimeBlock } from '../../core/model.ts'
 import { activeCategories, MINUTES_PER_DAY, type CategoryKind } from './categories.ts'
 
@@ -117,7 +127,8 @@ export function periodSummary(
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────
 
 export type Norm = NonNullable<Category['norm']>
-export type NormRule = keyof Norm
+/** Правило нормы. `since` — не правило, а день начала истории (Р-56). */
+export type NormRule = Exclude<keyof Norm, 'since'>
 
 /** Порядок правил на экране. */
 export const NORM_RULES: readonly NormRule[] = ['minDays', 'minMinutes', 'maxMinutes']
@@ -164,21 +175,102 @@ function statOf(summary: PeriodSummary, id: string): { days: number; minutes: nu
   return { days: row?.days ?? 0, minutes: row?.minutes ?? 0 }
 }
 
-export type WeekNorm = {
-  category: Category
-  checks: NormCheck[]
-  /** Минуты фоном за неделю — названы, но в норму не входят (Р-43). */
-  background: number
-  /** В скольких из `weeks` последних недель выполнены все правила. */
+// ─── История нормы (Р-53, Р-56) ────────────────────────────────────────────
+
+/** Сколько недель в счёт нужно, чтобы показать историю нормы (Р-53). */
+export const NORM_MIN_WEEKS = 3
+
+/**
+ * С какого дня считается история нормы: `since`; нет его — день последней
+ * правки категории (Р-53): не точнее, но не раньше. Не разобрать и его —
+ * null, без предела.
+ */
+export function normSince(category: Category): DateStr | null {
+  const since = category.norm?.since
+  if (since !== undefined && isDateStr(since)) return since
+  const at = new Date(category.updatedAt)
+  return Number.isNaN(at.getTime()) ? null : toDateStr(at)
+}
+
+export type WeekMark = {
+  week: Period
+  /** В счёт: закончилась, полная с `since` (Р-56), не раньше первого блока. */
+  counted: boolean
+  /** Выполнены все правила. У недели не в счёт не значит ничего. */
+  met: boolean
+}
+
+export type NormHistory = {
+  since: DateStr | null
+  /** Все недели, какие спрошены, по порядку. */
+  marks: WeekMark[]
+  /** В скольких неделях в счёт норма выполнена. */
   kept: number
-  /** Сколько недель в счёт: закончившиеся и не раньше первого блока. */
+  /** Сколько недель в счёт. */
   weeks: number
+  /** Недель в счёт хватает, чтобы показать историю (Р-53). */
+  enough: boolean
+}
+
+/** Первый живой блок вообще: неделя до начала учёта — не пропуск. */
+function firstBlock(blocks: readonly TimeBlock[]): DateStr | null {
+  return blocks.reduce<DateStr | null>(
+    (min, block) => (block.deleted || (min !== null && block.date >= min) ? min : block.date),
+    null,
+  )
+}
+
+type WeekStat = { week: Period; summary: PeriodSummary }
+
+function weekStats(
+  blocks: readonly TimeBlock[],
+  categories: readonly Category[],
+  weeks: readonly Period[],
+  today: DateStr,
+): WeekStat[] {
+  return weeks.map((week) => ({ week, summary: periodSummary(blocks, categories, week, today) }))
 }
 
 /**
- * Нормы недели `week` (любой её день) и вместо серии — сколько из последних
- * недель норма выполнена. В счёт идут только закончившиеся недели и не
- * раньше первого блока вообще: неделя до начала учёта — не пропуск.
+ * История нормы по неделям. В счёт — закончившиеся недели, не раньше первого
+ * блока и только полные с `since`: с понедельника не раньше него. Норма,
+ * заведённая в среду, в эту неделю не судится (Р-56).
+ */
+function historyOf(
+  category: Category & { norm: Norm },
+  stats: readonly WeekStat[],
+  first: DateStr | null,
+  today: DateStr,
+): NormHistory {
+  const since = normSince(category)
+  const marks = stats.map(({ week, summary }) => ({
+    week,
+    counted: week.to <= today && first !== null && week.to >= first && (since === null || week.from >= since),
+    met: checkNorm(category.norm, statOf(summary, category.id)).every((check) => check.met),
+  }))
+  const counted = marks.filter((mark) => mark.counted)
+  return {
+    since,
+    marks,
+    kept: counted.filter((mark) => mark.met).length,
+    weeks: counted.length,
+    enough: counted.length >= NORM_MIN_WEEKS,
+  }
+}
+
+export type WeekNorm = {
+  category: Category
+  /** Правила показанной недели — факт недели, а не история: считаются всегда. */
+  checks: NormCheck[]
+  /** Минуты фоном за неделю — названы, но в норму не входят (Р-43). */
+  background: number
+  /** Вместо серии — последние недели до показанной включительно. */
+  history: NormHistory
+}
+
+/**
+ * Нормы недели `week` (любой её день) и вместо серии — история за последние
+ * недели по правилу `historyOf`.
  */
 export function weekNorms(
   blocks: readonly TimeBlock[],
@@ -189,24 +281,40 @@ export function weekNorms(
   const list = normed(categories, NORM_RULES)
   if (list.length === 0) return []
 
-  const first = blocks.reduce<string | null>(
-    (min, block) => (block.deleted || (min !== null && block.date >= min) ? min : block.date),
-    null,
-  )
   const period = weekPeriod(week)
   const summary = periodSummary(blocks, categories, period, today)
-  const history = Array.from({ length: NORM_HISTORY_WEEKS }, (_, back) => weekPeriod(addDays(period.from, -7 * back)))
-    .filter((each) => each.to <= today && first !== null && each.to >= first)
-    .map((each) => periodSummary(blocks, categories, each, today))
+  // Старые первыми; последняя — сама показанная неделя.
+  const weeks = Array.from({ length: NORM_HISTORY_WEEKS }, (_, index) =>
+    weekPeriod(addDays(period.from, -7 * (NORM_HISTORY_WEEKS - 1 - index))),
+  )
+  const stats = weekStats(blocks, categories, weeks, today)
+  const first = firstBlock(blocks)
 
   return list.map((category) => ({
     category,
     checks: checkNorm(category.norm, statOf(summary, category.id)),
     background: summary.byCategory.find((each) => each.categoryId === category.id)?.background ?? 0,
-    kept: history.filter((each) => checkNorm(category.norm, statOf(each, category.id)).every((check) => check.met))
-      .length,
-    weeks: history.length,
+    history: historyOf(category, stats, first, today),
   }))
+}
+
+export type PeriodNorm = { category: Category; history: NormHistory }
+
+/**
+ * Нормы по неделям промежутка — месяца или года: недели, чьё воскресенье
+ * в нём (Р-55). То же правило истории, что у обзора недели.
+ */
+export function periodNorms(
+  blocks: readonly TimeBlock[],
+  categories: readonly Category[],
+  period: Period,
+  today: DateStr,
+): PeriodNorm[] {
+  const list = normed(categories, NORM_RULES)
+  if (list.length === 0) return []
+  const stats = weekStats(blocks, categories, weeksEndingIn(period), today)
+  const first = firstBlock(blocks)
+  return list.map((category) => ({ category, history: historyOf(category, stats, first, today) }))
 }
 
 export type NormProgress = { category: Category; checks: NormCheck[] }
@@ -287,9 +395,16 @@ export function normInput(norm: Norm | undefined): NormInput {
   }
 }
 
-/** Новая норма; `null` — убрать, ключом из записи. */
-export function withNorm(category: Category, norm: Norm | null): Category {
-  if (norm !== null) return { ...category, norm }
+/**
+ * Новая норма; `null` — убрать, ключом из записи. День начала истории (Р-56):
+ * у новой нормы — сегодня; у правки — прежний, правка правил его не сдвигает.
+ * У нормы без него — день последней правки категории, он и записывается.
+ */
+export function withNorm(category: Category, norm: Norm | null, today: DateStr): Category {
+  if (norm !== null) {
+    const since = (category.norm ? normSince(category) : null) ?? today
+    return { ...category, norm: { ...norm, since } }
+  }
   if (!('norm' in category)) return category
   const { norm: _norm, ...rest } = category
   return rest

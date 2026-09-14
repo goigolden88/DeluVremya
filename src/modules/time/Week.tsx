@@ -6,7 +6,7 @@ import {
   backgroundText,
   checkText,
   formatMinutes,
-  keptText,
+  historyText,
   kindLine,
   periodLine,
   progressLead,
@@ -96,7 +96,8 @@ export function WeekTime({ week, today }: { week: DateStr; today: DateStr }) {
 
 /**
  * Нормы недели — шаг обзора (Р-45): каждое правило с основанием, вместо
- * серии — в скольких из последних недель выполнена. Пределы видны здесь.
+ * серии — в скольких из последних недель выполнена, а пока недель в счёт
+ * мало — с какого дня норма (Р-56). Пределы видны здесь.
  */
 export function WeekNorms({ week, today }: { week: DateStr; today: DateStr }) {
   const catalog = useCatalog()
@@ -117,7 +118,7 @@ export function WeekNorms({ week, today }: { week: DateStr; today: DateStr }) {
     <ul className="plain">
       {rows.map((row) => {
         const notes = [
-          row.weeks > 0 ? keptText(row.kept, row.weeks) : null,
+          historyText(row.history),
           row.background > 0 ? `${backgroundText(row.background)} — в норму не входит` : null,
         ].filter((each): each is string => each !== null)
         return (

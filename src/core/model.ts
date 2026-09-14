@@ -47,6 +47,8 @@ export type Category = Base & {
     minMinutes?: number
     /** минут — не больше */
     maxMinutes?: number
+    /** YYYY-MM-DD, с какого дня считается история (Р-53, Р-56) */
+    since?: string
   }
 }
 

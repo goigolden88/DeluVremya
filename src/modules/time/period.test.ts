@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, TimeBlock } from '../../core/model.ts'
-import { checkNorm, normInput, periodSummary, readNorm, weekNorms, weekProgress, withNorm } from './period.ts'
+import {
+  checkNorm,
+  normInput,
+  normSince,
+  periodNorms,
+  periodSummary,
+  readNorm,
+  weekNorms,
+  weekProgress,
+  withNorm,
+} from './period.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
 const WEEK = { from: '2026-09-07', to: '2026-09-13' }
@@ -88,7 +98,7 @@ describe('нормы недели — Р-45', () => {
     ])
   })
 
-  const reading = cat('a', 'Чтение', 0, { norm: { minDays: 2 } })
+  const reading = cat('a', 'Чтение', 0, { norm: { minDays: 2, since: '2026-08-01' } })
   const youtube = cat('b', 'Ютуб', 1, { norm: { maxMinutes: 60 } })
   const plain = cat('c', 'Прочее', 2)
   const chess = cat('d', 'Шахматы', 3, { archived: true, norm: { minDays: 1 } })
@@ -117,12 +127,20 @@ describe('нормы недели — Р-45', () => {
       block('5', 'a', '2026-09-12', 30),
     ]
     // 17.08 — до первого блока; 24.08 — один день из двух; 31.08 и 07.09 — два.
-    expect(weekNorms(blocks, [reading], '2026-09-07', SUNDAY)[0]).toMatchObject({ kept: 2, weeks: 3 })
+    expect(weekNorms(blocks, [reading], '2026-09-07', SUNDAY)[0]?.history).toMatchObject({
+      kept: 2,
+      weeks: 3,
+      enough: true,
+    })
   })
 
-  it('неделя, которая ещё идёт, в счёт недель не входит', () => {
+  it('неделя, которая ещё идёт, в счёт недель не входит; меньше трёх — истории нет', () => {
     const blocks = [block('1', 'a', '2026-09-07', 30), block('2', 'a', '2026-09-08', 30), block('3', 'a', '2026-09-14', 30)]
-    expect(weekNorms(blocks, [reading], '2026-09-14', '2026-09-15')[0]).toMatchObject({ kept: 1, weeks: 1 })
+    expect(weekNorms(blocks, [reading], '2026-09-14', '2026-09-15')[0]?.history).toMatchObject({
+      kept: 1,
+      weeks: 1,
+      enough: false,
+    })
   })
 
   it('без норм — пусто, считать нечего', () => {
@@ -169,8 +187,61 @@ describe('норма из полей', () => {
   })
 
   it('убранная норма уходит из записи ключом', () => {
-    const category = cat('a', 'Чтение', 0, { norm: { minDays: 3 } })
-    expect('norm' in withNorm(category, null)).toBe(false)
-    expect(withNorm(category, { maxMinutes: 60 }).norm).toEqual({ maxMinutes: 60 })
+    const category = cat('a', 'Чтение', 0, { norm: { minDays: 3, since: '2026-09-01' } })
+    expect('norm' in withNorm(category, null, SUNDAY)).toBe(false)
+  })
+
+  it('день начала — Р-56: новая — сегодня; правка — прежний; без него — день правки категории', () => {
+    const fresh = cat('a', 'Чтение', 0)
+    expect(withNorm(fresh, { minDays: 3 }, SUNDAY).norm).toEqual({ minDays: 3, since: SUNDAY })
+
+    const kept = cat('a', 'Чтение', 0, { norm: { minDays: 3, since: '2026-09-01' } })
+    expect(withNorm(kept, { maxMinutes: 60 }, SUNDAY).norm).toEqual({ maxMinutes: 60, since: '2026-09-01' })
+
+    const old = cat('a', 'Чтение', 0, { updatedAt: '2026-09-02T12:00:00.000Z', norm: { minDays: 3 } })
+    expect(withNorm(old, { minDays: 4 }, SUNDAY).norm).toEqual({ minDays: 4, since: '2026-09-02' })
+  })
+})
+
+describe('история нормы — Р-53, Р-56', () => {
+  // Два дня чтения в каждой неделе с 17.08 по 13.09.
+  const blocks = ['2026-08-17', '2026-08-18', '2026-08-24', '2026-08-25', '2026-08-31', '2026-09-01', '2026-09-07', '2026-09-08'].map(
+    (date, index) => block(String(index), 'a', date, 30),
+  )
+
+  it('с понедельника не раньше since: норма со среды свою неделю не судит', () => {
+    const wednesday = cat('a', 'Чтение', 0, { norm: { minDays: 2, since: '2026-08-19' } })
+    const history = weekNorms(blocks, [wednesday], SUNDAY, SUNDAY)[0]?.history
+    // 17.08 — неделя заведения, не в счёт; 24.08, 31.08, 07.09 — в счёт.
+    expect(history?.marks.map((mark) => mark.counted)).toEqual([false, true, true, true])
+    expect(history).toMatchObject({ since: '2026-08-19', kept: 3, weeks: 3, enough: true })
+  })
+
+  it('норма с понедельника — её неделя в счёт; двух недель мало для истории', () => {
+    const monday = cat('a', 'Чтение', 0, { norm: { minDays: 2, since: '2026-08-31' } })
+    expect(weekNorms(blocks, [monday], SUNDAY, SUNDAY)[0]?.history).toMatchObject({ weeks: 2, enough: false })
+  })
+
+  it('без since — день последней правки категории; не разобрать — без предела', () => {
+    const edited = cat('a', 'Чтение', 0, { updatedAt: '2026-09-07T12:00:00.000Z', norm: { minDays: 2 } })
+    expect(normSince(edited)).toBe('2026-09-07')
+    expect(weekNorms(blocks, [edited], SUNDAY, SUNDAY)[0]?.history).toMatchObject({ weeks: 1, enough: false })
+
+    const broken = cat('a', 'Чтение', 0, { updatedAt: 'вчера', norm: { minDays: 2, since: '2026-02-30' } })
+    expect(normSince(broken)).toBeNull()
+    expect(weekNorms(blocks, [broken], SUNDAY, SUNDAY)[0]?.history.weeks).toBe(4)
+  })
+
+  it('по неделям месяца — те, чьё воскресенье в нём; идущая и будущие не в счёт', () => {
+    const reading = cat('a', 'Чтение', 0, { norm: { minDays: 2, since: '2026-08-01' } })
+    const september = { from: '2026-09-01', to: '2026-09-30' }
+    const [row] = periodNorms(blocks, [reading], september, '2026-09-15')
+    expect(row?.history.marks.map((mark) => [mark.week.to, mark.counted, mark.met])).toEqual([
+      ['2026-09-06', true, true],
+      ['2026-09-13', true, true],
+      ['2026-09-20', false, false],
+      ['2026-09-27', false, false],
+    ])
+    expect(row?.history).toMatchObject({ kept: 2, weeks: 2, enough: false })
   })
 })

@@ -9,10 +9,12 @@ import { DAY_WINDOW } from './day.ts'
 import {
   MAX_NORM_DAYS,
   MAX_NORM_MINUTES,
+  NORM_MIN_WEEKS,
   NORM_RULES,
   type KindTotal,
   type Norm,
   type NormCheck,
+  type NormHistory,
   type NormProblem,
   type NormRule,
   type PeriodSummary,
@@ -181,6 +183,25 @@ export function checkText(check: NormCheck): string {
 /** Вместо серии (Р-45): в скольких из последних недель норма выполнена. */
 export function keptText(kept: number, weeks: number): string {
   return `выполнена в ${kept} из ${weeks} ${plural(weeks, ['недели', 'недель', 'недель'])}`
+}
+
+/** С какого дня норма: «с 14 сентября 2026» (Р-56). */
+export function normSinceText(since: DateStr): string {
+  return `с ${formatDateLong(since)}`
+}
+
+/**
+ * Истории ещё нет (Р-53, Р-56): с какого дня норма и сколько полных недель
+ * набралось из нужных. Строка есть всегда — история не пропадает молча.
+ */
+export function historyWaitText(since: DateStr | null, weeks: number): string {
+  const need = `история — с ${NORM_MIN_WEEKS} ${plural(NORM_MIN_WEEKS, ['полной недели', 'полных недель', 'полных недель'])}, пока ${weeks}`
+  return since === null ? need : `норма ${normSinceText(since)} · ${need}`
+}
+
+/** История нормы словами: «выполнена в N из M недель» или когда появится. */
+export function historyText(history: NormHistory): string {
+  return history.enough ? keptText(history.kept, history.weeks) : historyWaitText(history.since, history.weeks)
 }
 
 // ─── Итог промежутка (Р-43) ────────────────────────────────────────────────

@@ -27,11 +27,13 @@ import {
   moveLine,
   NAME_PROBLEMS,
   NORM_PROBLEMS,
+  normSinceText,
   normText,
   PRESET_PROBLEMS,
   presetLabel,
 } from './labels.ts'
-import { normInput, readNorm, withNorm, type NormInput } from './period.ts'
+import { normInput, normSince, readNorm, withNorm, type NormInput } from './period.ts'
+import { useToday } from '../../ui/useToday.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
 import { quoted } from '../../ui/screenNames.ts'
@@ -413,8 +415,10 @@ function RemoveCategory({
  * noValidate: пределы проверяет `readNorm` и называет причину.
  */
 function NormForm({ category, save }: { category: Category; save: Save }) {
+  const today = useToday()
   const [input, setInput] = useState<NormInput>(() => normInput(category.norm))
   const [problem, setProblem] = useState('')
+  const since = category.norm ? normSince(category) : null
 
   function submit() {
     const read = readNorm(input)
@@ -423,7 +427,7 @@ function NormForm({ category, save }: { category: Category; save: Save }) {
       return
     }
     setProblem('')
-    void save(() => db.put('categories', withNorm(category, read.norm)))
+    void save(() => db.put('categories', withNorm(category, read.norm, today)))
   }
 
   const field = (key: keyof NormInput, label: string, mode: 'numeric' | 'decimal') => (
@@ -448,7 +452,10 @@ function NormForm({ category, save }: { category: Category; save: Save }) {
       }}
     >
       <p className="muted">
-        {category.norm ? `Норма недели: ${normText(category.norm)}.` : 'Нормы недели нет.'} Пустое поле — без этого
+        {category.norm
+          ? `Норма недели: ${normText(category.norm)}${since ? `, ${normSinceText(since)}` : ''}.`
+          : 'Нормы недели нет.'}{' '}
+        Пустое поле — без этого
         правила.
       </p>
       {field('minDays', 'Дней с блоком — не меньше', 'numeric')}
