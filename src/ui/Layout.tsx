@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import type { ScreenKey } from './screenNames.ts'
+import { ScrollButtons } from './ScrollButtons.tsx'
 import { useScreenNames } from './useScreenNames.ts'
 
 /**
@@ -24,6 +25,9 @@ export function Layout() {
       <main className="content">
         <Outlet />
       </main>
+
+      {/* «В начало» и «в конец» (Р-70): видны, пока экран листают. */}
+      <ScrollButtons />
 
       <nav className="tabs">
         {TABS.map((tab) => (

@@ -1129,6 +1129,8 @@ async function scenario() {
 
   await stageSixScenario()
 
+  await polishScenario()
+
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
     navigator.serviceWorker.ready.then((r) => r.active?.state ?? 'нет'),
@@ -2339,6 +2341,32 @@ function line(text, part) {
 // ─── Копия настоящих данных ────────────────────────────────────────────────
 
 /** Разворачивает все свёрнутые блоки, вложенные тоже: они появляются после внешних. */
+/**
+ * Доведение до ума (Р-68…Р-81): проверки по пунктам Плана, дописываются
+ * порциями вместе с экранами.
+ */
+async function polishScenario() {
+  // ─ Стрелки «в начало» и «в конец» (Р-70): видны, пока листают, потом гаснут.
+  await go('/help')
+  await unfoldAll()
+  await run('window.scrollTo(0, 600)')
+  await sleep(400)
+  const awake = await run(`JSON.stringify({
+    shown: document.querySelector('.scroll-btns') !== null,
+    idle: document.querySelector('.scroll-btns')?.classList.contains('scroll-btns--idle') ?? null,
+    up: document.querySelector('.scroll-btn[aria-label="В начало"]') !== null,
+  })`)
+  await sleep(3000)
+  const idle = await run(`document.querySelector('.scroll-btns')?.classList.contains('scroll-btns--idle') ?? null`)
+  const seen = JSON.parse(awake)
+  check(
+    'стрелки прокрутки: при прокрутке видна «В начало», через пару секунд гаснут — Р-70',
+    seen.shown && seen.idle === false && seen.up && idle === true,
+    `${awake}; потом idle ${idle}`,
+  )
+  await run('window.scrollTo(0, 0)')
+}
+
 async function unfoldAll() {
   for (let round = 0; round < 3; round++) {
     await act(`document.querySelectorAll('.fold__btn[aria-expanded="false"]').forEach((el) => el.click())`)
