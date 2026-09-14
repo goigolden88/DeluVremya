@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { blobSha } from './github.ts'
-import { buildFiles, canonical, parseFile, parseMeta, storeOf } from './layout.ts'
+import { buildFiles, canonical, parseFile, parseMeta, README_PATH, readmeFile, storeOf } from './layout.ts'
 import { SCHEMA_VERSION, SYNCED_STORES } from './model.ts'
 import type { Note, StoreRecord, SyncedStore, TimeBlock } from './model.ts'
 
@@ -213,5 +213,23 @@ describe('разбор файлов с сервера', () => {
     const files = buildFiles(withData({ time: [block('a', '2026-01-01')] }))
     const file = files.find((each) => each.path === 'time/2026-01.json')
     expect(parseFile(file?.path ?? '', file?.content ?? '')[0]?.id).toBe('a')
+  })
+})
+
+describe('README репозитория данных (Р-69)', () => {
+  it('называет каждый файл раскладки — таблица собрана из неё', () => {
+    const text = readmeFile().content
+    const produced = buildFiles(
+      withData({
+        notes: [note('n1', '2026-03-12'), note('n2', null)],
+        time: [block('b1', '2026-02-03')],
+      }),
+    ).map((file) => file.path.replace(/\d{4}-\d{2}/, 'ГГГГ-ММ'))
+    for (const path of produced) expect(text).toContain(`\`${path}\``)
+  })
+
+  it('своим файлом для разбора не считается', () => {
+    expect(readmeFile().path).toBe(README_PATH)
+    expect(storeOf(README_PATH)).toBeNull()
   })
 })

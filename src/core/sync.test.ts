@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GitHubError, blobSha } from './github.ts'
 import type { Client, FileToWrite } from './github.ts'
-import { buildFiles, canonical } from './layout.ts'
+import { buildFiles, canonical, readmeFile } from './layout.ts'
 import { SCHEMA_VERSION, SYNCED_STORES } from './model.ts'
 import type { StoreRecord, SyncedStore } from './model.ts'
 import { expiryDay, planDownload, planUpload, runSync } from './sync.ts'
@@ -476,5 +476,31 @@ describe('срок жизни токена', () => {
     expect(expiryDay('')).toBeNull()
     expect(expiryDay('никогда')).toBeNull()
     expect(expiryDay('2027-13-40')).toBeNull()
+  })
+})
+
+describe('README репозитория данных (Р-69)', () => {
+  it('кладётся, если его нет, — и в заведённом репозитории тоже', async () => {
+    const seed = { categories: [item('i1', '2026-09-01T10:00:00.000Z')] }
+    const repo = fakeRepo(repoWith(seed))
+    const local = fakeDb(seed)
+
+    await runSync(repo.api, local.ports)
+    expect(repo.files()['README.md']).toBe(readmeFile().content)
+
+    // Положен — следующий проход его не трогает и коммита не делает.
+    repo.calls.length = 0
+    const result = await runSync(repo.api, local.ports)
+    expect(result.pushed).toBe(0)
+  })
+
+  it('удалённый человеком — кладётся снова', async () => {
+    const repo = fakeRepo()
+    const local = fakeDb({ categories: [item('i1', '2026-09-01T10:00:00.000Z')] })
+    await runSync(repo.api, local.ports)
+    delete repo.files()['README.md']
+
+    await runSync(repo.api, local.ports)
+    expect(repo.files()['README.md']).toBe(readmeFile().content)
   })
 })

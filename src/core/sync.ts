@@ -27,7 +27,7 @@ import { isDateStr, nowIso } from './dates.ts'
 import type { DateStr } from './dates.ts'
 import { GitHubError, blobSha, createClient, parseRepo } from './github.ts'
 import type { Client, RepoInfo } from './github.ts'
-import { META_PATH, buildFiles, metaFile, parseFile, parseMeta, storeOf } from './layout.ts'
+import { META_PATH, README_PATH, buildFiles, metaFile, parseFile, parseMeta, readmeFile, storeOf } from './layout.ts'
 import type { RepoFile } from './layout.ts'
 import { SCHEMA_VERSION, SYNCED_STORES } from './model.ts'
 import type { StoreRecord, SyncedStore } from './model.ts'
@@ -289,6 +289,8 @@ async function onePass(
 
   // ── Своё наружу ──
   const files = buildFiles(await ports.readAll(), { merged })
+  // README — только если его нет: есть — он человека (Р-69 «Делу Время»).
+  if (tree[README_PATH] === undefined) files.push(readmeFile())
   const upload = await planUpload(files, tree)
 
   if (upload.files.length === 0) {
@@ -316,8 +318,8 @@ async function onePass(
  * Заводит репозиторий, в котором ещё ничего нет.
  *
  * Кладётся `meta.json` — версия схемы. Она всё равно нужна, и содержательного
- * файла на эту роль лучше нет: README человек пишет сам, а пустышка осталась
- * бы мусором навсегда.
+ * файла на эту роль лучше нет: пустышка осталась бы мусором навсегда. README
+ * приезжает следующим, обычным коммитом того же прохода.
  */
 async function bootstrap(api: Client): Promise<string> {
   try {

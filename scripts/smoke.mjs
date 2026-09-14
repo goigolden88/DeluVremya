@@ -2206,6 +2206,12 @@ async function syncScenario() {
     paths.join(', '),
   )
   check(
+    'README положен приложением в пустой репозиторий — Р-69',
+    (repoFiles()['README.md'] ?? '').startsWith('# Данные «Делу Время»') &&
+      (repoFiles()['README.md'] ?? '').includes('`time/ГГГГ-ММ.json`'),
+    (repoFiles()['README.md'] ?? 'README нет').slice(0, 60),
+  )
+  check(
     'импортированный февраль — в своём файле целиком',
     repoRecords('time/2026-02.json')?.length === 2,
     `в time/2026-02.json записей ${repoRecords('time/2026-02.json')?.length}`,
@@ -2226,8 +2232,20 @@ async function syncScenario() {
       { id: 'phone-block', updatedAt: later, date: '2026-02-03', categoryId: 'phone-run', minutes: 15 },
     ],
   })
+  // README, переписанный человеком, — его: приложение кладёт свой, только если файла нет (Р-69).
+  const ownReadme = '# Мои данные\n\nНаписано руками.\n'
+  github.head = putCommit(
+    putTree(new Map([...filesAt(github.head), ['README.md', putBlob(ownReadme)]])),
+    github.head,
+    'README руками',
+  )
   const pulled = await syncNow()
   check('коммит другого устройства влит', has(pulled, 'получено записей 2'), line(pulled, 'получено'))
+  check(
+    'README человека проход не трогает — Р-69',
+    repoFiles()['README.md'] === ownReadme,
+    (repoFiles()['README.md'] ?? 'README нет').slice(0, 40),
+  )
 
   // Слияние ждёт секунду тишины, его запись уезжает сама через пять.
   await sleep(8000)
@@ -2360,7 +2378,10 @@ async function dataScenario(file) {
   const loaded = /Загружено записей: (\d+)/.exec(restored.replace(/ /g, ' '))
   check('копия загрузилась через «Восстановить из копии»', loaded !== null, loaded?.[0] ?? restored.slice(0, 160))
 
-  const routes = ['/', '/time', '/inbox', '/time/categories', '/templates', '/review', '/feed', '/help', '/settings']
+  // Итоги месяца и года — с Этапа 8: на настоящих данных у них больше всего чисел (Р-68).
+  const routes = [
+    '/', '/time', '/inbox', '/time/categories', '/templates', '/review', '/month', '/year', '/feed', '/help', '/settings',
+  ]
 
   for (const route of routes) {
     await go(route)
