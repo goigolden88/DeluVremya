@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { IMPORT_FORMAT, IMPORT_VERSION, planTotal, type ImportPlan } from './core/importing.ts'
 import { SYNCED_STORES } from './core/model.ts'
-import { importPrompt, KIND_ORDER, KINDS, planImport, type Data } from './registry.ts'
+import { feedItems, importPrompt, KIND_ORDER, KINDS, markdownExport, planImport, type Data } from './registry.ts'
 
 // По образцу теста реестра «Дневников» с a913dcb: пример из промпта обязан
 // проходить собственную проверку — описание и разбор не могут разойтись.
@@ -104,5 +104,48 @@ describe('реестр видов записей', () => {
 
   it('подписи видов не пустые', () => {
     for (const kind of KIND_ORDER) expect(KINDS[kind].label).not.toBe('')
+  })
+})
+
+describe('лента и выгрузка — Р-58…Р-60, Р-63', () => {
+  function filled(): Data {
+    return {
+      ...empty(),
+      categories: [{ id: 'cat:чтение', updatedAt: at, name: 'Чтение', order: 1, kind: 'useful' }],
+      notes: [
+        {
+          id: 'n1',
+          updatedAt: at,
+          text: 'Купить фильтр',
+          kind: 'task',
+          capturedOn: '2026-09-10',
+          plannedFor: null,
+          status: 'open',
+        },
+      ],
+      time: [{ id: 't1', updatedAt: at, date: '2026-09-10', categoryId: 'cat:чтение', minutes: 30 }],
+      reviews: [{ id: 'review:2026-09-07', updatedAt: at, weekStart: '2026-09-07', doneAt: at }],
+    }
+  }
+
+  it('строки ленты — от каждого вида', () => {
+    const kinds = new Set(feedItems(filled(), '2026-09-14').map((item) => item.kind))
+    expect([...kinds].sort()).toEqual([...KIND_ORDER].sort())
+  })
+
+  it('markdown — шапка с датой и раздел на вид в порядке реестра', () => {
+    const text = markdownExport(filled(), '2026-09-14')
+    expect(text.startsWith('# Делу Время\n')).toBe(true)
+    expect(text).toContain('Выгрузка от 14.09.2026')
+    const places = KIND_ORDER.map((kind) => text.indexOf(`\n## ${KINDS[kind].label}\n`))
+    expect(places.every((place) => place > 0)).toBe(true)
+    expect(places).toEqual([...places].sort((a, b) => a - b))
+    expect(text).toContain('Купить фильтр')
+    expect(text.endsWith('\n')).toBe(true)
+  })
+
+  it('пустая база — разделы на месте, и в каждом сказано, что записей нет', () => {
+    const text = markdownExport(empty(), '2026-09-14')
+    expect(text.split('Записей нет.').length - 1).toBe(KIND_ORDER.length)
   })
 })

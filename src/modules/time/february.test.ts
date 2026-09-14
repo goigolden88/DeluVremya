@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { monthPeriod } from '../../core/dates.ts'
+import { timeMarkdown } from './feed.ts'
 import { importTime } from './import.ts'
 import { formatMinutes } from './labels.ts'
 import { periodSummary } from './period.ts'
@@ -33,5 +34,19 @@ describe('настоящий февраль — Р-55', () => {
     expect(summary.byCategory.reduce((sum, row) => sum + row.minutes, 0)).toBe(summary.total)
     expect(summary.count).toBe(173)
     expect(summary.days).toBe(28)
+  })
+
+  it.skipIf(!file)('в markdown — тот же итог и строка на каждый из 28 дней — Р-63', () => {
+    let next = 0
+    const plan = importTime(
+      file?.time,
+      { categories: [], time: [] },
+      { newId: () => `id${String(next++).padStart(4, '0')}`, now: '2026-09-14T10:00:00.000Z' },
+    )
+    const text = timeMarkdown(plan.writes.time ?? [], plan.writes.categories ?? [], '2026-09-14')
+
+    expect(text).toContain('### Февраль 2026')
+    expect(text).toContain('Учтено 211 ч 50 мин · 173 блока · учёт был в 28 днях из 28')
+    expect(text.split('\n').filter((line) => /^- \d\d\.02 — /.test(line))).toHaveLength(28)
   })
 })
