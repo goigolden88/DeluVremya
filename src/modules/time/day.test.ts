@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Category, TimeBlock } from '../../core/model.ts'
+import type { Category, TimeBlock } from '../../app/model.ts'
 import { createPreset } from './categories.ts'
 import { blockFromPreset, blocksOn, daySummary, DAY_WINDOW, viewedDay, windowElapsed, windowLeft } from './day.ts'
 

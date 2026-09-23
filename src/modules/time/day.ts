@@ -4,9 +4,9 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { isDateStr, nowIso, toDateStr, type DateStr } from '../../core/dates.ts'
-import { ulid } from '../../core/id.ts'
-import type { Category, Preset, TimeBlock } from '../../core/model.ts'
+import { isDateStr, nowIso, toDateStr, type DateStr } from '../../shared/core/dates.ts'
+import { ulid } from '../../shared/core/id.ts'
+import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 
 /**
  * Окно дня в часах, с `from` до `to` (Р-21). Неучтённое считается от

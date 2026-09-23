@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Note, Review } from '../core/model.ts'
+import type { Note, Review } from '../app/model.ts'
 import { reviewFeed, reviewMarkdown } from './reviewFeed.ts'
 
 const at = '2026-09-14T10:00:00.000Z'

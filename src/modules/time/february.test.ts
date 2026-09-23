@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { monthPeriod } from '../../core/dates.ts'
+import { monthPeriod } from '../../shared/core/dates.ts'
 import { timeMarkdown } from './feed.ts'
 import { importTime } from './import.ts'
 import { formatMinutes } from './labels.ts'

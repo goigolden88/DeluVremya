@@ -1,5 +1,5 @@
-import { weekStart, type DateStr } from '../../core/dates.ts'
-import { Fold } from '../../ui/Fold.tsx'
+import { weekStart, type DateStr } from '../../shared/core/dates.ts'
+import { Fold } from '../../shared/ui/Fold.tsx'
 import { quoted } from '../../ui/screenNames.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
 import { backgroundText, checkText, historyText, progressLead } from './labels.ts'

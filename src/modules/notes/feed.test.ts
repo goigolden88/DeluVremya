@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { filterFeed, groupFeed, type FeedItem } from '../../core/feed.ts'
-import type { Note } from '../../core/model.ts'
+import { filterFeed, groupFeed, type FeedItem } from '../../shared/core/feed.ts'
+import type { Note } from '../../app/model.ts'
 import { noteFeed, noteMarkdown } from './feed.ts'
 import { noteRef } from './inbox.ts'
 

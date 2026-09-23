@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Category } from '../../core/model.ts'
+import type { Category } from '../../app/model.ts'
 import { activeCategories } from './categories.ts'
 import { byGroup, groupKey, groupNames, hasGroups, moveGroup, moveInGroup, renameGroup, setGroup, ungroup } from './groups.ts'
 

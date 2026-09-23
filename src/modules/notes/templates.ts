@@ -5,9 +5,9 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { nowIso, type DateStr } from '../../core/dates.ts'
-import { ulid } from '../../core/id.ts'
-import type { DayTemplate, Note } from '../../core/model.ts'
+import { nowIso, type DateStr } from '../../shared/core/dates.ts'
+import { ulid } from '../../shared/core/id.ts'
+import type { DayTemplate, Note } from '../../app/model.ts'
 import { normalize } from './inbox.ts'
 import { shortText } from './labels.ts'
 import { dayPlan, MAX_ESTIMATE, planNote, readEstimate, type DayPlan } from './plan.ts'

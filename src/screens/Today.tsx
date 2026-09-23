@@ -1,20 +1,22 @@
 import { Link } from 'react-router-dom'
-import { formatDateLong } from '../core/dates.ts'
-import { Fold } from '../ui/Fold.tsx'
-import { IosNote } from '../ui/Install.tsx'
-import { syncDot } from '../ui/syncDot.ts'
-import { useNow } from '../ui/useNow.ts'
-import { useSyncStatus } from '../ui/useSync.ts'
-import { useToday } from '../ui/useToday.ts'
+import { formatDateLong } from '../shared/core/dates.ts'
+import { Fold } from '../shared/ui/Fold.tsx'
+import { IosNote } from '../shared/ui/Install.tsx'
+import { syncDot } from '../shared/ui/syncDot.ts'
+import { useNow } from '../shared/ui/useNow.ts'
+import { useSyncStatus } from '../shared/ui/useSync.ts'
+import { useToday } from '../shared/ui/useToday.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { PlanDay } from '../modules/notes/PlanDay.tsx'
 import { windowLeft } from '../modules/time/day.ts'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
 import { ReviewCall } from './Review.tsx'
-import { useFirstRun } from './useFirstRun.ts'
-import { useWhatsNew } from './useWhatsNew.ts'
+import { useFirstRun } from '../shared/screens/useFirstRun.ts'
+import { useWhatsNew } from '../shared/screens/useWhatsNew.ts'
 import { Welcome } from './Welcome.tsx'
-import { WhatsNew } from './WhatsNew.tsx'
+import { WhatsNew } from '../shared/screens/WhatsNew.tsx'
+import { OWN_STORES } from '../app/model.ts'
+import { CHANGES } from '../changes.ts'
 
 /** Остаток дня в реализме плана пересчитывается раз в минуту. */
 const MINUTE = 60 * 1000
@@ -28,8 +30,8 @@ const MINUTE = 60 * 1000
  * о друге они не знают, остаток окна передаёт в план этот экран (Р-35).
  */
 export function Today() {
-  const first = useFirstRun()
-  const news = useWhatsNew(first)
+  const first = useFirstRun(OWN_STORES)
+  const news = useWhatsNew(first, CHANGES)
   const day = useToday()
   const now = useNow(MINUTE)
   const names = useScreenNames()

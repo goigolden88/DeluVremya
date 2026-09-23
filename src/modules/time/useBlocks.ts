@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { db } from '../../core/db.ts'
-import type { TimeBlock } from '../../core/model.ts'
+import { db } from '../../app/core.ts'
+import type { TimeBlock } from '../../app/model.ts'
 
 export type Blocks = {
   status: 'loading' | 'ready' | 'failed'

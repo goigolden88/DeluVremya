@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { db } from '../../core/db.ts'
-import type { Category, Preset } from '../../core/model.ts'
+import { db } from '../../app/core.ts'
+import type { Category, Preset } from '../../app/model.ts'
 import { initialCategories, initialPresets, reconcilePlan } from './categories.ts'
 import { STARTER } from './starter.ts'
 

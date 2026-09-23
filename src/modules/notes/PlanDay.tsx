@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { DateStr } from '../../core/dates.ts'
-import { db } from '../../core/db.ts'
-import type { Note } from '../../core/model.ts'
-import { Fold } from '../../ui/Fold.tsx'
+import type { DateStr } from '../../shared/core/dates.ts'
+import { db } from '../../app/core.ts'
+import type { Note } from '../../app/model.ts'
+import { Fold } from '../../shared/ui/Fold.tsx'
 import { inboxOf } from './inbox.ts'
 import {
   AHEAD_TITLE,

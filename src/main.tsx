@@ -2,11 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import { App } from './app.tsx'
-import { db } from './core/db.ts'
+import { db } from './app/core.ts'
 import { applyLaunch } from './launch.ts'
-import { listenInstall } from './ui/install.ts'
-import { listenErrors } from './ui/report.ts'
+import { listenInstall } from './shared/ui/install.ts'
+import { listenErrors } from './shared/ui/report.ts'
 import { loadScreenNames } from './ui/useScreenNames.ts'
+// Каркас стилей ядра — первым, свои экраны и акцент — после.
+import './shared/styles.css'
 import './styles.css'
 
 /**
@@ -24,7 +26,7 @@ applyLaunch()
 listenInstall()
 
 // Тоже до первого экрана: ошибка при отрисовке должна попасть в журнал (Р-66).
-listenErrors()
+listenErrors(db.settings)
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Не найден #root')

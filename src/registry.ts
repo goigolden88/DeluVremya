@@ -18,18 +18,12 @@
  * с `app.tsx`, `notify.ts` и `screens/`. Модули друг про друга не знают.
  */
 
-import type { Snapshot } from './core/db.ts'
-import { formatDate, type DateStr, type Period } from './core/dates.ts'
-import type { FeedItem } from './core/feed.ts'
-import {
-  buildPrompt,
-  mergeResults,
-  readImportFile,
-  type ImportContext,
-  type ImportPlan,
-  type ImportSpec,
-} from './core/importing.ts'
-import type { RecordKind } from './core/model.ts'
+import type { Snapshot } from './shared/core/db.ts'
+import { formatDate, type DateStr, type Period } from './shared/core/dates.ts'
+import type { FeedItem } from './shared/core/feed.ts'
+import { mergeResults, type ImportContext, type ImportPlan, type ImportSpec } from './shared/core/importing.ts'
+import { importing } from './app/core.ts'
+import type { RecordKind, StoreRecord } from './app/model.ts'
 import { noteFeed, noteMarkdown } from './modules/notes/feed.ts'
 import { importNotes, notesImportSpec } from './modules/notes/import.ts'
 import { timeFeed, timeMarkdown } from './modules/time/feed.ts'
@@ -41,14 +35,17 @@ import { reviewFeed, reviewMarkdown } from './screens/reviewFeed.ts'
  * справочникам: по ним видно, какие id заняты, и у блока удалённой
  * категории остаётся имя. Сами записи без надгробий отбирают модули.
  */
-export type Data = Snapshot['data']
+export type Data = Snapshot<StoreRecord>['data']
 
-type ImportEntry = { spec: ImportSpec; run: (raw: unknown, data: Data, ctx: ImportContext) => ImportPlan }
+/** План импорта «Делу Время»: записи — его хранилищ. */
+export type Plan = ImportPlan<StoreRecord>
+
+type ImportEntry = { spec: ImportSpec; run: (raw: unknown, data: Data, ctx: ImportContext) => Plan }
 
 type KindEntry = {
   /** Подпись вида: чип ленты, заголовок раздела выгрузки. */
   label: string
-  /** Строки ленты, без порядка: порядок — дело `core/feed.ts`. */
+  /** Строки ленты, без порядка: порядок — дело `shared/core/feed.ts`. */
   feed: (data: Data, day: DateStr) => FeedItem[]
   /**
    * Раздел выгрузки без заголовка: заголовок — подпись вида. `period` — вид
@@ -82,7 +79,16 @@ export const KINDS: { readonly [K in RecordKind]: KindEntry } = {
 /** Порядок видов на экране, в промпте и в выгрузке — порядок строк таблицы. */
 export const KIND_ORDER = Object.keys(KINDS) as RecordKind[]
 
-/** Все строки ленты, без порядка: порядок — дело `core/feed.ts`. */
+/**
+ * Подпись вида по строке ленты. Лента ядра держит `kind` строкой — вид любого
+ * приложения семьи; незнакомый вид подписывается как есть.
+ */
+export function kindLabel(kind: string): string {
+  const known = KIND_ORDER.find((each) => each === kind)
+  return known ? KINDS[known].label : kind
+}
+
+/** Все строки ленты, без порядка: порядок — дело `shared/core/feed.ts`. */
 export function feedItems(data: Data, day: DateStr): FeedItem[] {
   return KIND_ORDER.flatMap((kind) => KINDS[kind].feed(data, day))
 }
@@ -131,11 +137,11 @@ function importEntries(): ImportEntry[] {
  * В базу не пишет — сначала сводка, запись только по кнопке.
  * Кидает, если файл не тот вовсе.
  */
-export function planImport(text: string, data: Data, ctx: ImportContext): ImportPlan {
-  const sections = readImportFile(text)
+export function planImport(text: string, data: Data, ctx: ImportContext): Plan {
+  const sections = importing.readImportFile(text)
   const bySection = new Map(importEntries().map((entry) => [entry.spec.section, entry]))
 
-  const results = Object.entries(sections).map(([section, raw]): ImportPlan => {
+  const results = Object.entries(sections).map(([section, raw]): Plan => {
     const entry = bySection.get(section)
     if (entry) return entry.run(raw, data, ctx)
     return {
@@ -150,7 +156,7 @@ export function planImport(text: string, data: Data, ctx: ImportContext): Import
 
 /** Промпт для ИИ — из описаний всех разделов, в порядке таблицы. */
 export function importPrompt(day: DateStr): string {
-  return buildPrompt(
+  return importing.buildPrompt(
     importEntries().map((entry) => entry.spec),
     day,
   )

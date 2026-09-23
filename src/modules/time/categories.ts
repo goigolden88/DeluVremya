@@ -6,8 +6,8 @@
  * из «Дневников» — там так заведены категории циклов.
  */
 
-import { nowIso } from '../../core/dates.ts'
-import type { Category, Preset, TimeBlock } from '../../core/model.ts'
+import { nowIso } from '../../shared/core/dates.ts'
+import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 
 export type CategoryKind = Category['kind']
 

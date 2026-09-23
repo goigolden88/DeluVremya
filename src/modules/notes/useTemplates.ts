@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { db } from '../../core/db.ts'
-import type { DayTemplate } from '../../core/model.ts'
+import { db } from '../../app/core.ts'
+import type { DayTemplate } from '../../app/model.ts'
 
 /**
  * Шаблоны дня. Перечитываются на любую запись в `templates` — своей рукой

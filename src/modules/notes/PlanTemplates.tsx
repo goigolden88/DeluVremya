@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { DateStr } from '../../core/dates.ts'
-import { db } from '../../core/db.ts'
-import type { DayTemplate, Note } from '../../core/model.ts'
-import { Fold } from '../../ui/Fold.tsx'
+import type { DateStr } from '../../shared/core/dates.ts'
+import { db } from '../../app/core.ts'
+import type { DayTemplate, Note } from '../../app/model.ts'
+import { Fold } from '../../shared/ui/Fold.tsx'
 import { appliedText, templateSavedLine, TEMPLATES_TITLE } from './labels.ts'
 import type { DayPlan } from './plan.ts'
 import {

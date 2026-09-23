@@ -2233,7 +2233,7 @@ async function syncScenario() {
   )
   check(
     'README положен приложением в пустой репозиторий — Р-69',
-    (repoFiles()['README.md'] ?? '').startsWith('# Данные «Делу Время»') &&
+    (repoFiles()['README.md'] ?? '').startsWith('# Данные приложения «Делу Время»') &&
       (repoFiles()['README.md'] ?? '').includes('`time/ГГГГ-ММ.json`'),
     (repoFiles()['README.md'] ?? 'README нет').slice(0, 60),
   )

@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { addDays, type DateStr } from '../../core/dates.ts'
-import { db } from '../../core/db.ts'
-import type { Note } from '../../core/model.ts'
+import { addDays, type DateStr } from '../../shared/core/dates.ts'
+import { db } from '../../app/core.ts'
+import type { Note } from '../../app/model.ts'
 import {
   ageText,
   deleteConfirm,

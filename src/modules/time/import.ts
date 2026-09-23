@@ -10,7 +10,7 @@
  * заводится.
  */
 
-import { toDateStr } from '../../core/dates.ts'
+import { toDateStr } from '../../shared/core/dates.ts'
 import {
   absent,
   dayOf,
@@ -21,8 +21,8 @@ import {
   type ImportContext,
   type ImportPlan,
   type ImportSpec,
-} from '../../core/importing.ts'
-import type { Category, TimeBlock } from '../../core/model.ts'
+} from '../../shared/core/importing.ts'
+import type { Category, StoreRecord, TimeBlock } from '../../app/model.ts'
 import { createCategory, isMinutes, MINUTES_PER_DAY, sameName } from './categories.ts'
 import { STARTER } from './starter.ts'
 
@@ -58,7 +58,7 @@ export function importTime(
   raw: unknown,
   data: { categories: readonly Category[]; time: readonly TimeBlock[] },
   ctx: ImportContext,
-): ImportPlan {
+): ImportPlan<StoreRecord> {
   const { records, issues } = recordsOf(SECTION, raw)
   const issue = (title: string, reason: string) => issues.push({ section: SECTION, title, reason })
   const today = toDateStr(new Date(ctx.now))

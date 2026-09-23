@@ -3,7 +3,7 @@
  * (правило в CLAUDE.md).
  */
 
-import { formatDateLong, plural, type DateStr, type Period } from '../../core/dates.ts'
+import { formatDateLong, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW } from './day.ts'
 import {

@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { addDays, formatDateLong, type DateStr } from '../../core/dates.ts'
-import { useToday } from '../../ui/useToday.ts'
+import { addDays, formatDateLong, type DateStr } from '../../shared/core/dates.ts'
+import { useToday } from '../../shared/ui/useToday.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
 import { viewedDay } from './day.ts'
 import { windowNote } from './labels.ts'

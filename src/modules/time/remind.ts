@@ -9,8 +9,8 @@
  * «Проверить сейчас».
  */
 
-import type { DateStr } from '../../core/dates.ts'
-import type { TimeBlock } from '../../core/model.ts'
+import type { DateStr } from '../../shared/core/dates.ts'
+import type { TimeBlock } from '../../app/model.ts'
 import { quoted } from '../../ui/screenNames.ts'
 import { blocksOn } from './day.ts'
 

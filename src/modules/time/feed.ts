@@ -8,9 +8,9 @@
  * Чистые функции, без React и без базы.
  */
 
-import { formatDate, inPeriod, isDateStr, monthPeriod, plural, type DateStr, type Period } from '../../core/dates.ts'
-import { escapeMarkdown as md, feedHeading, type FeedItem } from '../../core/feed.ts'
-import type { Category, TimeBlock } from '../../core/model.ts'
+import { formatDate, inPeriod, isDateStr, monthPeriod, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
+import { escapeMarkdown as md, feedHeading, type FeedItem } from '../../shared/core/feed.ts'
+import type { Category, TimeBlock } from '../../app/model.ts'
 import { categoryName } from './day.ts'
 import { formatMinutes, periodLine, summaryLine, UNKNOWN_CATEGORY } from './labels.ts'
 import { periodSummary } from './period.ts'

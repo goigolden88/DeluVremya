@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Note } from '../../core/model.ts'
+import type { Note } from '../../app/model.ts'
 import { isUnsorted, noteRef } from './inbox.ts'
 import { fromSomeday, recall, RECALL_WEEKS, somedayOf, staleTasks, stuckGoals, withSomeday } from './review.ts'
 

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { InstallNote } from '../ui/Install.tsx'
+import { InstallNote } from '../shared/ui/Install.tsx'
 import { quoted } from '../ui/screenNames.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 

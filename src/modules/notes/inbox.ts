@@ -4,10 +4,10 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { daysBetween, isDateStr, nowIso, type DateStr } from '../../core/dates.ts'
-import { dateWords, normalize } from '../../core/feed.ts'
-import { ulid } from '../../core/id.ts'
-import type { Note, NoteKind } from '../../core/model.ts'
+import { daysBetween, isDateStr, nowIso, type DateStr } from '../../shared/core/dates.ts'
+import { dateWords, normalize } from '../../shared/core/feed.ts'
+import { ulid } from '../../shared/core/id.ts'
+import type { Note, NoteKind } from '../../app/model.ts'
 
 /** Вид записи, когда при захвате его не выбрали (Р-13). */
 export const DEFAULT_KIND: NoteKind = 'task'
@@ -106,7 +106,7 @@ export function kindCounts(notes: readonly Note[]): Record<NoteKind, number> {
 
 // Приведение текста, слова запроса и слова даты — общее правило ядра:
 // лента ищет так же (Р-61). Отсюда их берут шаблоны и план против факта.
-export { normalize, queryWords } from '../../core/feed.ts'
+export { normalize, queryWords } from '../../shared/core/feed.ts'
 
 /**
  * Подходит ли запись. Слова ищутся по отдельности и нужны все: «воды

@@ -1,9 +1,9 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { addMonths, monthOf, monthPeriod } from '../core/dates.ts'
+import { addMonths, monthOf, monthPeriod } from '../shared/core/dates.ts'
 import { PlanPeriod } from '../modules/notes/PlanPeriod.tsx'
 import { PeriodNorms, PeriodTime } from '../modules/time/Period.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
-import { useToday } from '../ui/useToday.ts'
+import { useToday } from '../shared/ui/useToday.ts'
 import { monthChoices, monthLabel, monthTitle, runningText, viewedMonth } from './period.ts'
 import { useRecordDates } from './useRecordDates.ts'
 

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { feedDateText, feedHeading, filterFeed, groupFeed, recordsText, type FeedItem } from '../core/feed.ts'
-import type { RecordKind } from '../core/model.ts'
-import { KIND_ORDER, KINDS } from '../registry.ts'
-import { Fold } from '../ui/Fold.tsx'
-import { monthFoldedByDefault } from '../ui/monthFold.ts'
-import { useFeed } from './useFeed.ts'
+import { feedDateText, feedHeading, filterFeed, groupFeed, recordsText, type FeedItem } from '../shared/core/feed.ts'
+import type { RecordKind } from '../app/model.ts'
+import { feedItems, KIND_ORDER, KINDS, kindLabel } from '../registry.ts'
+import { Fold } from '../shared/ui/Fold.tsx'
+import { monthFoldedByDefault } from '../shared/ui/monthFold.ts'
+import { useFeed } from '../shared/screens/useFeed.ts'
 
 /**
  * Лента `#/feed` (Р-62): все записи одной хроникой, новые сверху. Взято
@@ -20,7 +20,7 @@ import { useFeed } from './useFeed.ts'
  * сделанного и прошлого такого места нет — там строка без перехода.
  */
 export function Feed() {
-  const feed = useFeed()
+  const feed = useFeed(feedItems)
   const [kind, setKind] = useState<RecordKind | null>(null)
   const [query, setQuery] = useState('')
 
@@ -43,7 +43,7 @@ export function Feed() {
         <span className="feed__title">{item.title}</span>
         {item.detail && <span className="feed__detail muted">{item.detail}</span>}
       </span>
-      {kind === null && <span className="feed__kind muted">{KINDS[item.kind].label}</span>}
+      {kind === null && <span className="feed__kind muted">{kindLabel(item.kind)}</span>}
       {item.link && (
         <span className="feed__go muted" aria-hidden="true">
           ›

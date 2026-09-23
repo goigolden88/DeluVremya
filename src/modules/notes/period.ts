@@ -10,8 +10,8 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { inPeriod, type DateStr, type Period } from '../../core/dates.ts'
-import type { Note } from '../../core/model.ts'
+import { inPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
+import type { Note } from '../../app/model.ts'
 import { normalize } from './inbox.ts'
 import { mainOf } from './plan.ts'
 

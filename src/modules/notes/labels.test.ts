@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { addDays } from '../../core/dates.ts'
-import type { Note } from '../../core/model.ts'
+import { addDays } from '../../shared/core/dates.ts'
+import type { Note } from '../../app/model.ts'
 import {
   AGE_MONTHS_FROM,
   AGE_WEEKS_FROM,

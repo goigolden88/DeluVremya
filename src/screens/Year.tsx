@@ -1,10 +1,10 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { yearPeriod } from '../core/dates.ts'
+import { yearPeriod } from '../shared/core/dates.ts'
 import { PlanPeriod } from '../modules/notes/PlanPeriod.tsx'
 import { PeriodNorms } from '../modules/time/Period.tsx'
 import { YearTime } from '../modules/time/YearTime.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
-import { useToday } from '../ui/useToday.ts'
+import { useToday } from '../shared/ui/useToday.ts'
 import { monthChoices, runningText, viewedYear, yearChoices } from './period.ts'
 import { useRecordDates } from './useRecordDates.ts'
 

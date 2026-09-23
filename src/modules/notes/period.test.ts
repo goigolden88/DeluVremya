@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Note } from '../../core/model.ts'
+import type { Note } from '../../app/model.ts'
 import { planFact, plannedIn } from './period.ts'
 
 const WEEK = { from: '2026-09-07', to: '2026-09-13' }

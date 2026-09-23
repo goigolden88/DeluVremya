@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import type { DateStr, Period } from '../../core/dates.ts'
+import type { DateStr, Period } from '../../shared/core/dates.ts'
 import { quoted } from '../../ui/screenNames.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
 import {

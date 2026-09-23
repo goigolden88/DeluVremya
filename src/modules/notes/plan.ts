@@ -8,8 +8,8 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { isDateStr, type DateStr } from '../../core/dates.ts'
-import type { Note } from '../../core/model.ts'
+import { isDateStr, type DateStr } from '../../shared/core/dates.ts'
+import type { Note } from '../../app/model.ts'
 import { captureNote } from './inbox.ts'
 
 // ─── Пункты дня ────────────────────────────────────────────────────────────

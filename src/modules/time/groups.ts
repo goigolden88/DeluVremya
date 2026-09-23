@@ -9,7 +9,7 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import type { Category } from '../../core/model.ts'
+import type { Category } from '../../app/model.ts'
 import { activeCategories } from './categories.ts'
 
 /** Название группы без лишних пробелов. Пустое — null. */

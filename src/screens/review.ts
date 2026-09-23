@@ -16,8 +16,8 @@ import {
   weekPeriod,
   weekStart,
   type DateStr,
-} from '../core/dates.ts'
-import type { Review } from '../core/model.ts'
+} from '../shared/core/dates.ts'
+import type { Review } from '../app/model.ts'
 import { GOAL_STILL_DAYS, MAX_THRESHOLD, MIN_THRESHOLD, STALE_DAYS } from '../modules/notes/review.ts'
 
 // ─── Неделя (Р-41) ─────────────────────────────────────────────────────────

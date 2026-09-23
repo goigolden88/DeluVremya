@@ -23,7 +23,7 @@ import {
   type DateStr,
   type MonthStr,
   type Period,
-} from '../core/dates.ts'
+} from '../shared/core/dates.ts'
 
 /** Первые столько дней месяца по умолчанию показывается прошлый (Р-54). */
 export const MONTH_LOOKBACK_DAYS = 7

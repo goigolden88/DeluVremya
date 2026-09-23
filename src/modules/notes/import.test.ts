@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Note } from '../../core/model.ts'
+import type { Note } from '../../app/model.ts'
 import { importNotes } from './import.ts'
 
 const NOW = '2026-09-13T10:00:00.000Z'

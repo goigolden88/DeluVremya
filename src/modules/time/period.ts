@@ -22,8 +22,8 @@ import {
   type DateStr,
   type MonthStr,
   type Period,
-} from '../../core/dates.ts'
-import type { Category, TimeBlock } from '../../core/model.ts'
+} from '../../shared/core/dates.ts'
+import type { Category, TimeBlock } from '../../app/model.ts'
 import { activeCategories, MINUTES_PER_DAY, type CategoryKind } from './categories.ts'
 
 // ─── Итог промежутка ───────────────────────────────────────────────────────

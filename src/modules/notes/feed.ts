@@ -9,9 +9,9 @@
  * Чистые функции, без React и без базы.
  */
 
-import { formatDate, inPeriod, isDateStr, type Period } from '../../core/dates.ts'
-import { dateWords, escapeMarkdown as md, type FeedItem } from '../../core/feed.ts'
-import type { Note } from '../../core/model.ts'
+import { formatDate, inPeriod, isDateStr, type Period } from '../../shared/core/dates.ts'
+import { dateWords, escapeMarkdown as md, type FeedItem } from '../../shared/core/feed.ts'
+import type { Note } from '../../app/model.ts'
 import { goalOf, groupByMonth, isUnsorted } from './inbox.ts'
 import { firstLine, goalLine, KIND_NAMES, monthHeading } from './labels.ts'
 

@@ -1,38 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { RecordKind } from '../core/model.ts'
+import type { RecordKind } from '../app/model.ts'
 import { exportSpan, monthChoices, monthTitle, yearChoices } from './period.ts'
 import { useRecordDates } from './useRecordDates.ts'
 import { Link } from 'react-router-dom'
 import { CHANGES } from '../changes.ts'
-import { db } from '../core/db.ts'
-import { days, today } from '../core/dates.ts'
-import { SCHEMA_VERSION, SYNCED_STORES } from '../core/model.ts'
-import type { SyncedStore } from '../core/model.ts'
-import {
-  checkReminder,
-  disableReminders,
-  enableReminders,
-  readWakes,
-  readWindow,
-  reminderStatus,
-  saveWindow,
-  type ReminderStatus,
-  type ReminderWindow,
-  type RemindResult,
-  type Wake,
-} from '../notify.ts'
-import { backupNote, backupSummary } from '../ui/backup.ts'
-import { Fold } from '../ui/Fold.tsx'
-import { InstallNote } from '../ui/Install.tsx'
-import { ReportBug } from '../ui/Report.tsx'
-import { SyncSettings } from '../ui/SyncSettings.tsx'
-import { useSyncStatus } from '../ui/useSync.ts'
+import { db } from '../app/core.ts'
+import { days, today } from '../shared/core/dates.ts'
+import { OWN_STORES, SCHEMA_VERSION, SYNCED_STORES } from '../app/model.ts'
+import type { SyncedStore } from '../app/model.ts'
+import { reminders } from '../notify.ts'
+import type { ReminderStatus, ReminderWindow, RemindResult, Wake } from '../shared/notify.ts'
+import { backupNote, backupSummary } from '../shared/ui/backup.ts'
+import { Fold } from '../shared/ui/Fold.tsx'
+import { InstallNote } from '../shared/ui/Install.tsx'
+import { ReportBug } from '../shared/ui/Report.tsx'
+import { SyncSettings } from '../shared/ui/SyncSettings.tsx'
+import { useSyncStatus } from '../shared/ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
-import { KIND_ORDER, KINDS, markdownExport } from '../registry.ts'
-import { isEmptyBase } from './firstRun.ts'
-import { ImportRecords } from './ImportRecords.tsx'
-import { ChangeList } from './WhatsNew.tsx'
+import { importPrompt, KIND_ORDER, KINDS, markdownExport, planImport } from '../registry.ts'
+import { isEmptyBase } from '../shared/screens/firstRun.ts'
+import { ImportRecords } from '../shared/screens/ImportRecords.tsx'
+import { ChangeList } from '../shared/screens/WhatsNew.tsx'
 import { DEFAULT_THRESHOLDS, readThreshold, THRESHOLD_PROBLEM, type Thresholds } from './review.ts'
 import { readThresholds, saveThresholds } from './useReview.ts'
 
@@ -172,7 +161,7 @@ function About({ state }: { state: State }) {
       <InstallNote
         empty={
           state.status !== 'ready' ||
-          isEmptyBase(Object.fromEntries(state.rows.map((row) => [row.store, row.live])))
+          isEmptyBase(Object.fromEntries(state.rows.map((row) => [row.store, row.live])), OWN_STORES)
         }
       />
 
@@ -403,7 +392,12 @@ function DataTransfer({ onChanged }: { onChanged: () => Promise<void> }) {
 
       {/* Чужие записи — свой вход: копия приложения сюда не принимается (Р-08). */}
       <Fold id="settings:transfer:import" title="Импорт записей" sub folded>
-        <ImportRecords onChanged={onChanged} />
+        <ImportRecords
+          planImport={planImport}
+          importPrompt={importPrompt}
+          intro={<p className="muted">Записи из таблиц, заметок и других сервисов.</p>}
+          onChanged={onChanged}
+        />
       </Fold>
 
       {/* .txt — копия, отправленная через «Поделиться» (см. deliver). */}
@@ -690,18 +684,18 @@ function Reminders() {
   const [note, setNote] = useState('')
 
   useEffect(() => {
-    void reminderStatus()
+    void reminders.reminderStatus()
       .then(setStatus)
       .catch(() => setStatus('unsupported'))
-    void readWindow().then(setHours)
-    void readWakes()
+    void reminders.readWindow().then(setHours)
+    void reminders.readWakes()
       .then(setWakes)
       .catch(() => setWakes([]))
   }, [])
 
   async function pickHours(next: ReminderWindow) {
     setHours(next)
-    await saveWindow(next)
+    await reminders.saveWindow(next)
   }
 
   async function act(action: () => Promise<void>) {
@@ -738,7 +732,7 @@ function Reminders() {
                 type="button"
                 className="btn"
                 disabled={busy}
-                onClick={() => void act(async () => setStatus(await enableReminders()))}
+                onClick={() => void act(async () => setStatus(await reminders.enableReminders()))}
               >
                 Включить напоминания
               </button>
@@ -750,7 +744,7 @@ function Reminders() {
                 disabled={busy}
                 onClick={() =>
                   void act(async () => {
-                    await disableReminders()
+                    await reminders.disableReminders()
                     setStatus('off')
                   })
                 }
@@ -763,7 +757,7 @@ function Reminders() {
                 type="button"
                 className="btn"
                 disabled={busy}
-                onClick={() => void act(async () => setNote(CHECK_TEXT[await checkReminder()]))}
+                onClick={() => void act(async () => setNote(CHECK_TEXT[await reminders.checkReminder()]))}
               >
                 Проверить сейчас
               </button>
@@ -855,7 +849,7 @@ function WakeLog({ wakes }: { wakes: Wake[] | null }) {
 /**
  * Где лежит копия данных и стоит ли об этом беспокоиться.
  *
- * Само правило — в `ui/backup.ts`: оно неочевидное и зависит от того,
+ * Само правило — в `shared/ui/backup.ts`: оно неочевидное и зависит от того,
  * проходила ли синхронизация хоть раз, а такое должно проверяться
  * тестами, а не глазами.
  */

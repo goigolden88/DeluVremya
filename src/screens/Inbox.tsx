@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { addDays, type DateStr } from '../core/dates.ts'
-import { db } from '../core/db.ts'
-import type { Note, NoteKind } from '../core/model.ts'
+import { addDays, type DateStr } from '../shared/core/dates.ts'
+import { db } from '../app/core.ts'
+import type { Note, NoteKind } from '../app/model.ts'
 import {
   captureNote,
   DEFAULT_KIND,
@@ -35,10 +35,10 @@ import { noteAnchor, NoteItem } from '../modules/notes/NoteItem.tsx'
 import { plannedCount, withPlan } from '../modules/notes/plan.ts'
 import { fromSomeday, somedayOf } from '../modules/notes/review.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
-import { Fold } from '../ui/Fold.tsx'
-import { monthFoldedByDefault } from '../ui/monthFold.ts'
+import { Fold } from '../shared/ui/Fold.tsx'
+import { monthFoldedByDefault } from '../shared/ui/monthFold.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
-import { useToday } from '../ui/useToday.ts'
+import { useToday } from '../shared/ui/useToday.ts'
 
 /** Чипы отбора неразобранного: замыслы живут своим блоком (Р-31). */
 const UNSORTED_KINDS = NOTE_KINDS.filter((kind) => kind !== 'goal')

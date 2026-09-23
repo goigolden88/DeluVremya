@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Review } from '../core/model.ts'
+import type { Review } from '../app/model.ts'
 import {
   CALL_DAYS,
   DEFAULT_THRESHOLDS,

@@ -1,4 +1,4 @@
-import type { DateStr, Period } from '../../core/dates.ts'
+import type { DateStr, Period } from '../../shared/core/dates.ts'
 import { estimateFactText, mainFactText, PLAN_FACT_BASIS, planFactText, repeatText } from './labels.ts'
 import { planFact } from './period.ts'
 import { useNotes } from './useNotes.ts'

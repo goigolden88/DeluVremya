@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { filterFeed, type FeedItem } from '../../core/feed.ts'
-import type { Category, TimeBlock } from '../../core/model.ts'
+import { filterFeed, type FeedItem } from '../../shared/core/feed.ts'
+import type { Category, TimeBlock } from '../../app/model.ts'
 import { timeFeed, timeMarkdown } from './feed.ts'
 
 const at = '2026-09-14T10:00:00.000Z'

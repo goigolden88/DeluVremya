@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { db } from '../../core/db.ts'
-import type { Note } from '../../core/model.ts'
+import { db } from '../../app/core.ts'
+import type { Note } from '../../app/model.ts'
 
 /**
  * Все живые заметки. Перечитываются на любую запись в `notes` — своей рукой

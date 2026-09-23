@@ -14,7 +14,7 @@
  * принимается: первое число было бы выдумкой, а у заметки нет даты-месяца.
  */
 
-import { isMonthStr, toDateStr } from '../../core/dates.ts'
+import { isMonthStr, toDateStr } from '../../shared/core/dates.ts'
 import {
   absent,
   dayOf,
@@ -24,8 +24,8 @@ import {
   type ImportContext,
   type ImportPlan,
   type ImportSpec,
-} from '../../core/importing.ts'
-import type { Note, NoteKind } from '../../core/model.ts'
+} from '../../shared/core/importing.ts'
+import type { Note, NoteKind, StoreRecord } from '../../app/model.ts'
 import { DEFAULT_KIND, NOTE_KINDS } from './inbox.ts'
 import { shortText } from './labels.ts'
 
@@ -63,7 +63,7 @@ function kindOf(value: unknown): NoteKind | null {
   return NOTE_KINDS.find((kind) => kind === text) ?? null
 }
 
-export function importNotes(raw: unknown, data: { notes: readonly Note[] }, ctx: ImportContext): ImportPlan {
+export function importNotes(raw: unknown, data: { notes: readonly Note[] }, ctx: ImportContext): ImportPlan<StoreRecord> {
   const { records, issues } = recordsOf(SECTION, raw)
   const issue = (title: string, reason: string) => issues.push({ section: SECTION, title, reason })
   const today = toDateStr(new Date(ctx.now))

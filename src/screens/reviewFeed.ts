@@ -8,9 +8,9 @@
  * Чистые функции, без React и без базы.
  */
 
-import { formatDate, formatPeriod, inPeriod, isDateStr, toDateStr, weekPeriod, type DateStr, type Period } from '../core/dates.ts'
-import { escapeMarkdown as md, type FeedItem } from '../core/feed.ts'
-import type { Note, Review } from '../core/model.ts'
+import { formatDate, formatPeriod, inPeriod, isDateStr, toDateStr, weekPeriod, type DateStr, type Period } from '../shared/core/dates.ts'
+import { escapeMarkdown as md, type FeedItem } from '../shared/core/feed.ts'
+import type { Note, Review } from '../app/model.ts'
 
 /** Ссылка на заметку в `refs` — вид записи в начале строки (02-Архитектура). */
 const NOTE_REF = 'note:'

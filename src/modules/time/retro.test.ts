@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TimeBlock } from '../../core/model.ts'
+import type { TimeBlock } from '../../app/model.ts'
 import { blockFromDraft, blockProblem, DEFAULT_MINUTES, MEDIAN_OF, medianMinutes, quickDates } from './retro.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'

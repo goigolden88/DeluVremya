@@ -5,8 +5,8 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { addDays, daysBetween, inPeriod, isDateStr, weekPeriod, type DateStr, type Period } from '../../core/dates.ts'
-import type { Note } from '../../core/model.ts'
+import { addDays, daysBetween, inPeriod, isDateStr, weekPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
+import type { Note } from '../../app/model.ts'
 import { ageDays, compareNotes, goalsOf, isUnsorted, tasksOfGoal } from './inbox.ts'
 import { withoutMain } from './plan.ts'
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { IMPORT_FORMAT, IMPORT_VERSION, planTotal, type ImportPlan } from './core/importing.ts'
-import { SYNCED_STORES } from './core/model.ts'
+import { IMPORT_VERSION, planTotal, type ImportPlan } from './shared/core/importing.ts'
+import { config } from './app/config.ts'
+import { SYNCED_STORES } from './app/model.ts'
 import { feedItems, importPrompt, KIND_ORDER, KINDS, markdownExport, planImport, type Data } from './registry.ts'
 
 // По образцу теста реестра «Дневников» с a913dcb: пример из промпта обязан
@@ -18,7 +19,7 @@ describe('импорт записей', () => {
 
   /** Файл из примеров всех разделов — ровно то, что стоит в промпте. */
   function example(): Record<string, unknown> {
-    const file: Record<string, unknown> = { format: IMPORT_FORMAT, version: IMPORT_VERSION }
+    const file: Record<string, unknown> = { format: config.importFormat, version: IMPORT_VERSION }
     for (const kind of KIND_ORDER) {
       const entry = KINDS[kind].import
       if (entry) file[entry.spec.section] = entry.spec.example
@@ -36,7 +37,7 @@ describe('импорт записей', () => {
   }
 
   it('формат — свой, не «Дневников»: базы на одном origin, файлы не должны путаться', () => {
-    expect(IMPORT_FORMAT).toBe('deluvremya-import')
+    expect(config.importFormat).toBe('deluvremya-import')
   })
 
   it('промпт называет разделы, формат, сегодняшнюю дату и приложение', () => {
@@ -72,7 +73,7 @@ describe('импорт записей', () => {
 
   it('незнакомый раздел — в отчёт, остальные разбираются', () => {
     const text = JSON.stringify({
-      format: IMPORT_FORMAT,
+      format: config.importFormat,
       version: 1,
       food: [],
       time: [{ date: '2026-02-03', category: 'Чтение', minutes: 30 }],

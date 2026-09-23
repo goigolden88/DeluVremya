@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Category, Preset, TimeBlock } from '../../core/model.ts'
+import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import {
   activeCategories,
   archivedCategories,

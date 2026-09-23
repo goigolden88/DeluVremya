@@ -8,9 +8,9 @@
  * Чистые функции, без React и без базы.
  */
 
-import { nowIso, toDateStr, type DateStr } from '../../core/dates.ts'
-import { ulid } from '../../core/id.ts'
-import type { TimeBlock } from '../../core/model.ts'
+import { nowIso, toDateStr, type DateStr } from '../../shared/core/dates.ts'
+import { ulid } from '../../shared/core/id.ts'
+import type { TimeBlock } from '../../app/model.ts'
 import { MINUTES_PER_DAY } from './categories.ts'
 
 /** Ключ в `settings` (Р-18). Лежит в базе на устройствах — не переименовывать. */

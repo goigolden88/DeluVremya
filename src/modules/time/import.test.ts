@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Category, TimeBlock } from '../../core/model.ts'
+import type { Category, TimeBlock } from '../../app/model.ts'
 import { MINUTES_PER_DAY } from './categories.ts'
 import { importTime } from './import.ts'
 

@@ -13,8 +13,8 @@ import {
   plural,
   type DateStr,
   type Period,
-} from '../../core/dates.ts'
-import type { Note, NoteKind } from '../../core/model.ts'
+} from '../../shared/core/dates.ts'
+import type { Note, NoteKind } from '../../app/model.ts'
 import { quoted } from '../../ui/screenNames.ts'
 import { ageDays, type GoalProgress } from './inbox.ts'
 import type { PlanFact, Repeat } from './period.ts'

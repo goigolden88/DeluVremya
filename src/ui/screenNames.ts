@@ -12,7 +12,7 @@
  * Без React: имя нужно и service worker — в тексте уведомления.
  */
 
-import { db } from '../core/db.ts'
+import { db } from '../app/core.ts'
 
 export type ScreenKey = 'today' | 'time' | 'inbox'
 export type ScreenNames = Record<ScreenKey, string>

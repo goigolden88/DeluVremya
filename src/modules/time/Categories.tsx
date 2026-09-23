@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { db } from '../../core/db.ts'
-import { ulid } from '../../core/id.ts'
-import type { Category, Preset } from '../../core/model.ts'
-import { Fold } from '../../ui/Fold.tsx'
-import type { TimeBlock } from '../../core/model.ts'
+import { db } from '../../app/core.ts'
+import { ulid } from '../../shared/core/id.ts'
+import type { Category, Preset } from '../../app/model.ts'
+import { Fold } from '../../shared/ui/Fold.tsx'
+import type { TimeBlock } from '../../app/model.ts'
 import {
   activeCategories,
   archivedCategories,
@@ -46,7 +46,7 @@ import {
   presetLabel,
 } from './labels.ts'
 import { normInput, normSince, readNorm, withNorm, type NormInput } from './period.ts'
-import { useToday } from '../../ui/useToday.ts'
+import { useToday } from '../../shared/ui/useToday.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
 import { quoted } from '../../ui/screenNames.ts'

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { db } from '../core/db.ts'
-import type { Review } from '../core/model.ts'
+import { db } from '../app/core.ts'
+import type { Review } from '../app/model.ts'
 import { DEFAULT_THRESHOLDS, GOAL_KEY, parseThresholds, STALE_KEY, type Thresholds } from './review.ts'
 
 function describe(error: unknown): string {

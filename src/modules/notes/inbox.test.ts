@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isUlid } from '../../core/id.ts'
-import type { Note } from '../../core/model.ts'
+import { isUlid } from '../../shared/core/id.ts'
+import type { Note } from '../../app/model.ts'
 import {
   ageDays,
   captureNote,

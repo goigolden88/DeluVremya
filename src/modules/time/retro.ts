@@ -5,9 +5,9 @@
  * Чистые функции, без React и без базы.
  */
 
-import { addDays, isDateStr, nowIso, type DateStr } from '../../core/dates.ts'
-import { ulid } from '../../core/id.ts'
-import type { TimeBlock } from '../../core/model.ts'
+import { addDays, isDateStr, nowIso, type DateStr } from '../../shared/core/dates.ts'
+import { ulid } from '../../shared/core/id.ts'
+import type { TimeBlock } from '../../app/model.ts'
 import { isMinutes } from './categories.ts'
 
 /** Сколько последних блоков категории берёт медиана: нынешняя привычка важнее давней. */

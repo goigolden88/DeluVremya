@@ -1,4 +1,4 @@
-import type { DateStr } from '../../core/dates.ts'
+import type { DateStr } from '../../shared/core/dates.ts'
 import { RECALL_EMPTY, recallTitle } from './labels.ts'
 import { recall } from './review.ts'
 import { useNotes } from './useNotes.ts'

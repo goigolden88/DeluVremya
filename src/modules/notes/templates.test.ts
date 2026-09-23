@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { DayTemplate, Note } from '../../core/model.ts'
+import type { DayTemplate, Note } from '../../app/model.ts'
 import { appliedText, itemsText, templateSavedLine } from './labels.ts'
 import { dayPlan, MAX_ESTIMATE } from './plan.ts'
 import {

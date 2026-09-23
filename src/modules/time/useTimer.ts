@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { db } from '../../core/db.ts'
+import { db } from '../../app/core.ts'
 import { parseTimer, startTimer, TIMER_KEY, type RunningTimer } from './timer.ts'
 
 export type Timer = {
