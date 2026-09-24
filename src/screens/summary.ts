@@ -41,8 +41,6 @@ export type SummaryData = { [S in SyncedStore]: StoreRecord[S][] }
 
 /** Свои причины «не известно» — сверх общих кодов ядра. */
 export const OWN_UNKNOWN = {
-  /** Неделя идёт: норма судится по её окончании (Р-45). */
-  weekRunning: 'week-running',
   /** Неделя не полная с дня нормы — не судится (Р-56). */
   normSince: 'norm-since',
   /** Главное дело не выбиралось ни в одном дне. */
