@@ -159,7 +159,18 @@ describe('план и факт — счёты без текстов (Я-14 «Fam
     expect(week['plan.waiting']?.value).toEqual({ n: 1, unit: 'count' })
     expect(week['plan.main']).toMatchObject({ value: { n: 1, unit: 'days' } })
     expect(week['plan.estimate']).toMatchObject({ value: { n: 75, unit: 'minutes' } })
-    expect(week['plan.estimate']?.basis).toContain('из 75 мин по оценкам')
+    expect(week['plan.estimate']?.basis).toContain('из 1 ч 15 мин по оценкам')
+  })
+
+  it('основания склоняются при единице, минуты — часами', () => {
+    const one = data({
+      notes: [item('n1', 'Дело', '2026-09-14', { status: 'done', doneOn: '2026-09-14', estMin: 90 })],
+    })
+    const week = byKey(sliced(one, MONDAY).periods[0])
+    expect(week['plan.done']?.basis).toBe('из 1 намеченного')
+    expect(week['plan.late']?.basis).toContain('из 1 сделанного;')
+    expect(week['plan.main']?.basis).toBe('1 намеченный, ни в одном дне нет главного')
+    expect(week['plan.estimate']?.basis).toBe('из 1 ч 30 мин по оценкам; пунктов с оценкой 1 из 1 намеченного')
   })
 
   it('без пунктов — одна строка «намечено 0» с основанием', () => {

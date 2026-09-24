@@ -157,6 +157,16 @@ function timeMetrics(data: SummaryData, time: TimeSummary, length: number): Metr
 
 // ─── План и факт ───────────────────────────────────────────────────────────
 
+/** «из 1 намеченного», «из 5 намеченных» — после «из» родительный. */
+function ofCount(count: number, forms: [string, string, string]): string {
+  return `из ${count} ${plural(count, forms)}`
+}
+
+const OF_PLANNED: [string, string, string] = ['намеченного', 'намеченных', 'намеченных']
+const OF_DONE: [string, string, string] = ['сделанного', 'сделанных', 'сделанных']
+/** «1 намеченный, …», «5 намеченных, …». */
+const PLANNED: [string, string, string] = ['намеченный', 'намеченных', 'намеченных']
+
 function planMetrics(fact: PlanFact): Metric[] {
   const planned: Metric = {
     key: KEYS.planned,
@@ -169,7 +179,7 @@ function planMetrics(fact: PlanFact): Metric[] {
   }
   if (fact.planned === 0) return [planned]
 
-  const of = `из ${fact.planned} намеченных`
+  const of = ofCount(fact.planned, OF_PLANNED)
   const rest = fact.today + fact.ahead
   return [
     planned,
@@ -183,7 +193,7 @@ function planMetrics(fact: PlanFact): Metric[] {
       key: KEYS.late,
       label: 'Сделано позже своего дня',
       value: { n: fact.late, unit: 'count' },
-      basis: `из ${fact.done} сделанных; день факта — когда отмечено сделанным`,
+      basis: `${ofCount(fact.done, OF_DONE)}; день факта — когда отмечено сделанным`,
     },
     {
       key: KEYS.waiting,
@@ -200,7 +210,7 @@ function planMetrics(fact: PlanFact): Metric[] {
           : { n: fact.mainDone, unit: 'days' },
       basis:
         fact.mainDays === 0
-          ? `${fact.planned} намеченных, ни в одном дне нет главного`
+          ? `${fact.planned} ${plural(fact.planned, PLANNED)}, ни в одном дне нет главного`
           : `в ${fact.mainDone} из ${fact.mainDays} ${plural(fact.mainDays, ['дня', 'дней', 'дней'])}, где главное было выбрано`,
     },
     {
@@ -212,8 +222,8 @@ function planMetrics(fact: PlanFact): Metric[] {
           : { n: fact.estDone, unit: 'minutes' },
       basis:
         fact.estimated === 0
-          ? `${fact.planned} намеченных, оценок нет`
-          : `из ${fact.estPlanned} мин по оценкам; пунктов с оценкой ${fact.estimated} ${of}`,
+          ? `${fact.planned} ${plural(fact.planned, PLANNED)}, оценок нет`
+          : `из ${formatMinutes(fact.estPlanned)} по оценкам; пунктов с оценкой ${fact.estimated} ${of}`,
     },
   ]
 }
