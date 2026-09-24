@@ -262,8 +262,7 @@ export function planFactText(fact: PlanFact): string {
   return parts.join('; ')
 }
 
-/** Как считается план против факта (Р-44): число не врёт молча. */
-export const PLAN_FACT_BASIS = 'Пункт считается днём, на котором стоит сейчас; удалённые не считаются.'
+export { PLAN_FACT_BASIS } from './period.ts'
 
 /** Главное дело по дням (Р-40). */
 export function mainFactText(fact: PlanFact): string {

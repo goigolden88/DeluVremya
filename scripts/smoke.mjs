@@ -2237,6 +2237,35 @@ async function syncScenario() {
       (repoFiles()['README.md'] ?? '').includes('`time/ГГГГ-ММ.json`'),
     (repoFiles()['README.md'] ?? 'README нет').slice(0, 60),
   )
+  // Срез итогов едет тем же коммитом (Р-87; Я-16 «FamilyCore»). Форму
+  // проверяет `checkSummary` в тестах; здесь — что проход его кладёт.
+  let slice = null
+  try {
+    slice = JSON.parse(repoFiles()['summary.json'] ?? 'null')
+  } catch {
+    slice = null
+  }
+  const sliceKeys = (slice?.periods?.[1]?.metrics ?? []).map?.((metric) => metric.key) ?? []
+  check(
+    'срез итогов summary.json — в том же коммите, на сегодня, четыре отрезка — Р-87',
+    slice?.format === 1 &&
+      slice.computedOn === localDay() &&
+      slice.periods?.length === 4 &&
+      sliceKeys.includes('time.total') &&
+      sliceKeys.includes('plan.planned'),
+    slice ? `format ${slice.format}, день ${slice.computedOn}, ключи ${sliceKeys.join(' ')}` : 'summary.json нет или не JSON',
+  )
+  const noteTexts = paths
+    .filter((path) => path.startsWith('notes/'))
+    .flatMap((path) => repoRecords(path) ?? [])
+    .map((note) => note.text)
+    .filter((text) => typeof text === 'string' && text.length > 0)
+  const leaked = noteTexts.filter((text) => (repoFiles()['summary.json'] ?? '').includes(text))
+  check(
+    'в срезе нет текстов заметок и пунктов — Я-14 «FamilyCore»',
+    noteTexts.length > 0 && leaked.length === 0,
+    `заметок с текстом ${noteTexts.length}; в срезе ${leaked.length ? leaked.join(', ') : 'ни одного'}`,
+  )
   check(
     'импортированный февраль — в своём файле целиком',
     repoRecords('time/2026-02.json')?.length === 2,

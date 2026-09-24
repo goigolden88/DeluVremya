@@ -9,6 +9,7 @@
  */
 
 import type { AppConfig } from '../shared/core/model.ts'
+import { summary } from '../screens/summary.ts'
 import { migrations, SCHEMA_VERSION, SYNCED_STORES, type StoreRecord } from './model.ts'
 
 export const config: AppConfig<StoreRecord> = {
@@ -61,6 +62,11 @@ export const config: AppConfig<StoreRecord> = {
   },
 
   importFormat: 'deluvremya-import',
+
+  // Срез итогов для метаприложения семьи — `summary.json` в корне
+  // репозитория данных (Р-87; Я-16 «FamilyCore»). Считается из живых
+  // синхронизируемых записей и дня, без настроек устройства.
+  summary,
 
   // Свои правила промпта — 1–4; общие ядро допишет следом. Правила про поля
   // живут в описаниях разделов `modules/<имя>/import.ts`, а не здесь.
