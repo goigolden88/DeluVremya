@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { Category } from '../../app/model.ts'
+import type { Category, TimeBlock } from '../../app/model.ts'
 import { activeCategories } from './categories.ts'
-import { byGroup, groupKey, groupNames, hasGroups, moveGroup, moveInGroup, renameGroup, setGroup, ungroup } from './groups.ts'
+import {
+  byGroup,
+  groupKey,
+  groupMinutes,
+  groupNames,
+  groupTotals,
+  hasGroups,
+  moveGroup,
+  moveInGroup,
+  renameGroup,
+  setGroup,
+  ungroup,
+} from './groups.ts'
 
 function cat(id: string, order: number, group?: string, extra: Partial<Category> = {}): Category {
   return {
@@ -98,5 +110,55 @@ describe('группы категорий — Р-81', () => {
     const cleared = ungroup(BASE, 'развитие')
     expect(screen(BASE, cleared)).toEqual(['Развлечения: c', '—: b a d'])
     expect(cleared.find((each) => each.id === 'a')).not.toHaveProperty('group')
+  })
+})
+
+describe('итоги по группам — суммы не склеивает экран', () => {
+  function block(id: string, categoryId: string, date: string, minutes: number, bg?: string): TimeBlock {
+    return {
+      id,
+      updatedAt: '2026-09-01T10:00:00.000Z',
+      date,
+      categoryId,
+      minutes,
+      ...(bg === undefined ? {} : { bgCategoryId: bg }),
+    }
+  }
+
+  it('сумма, блоки и дни группы; день — один, сколько бы категорий в нём ни было', () => {
+    const blocks = [
+      block('1', 'a', '2026-09-07', 30),
+      block('2', 'd', '2026-09-07', 60),
+      block('3', 'a', '2026-09-08', 15),
+      block('4', 'c', '2026-09-08', 40),
+    ]
+    expect(groupTotals(blocks, BASE)).toEqual([
+      { key: 'развитие', name: 'Развитие', minutes: 105, count: 3, days: 2, background: 0 },
+      { key: 'развлечения', name: 'Развлечения', minutes: 40, count: 1, days: 1, background: 0 },
+    ])
+  })
+
+  it('порядок — по первой категории группы; без группы и неизвестная — последней', () => {
+    const blocks = [block('1', 'zz', '2026-09-07', 10), block('2', 'b', '2026-09-07', 20), block('3', 'c', '2026-09-07', 5)]
+    expect(groupTotals(blocks, BASE).map((group) => [group.key, group.minutes])).toEqual([
+      ['развлечения', 5],
+      [null, 30],
+    ])
+  })
+
+  it('фоновое — у группы фоновой категории, в сумму не входит; группа только с фоном — с нулём', () => {
+    const blocks = [block('1', 'b', '2026-09-07', 60, 'c')]
+    expect(groupTotals(blocks, BASE)).toEqual([
+      { key: 'развлечения', name: 'Развлечения', minutes: 0, count: 0, days: 0, background: 60 },
+      { key: null, name: null, minutes: 60, count: 1, days: 1, background: 0 },
+    ])
+  })
+
+  it('минуты по ключу; нет группы — ноль', () => {
+    const totals = groupTotals([block('1', 'a', '2026-09-07', 30)], BASE)
+    expect(groupMinutes(totals, 'развитие')).toBe(30)
+    expect(groupMinutes(totals, 'развлечения')).toBe(0)
+    expect(groupMinutes(totals, null)).toBe(0)
+    expect(groupTotals([], BASE)).toEqual([])
   })
 })

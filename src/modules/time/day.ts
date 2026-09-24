@@ -7,6 +7,7 @@
 import { isDateStr, nowIso, toDateStr, type DateStr } from '../../shared/core/dates.ts'
 import { ulid } from '../../shared/core/id.ts'
 import type { Category, Preset, TimeBlock } from '../../app/model.ts'
+import { groupTotals, type GroupTotal } from './groups.ts'
 
 /**
  * Окно дня в часах, с `from` до `to` (Р-21). Неучтённое считается от
@@ -109,6 +110,8 @@ export type DaySummary = {
   byCategory: CategoryTotal[]
   /** Фоновая активность отдельно: покер под ютуб не удваивает час. */
   background: CategoryTotal[]
+  /** По группам (Р-81): сумма группы за день — экран берёт отсюда, а не складывает сам. */
+  byGroup: GroupTotal[]
   /** Прошедшая часть окна дня, минут. */
   elapsed: number
   /** Прошедшая часть окна минус учтённое, не меньше нуля. */
@@ -130,6 +133,7 @@ export function daySummary(
     count: day.length,
     byCategory: totals(day, categories, (block) => block.categoryId),
     background: totals(day, categories, (block) => block.bgCategoryId),
+    byGroup: groupTotals(day, categories),
     elapsed,
     unaccounted: Math.max(0, elapsed - total),
   }

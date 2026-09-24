@@ -5,7 +5,7 @@ import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { BlockForm } from './BlockForm.tsx'
 import { presetRow, type PresetButton } from './categories.ts'
-import { byGroup, hasGroups } from './groups.ts'
+import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { blockFromPreset, blocksOn, categoryName, daySummary, type DaySummary } from './day.ts'
 import {
   addedLine,
@@ -96,10 +96,6 @@ export function TimeDay({
   const grouped = hasGroups(catalog.categories)
     ? byGroup(buttons, catalog.categories, (button) => button.category.id)
     : null
-  const spentIn = (list: readonly PresetButton[]) => {
-    const ids = new Set(list.map((button) => button.category.id))
-    return summary.byCategory.reduce((sum, row) => sum + (ids.has(row.categoryId) ? row.minutes : 0), 0)
-  }
   const presetButton = (button: PresetButton) => (
     <button key={button.preset.id} type="button" className="preset" onClick={() => void add(button)}>
       {button.category.name} {presetLabel(button.preset.minutes)}
@@ -118,7 +114,7 @@ export function TimeDay({
           </p>
         ) : grouped ? (
           grouped.map((group) => {
-            const spent = spentIn(group.items)
+            const spent = groupMinutes(summary.byGroup, group.key)
             return (
               <Fold
                 key={group.key ?? ''}
@@ -209,7 +205,7 @@ function Summary({ summary, categories }: { summary: DaySummary; categories: Cat
                   <Fragment key={group.key ?? ''}>
                     <tr className="stats__group">
                       <td>{group.name ?? NO_GROUP}</td>
-                      <td className="num">{formatMinutes(group.items.reduce((sum, each) => sum + each.minutes, 0))}</td>
+                      <td className="num">{formatMinutes(groupMinutes(summary.byGroup, group.key))}</td>
                     </tr>
                     {group.items.map((each) => row(each, true))}
                   </Fragment>

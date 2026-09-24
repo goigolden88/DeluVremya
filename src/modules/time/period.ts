@@ -25,6 +25,7 @@ import {
 } from '../../shared/core/dates.ts'
 import type { Category, TimeBlock } from '../../app/model.ts'
 import { activeCategories, MINUTES_PER_DAY, type CategoryKind } from './categories.ts'
+import { groupTotals, type GroupTotal } from './groups.ts'
 
 // ─── Итог промежутка ───────────────────────────────────────────────────────
 
@@ -60,6 +61,8 @@ export type PeriodSummary = {
   /** Сколько дней промежутка уже наступило — основание «в 5 днях из 7». */
   elapsedDays: number
   byCategory: PeriodCategory[]
+  /** По группам (Р-81): сумма, дни и фон группы — экраны и срез берут отсюда, а не складывают сами. */
+  byGroup: GroupTotal[]
   /** По признаку категории — только для обзора, дневной экран им не красится (Р-05). */
   byKind: KindTotal[]
 }
@@ -132,6 +135,7 @@ export function periodSummary(
     days: dates.size,
     elapsedDays: periodDays(period).filter((day) => day <= today).length,
     byCategory,
+    byGroup: groupTotals(list, categories),
     byKind,
   }
 }

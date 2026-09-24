@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import { formatMonth, monthName, monthPeriod, MONTHS_SHORT, type DateStr, type MonthStr } from '../../shared/core/dates.ts'
 import { BarChart, MiniBars } from '../../shared/ui/BarChart.tsx'
 import { Fold } from '../../shared/ui/Fold.tsx'
-import { byGroup, hasGroups } from './groups.ts'
+import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { backgroundText, formatMinutes, kindLine, lowerFirst, NO_GROUP, periodLine, UNKNOWN_CATEGORY } from './labels.ts'
 import { yearTime } from './period.ts'
 import { Unready } from './Period.tsx'
@@ -117,10 +117,8 @@ export function YearTime({
             <tbody>
               {groups
                 ? groups.map((group) => {
-                    const total = group.items.reduce((sum, row) => sum + row.minutes, 0)
-                    const months = data.months.map((_, index) =>
-                      group.items.reduce((sum, row) => sum + (row.byMonth[index] ?? 0), 0),
-                    )
+                    const total = groupMinutes(data.total.byGroup, group.key)
+                    const months = data.months.map(({ summary }) => groupMinutes(summary.byGroup, group.key))
                     return (
                       <Fragment key={group.key ?? ''}>
                         <tr className="stats__group">

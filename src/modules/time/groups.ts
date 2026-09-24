@@ -9,7 +9,7 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import type { Category } from '../../app/model.ts'
+import type { Category, TimeBlock } from '../../app/model.ts'
 import { activeCategories } from './categories.ts'
 
 /** Название группы без лишних пробелов. Пустое — null. */
@@ -60,6 +60,61 @@ export function byGroup<T>(
 /** Есть ли группа хоть у одной рабочей категории. Нет — экраны выглядят как прежде. */
 export function hasGroups(categories: readonly Category[]): boolean {
   return activeCategories(categories).some((category) => clean(category.group) !== null)
+}
+
+/** Итог группы по блокам: сумма и её основание, фоновое отдельно (Р-43). */
+export type GroupTotal = {
+  /** Ключ группы; null — «Без группы». */
+  key: string | null
+  /** Название — как у первой её категории; null — «Без группы». */
+  name: string | null
+  /** Минуты, где категория группы — основная. */
+  minutes: number
+  /** Сколько блоков в сумме. */
+  count: number
+  /** В скольких днях у группы есть блок — не сумма дней категорий: день один. */
+  days: number
+  /** Минуты фоном у категорий группы — в сумму не входят. */
+  background: number
+}
+
+/**
+ * Итоги по группам (Р-81) из уже отобранных блоков — дня или промежутка.
+ * Группы в порядке категорий, без группы — последней, как на экранах;
+ * неизвестная категория — без группы. Группа только с фоновым — тоже здесь,
+ * с нулём минут: фон не пропадает молча.
+ */
+export function groupTotals(blocks: readonly TimeBlock[], categories: readonly Category[]): GroupTotal[] {
+  const known = new Map(categories.map((category) => [category.id, category]))
+  const ids = new Set<string>()
+  for (const block of blocks) {
+    ids.add(block.categoryId)
+    if (block.bgCategoryId) ids.add(block.bgCategoryId)
+  }
+  const order = (id: string) => known.get(id)?.order ?? Number.POSITIVE_INFINITY
+  const sorted = [...ids].sort((a, b) => order(a) - order(b) || a.localeCompare(b, 'ru'))
+
+  return byGroup(sorted, categories, (id) => id).map((group) => {
+    const members = new Set(group.items)
+    const dates = new Set<string>()
+    let minutes = 0
+    let count = 0
+    let background = 0
+    for (const block of blocks) {
+      if (members.has(block.categoryId)) {
+        minutes += block.minutes
+        count += 1
+        dates.add(block.date)
+      }
+      if (block.bgCategoryId && members.has(block.bgCategoryId)) background += block.minutes
+    }
+    return { key: group.key, name: group.name, minutes, count, days: dates.size, background }
+  })
+}
+
+/** Минуты группы по ключу; нет её в итогах — ноль. */
+export function groupMinutes(totals: readonly GroupTotal[], key: string | null): number {
+  return totals.find((group) => group.key === key)?.minutes ?? 0
 }
 
 /** Рабочие категории по группам — порядок экрана категорий и кнопок. */

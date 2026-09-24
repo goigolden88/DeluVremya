@@ -16,7 +16,7 @@ import {
   UNKNOWN_CATEGORY,
   YEAR_NORMS_BASIS,
 } from './labels.ts'
-import { byGroup, hasGroups } from './groups.ts'
+import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { compareRows, periodNorms, periodSummary } from './period.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
@@ -96,9 +96,9 @@ export function PeriodTime({ period, today, compare }: { period: Period; today: 
                   <Fragment key={group.key ?? ''}>
                     <tr className="stats__group">
                       <td>{group.name ?? NO_GROUP}</td>
-                      <td className="num">{dash(group.items.reduce((sum, row) => sum + row.minutes, 0))}</td>
+                      <td className="num">{dash(groupMinutes(summary.byGroup, group.key))}</td>
                       {compare && (
-                        <td className="num muted">{dash(group.items.reduce((sum, row) => sum + row.before, 0))}</td>
+                        <td className="num muted">{dash(before ? groupMinutes(before.byGroup, group.key) : 0)}</td>
                       )}
                     </tr>
                     {group.items.map((row) => line(row, true))}
