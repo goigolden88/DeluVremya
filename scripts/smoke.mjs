@@ -235,6 +235,9 @@ const HELPERS = `
     [...document.querySelectorAll(tag)].find((el) => el.textContent.trim() === label)
   const startsWith = (tag, prefix) =>
     [...document.querySelectorAll(tag)].find((el) => el.textContent.trim().startsWith(prefix))
+  // Кнопка учёта: на ней одни минуты, название категории — в aria-label.
+  const preset = (label) =>
+    [...document.querySelectorAll('button.preset')].find((el) => el.getAttribute('aria-label') === label)
 `
 
 const act = (body) => run(`(() => {${HELPERS}\n${body}\n})()`)
@@ -802,11 +805,50 @@ async function scenario() {
     line(archived, 'Архив'),
   )
 
+  // ─ Кнопки строкой на категорию: название раз, на кнопках минуты; сверх двух — по «ещё».
+  await act(`byText('button', 'Чтение')?.click()`)
+  await sleep(400)
+  await act(`
+    set(document.querySelector('input[name=minutes]'), '90');
+    byText('button', 'Добавить кнопку')?.click();
+  `)
+  await sleep(700)
+  await go('/time')
+  const readingPresets = async () =>
+    JSON.parse(
+      await run(`JSON.stringify([...document.querySelectorAll('button.preset')]
+        .map((el) => el.getAttribute('aria-label') ?? '').filter((label) => label.startsWith('Чтение ')))`),
+    ).join(', ')
+  const readingLine = await run(`[...document.querySelectorAll('.preset-line')]
+    .find((el) => el.querySelector('.preset-line__name > span')?.textContent === 'Чтение')?.innerText ?? ''`)
+  const foldedLine = await readingPresets()
+  await act(`document.querySelector('[aria-label="Чтение: ещё 1"]')?.click()`)
+  await sleep(400)
+  const openLine = await readingPresets()
+  await act(`document.querySelector('[aria-label="Чтение: свернуть"]')?.click()`)
+  await sleep(400)
+  const refoldedLine = await readingPresets()
+  check(
+    'кнопки строкой на категорию: на кнопках минуты, сверх двух — по «ещё», повторно сворачивается',
+    foldedLine === 'Чтение +30, Чтение +60' &&
+      openLine === 'Чтение +30, Чтение +60, Чтение +90' &&
+      refoldedLine === foldedLine &&
+      has(readingLine, '+30') &&
+      !has(readingLine, 'Чтение +'),
+    `${foldedLine} → ${openLine} → ${refoldedLine}; строка: ${readingLine.replace(/\s+/g, ' ')}`,
+  )
+  // Третья кнопка — только для этой проверки: дальше прогон идёт по стартовому набору.
+  await go('/time/categories')
+  await act(`byText('button', 'Чтение')?.click()`)
+  await sleep(400)
+  await act(`document.querySelector('[aria-label="Убрать кнопку +90"]')?.click()`)
+  await sleep(700)
+
   // ─ Учёт времени (Этап 1, пп. 2 и 5): тап — блок, итог сразу, «Отменить».
   await go('/time')
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`preset('Чтение +30')?.click()`)
   await sleep(700)
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`preset('Чтение +30')?.click()`)
   await sleep(700)
   const tapped = await screen()
   check(
@@ -836,7 +878,7 @@ async function scenario() {
   check('блок снимается из списка дня', has(await screen(), 'За день ничего не учтено'))
 
   await go('/')
-  await act(`byText('button', 'Прогулка +30')?.click()`)
+  await act(`preset('Прогулка +30')?.click()`)
   await sleep(700)
   const today = await screen()
   check(
@@ -992,7 +1034,7 @@ async function scenario() {
     `${yesterdayHash}; ${line(yesterday, 'Учтено')}; таймер ${yesterdayTimer ? 'есть' : 'нет'}`,
   )
 
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`preset('Чтение +30')?.click()`)
   await sleep(700)
   await reload(hasOnPage('Кнопки записывают на'))
   const reloaded = await screen()
@@ -2409,7 +2451,7 @@ async function syncScenario() {
   github.down = true
   const before = repoRecords(`time/${month}.json`)?.length ?? 0
   await go('/time')
-  await act(`byText('button', 'Прогулка +30')?.click()`)
+  await act(`preset('Прогулка +30')?.click()`)
   await sleep(6500)
   await go('/')
   const queued = await run(`document.querySelector('.gear .dot') !== null`)
@@ -2588,7 +2630,7 @@ async function polishScenario() {
   await sleep(700)
   const regrouped = await screen()
   await go('/time')
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`preset('Чтение +30')?.click()`)
   await sleep(700)
   const dayGroups = await run(
     `[...document.querySelectorAll('.stats__group')].map((el) => el.innerText.replace(/\\s+/g, ' ')).join(' | ')`,

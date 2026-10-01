@@ -58,6 +58,19 @@ export function presetLabel(minutes: number): string {
   return `+${minutes}`
 }
 
+/** Кнопка целиком, для чтения с экрана: «Чтение +30» — на ней самой только минуты. */
+export function presetFullLabel(name: string, minutes: number): string {
+  return `${name} ${presetLabel(minutes)}`
+}
+
+/** Раскрыть спрятанные кнопки строки: «ещё 2». */
+export function morePresetsLabel(count: number): string {
+  return `ещё ${count}`
+}
+
+/** Свернуть раскрытую строку кнопок. */
+export const FEWER_PRESETS = 'свернуть'
+
 const MINUTES_PER_HOUR = 60
 
 /** `45` → `45 мин`, `60` → `1 ч`, `90` → `1 ч 30 мин`. */

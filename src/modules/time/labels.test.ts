@@ -9,8 +9,11 @@ import {
   historyWaitText,
   keptText,
   marksLine,
+  morePresetsLabel,
   NORM_PROBLEMS,
   normText,
+  presetFullLabel,
+  presetLabel,
   runningLine,
   savedLine,
   startedLine,
@@ -36,6 +39,12 @@ describe('тексты итога дня', () => {
 
   it('отклик на тап — что записано и итог категории за день', () => {
     expect(addedLine('Чтение', 30, 90)).toBe('Записано: Чтение, 30 мин. По категории за день — 1 ч 30 мин')
+  })
+
+  it('кнопка — минутами, название категории только для чтения с экрана', () => {
+    expect(presetLabel(30)).toBe('+30')
+    expect(presetFullLabel('Чтение', 30)).toBe('Чтение +30')
+    expect(morePresetsLabel(2)).toBe('ещё 2')
   })
 
   it('границы окна в пояснении — из константы', () => {
