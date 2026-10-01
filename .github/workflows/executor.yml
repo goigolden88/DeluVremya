@@ -1,7 +1,8 @@
 name: Исполнитель
 
-# Конвейер «Штаб» (Ш-12, Ш-30): владелец ставит на issue метку «готово» —
-# Claude Code берёт задачу и доводит её до PR по инструкции исполнителя.
+# Конвейер «Штаб»: владелец ставит на issue метку «готово» — исполнитель
+# берёт задачу и доводит её до PR. Сам исполнитель общий для проектов —
+# в goigolden88/Skills_Claude (Ш-33 Штаба); здесь — когда и с чем его звать.
 # Сливает только человек. Остановить — Actions → «Исполнитель» → Disable workflow.
 
 on:
@@ -10,85 +11,21 @@ on:
 
 jobs:
   executor:
-    # Только метка «готово» и только от владельца: остальные метки (в том
-    # числе «в-работе», которую ставит сам исполнитель) запуска не дают.
+    # Только «готово» и только от владельца: метки, которые ставит сам
+    # исполнитель, запуска не дают.
     if: github.event.label.name == 'готово' && github.event.sender.login == github.repository_owner
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-
-    # Один исполнитель на репо (Ш-07); следующая задача ждёт, а не отменяет.
+    # Один исполнитель на репо; следующая задача ждёт, а не отменяет.
     concurrency:
       group: executor
       cancel-in-progress: false
-
     permissions:
       contents: write
       pull-requests: write
       issues: write
       id-token: write
-
-    steps:
-      # Ядро — подмодулем в src/shared: без него сборки нет.
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      # Как в ci.yml: пустить Chrome в песочницу и прогреть его, чтобы
-      # исполнитель мог сам запустить прогон в браузере.
-      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: timeout 30 google-chrome --headless=new --disable-gpu --dump-dom about:blank > /dev/null 2>&1 || true
-
-      # Инструкция исполнителя — общая для всех проектов, в публичном репо (Ш-30).
-      - name: Инструкция исполнителя
-        id: instruction
-        run: |
-          curl -sfL https://raw.githubusercontent.com/goigolden88/Skills_Claude/main/agents/executor.md -o "$RUNNER_TEMP/executor.md"
-          {
-            echo 'text<<END_OF_INSTRUCTION'
-            cat "$RUNNER_TEMP/executor.md"
-            echo 'END_OF_INSTRUCTION'
-          } >> "$GITHUB_OUTPUT"
-
-      - uses: anthropics/claude-code-action@v1
-        id: claude
-        with:
-          # Токен подписки (claude setup-token); ключ API не заводится (Ш-12, Ш-17).
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            Репо: ${{ github.repository }}
-            Issue: #${{ github.event.issue.number }}
-            Владелец: @${{ github.repository_owner }}
-
-            Ты в GitHub Action: клон с подмодулями готов, Node и Chrome есть.
-            Ветку назови agent/${{ github.event.issue.number }}. Метки, комментарии
-            и PR — через gh.
-
-            ${{ steps.instruction.outputs.text }}
-          # Модель и усилие — по замерам 1Г (Ш-19); 80 ходов — Ш-07, Ш-31.
-          claude_args: |
-            --model claude-sonnet-5-5
-            --effort high
-            --max-turns 80
-            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm ci),Bash(npm test),Bash(npm run:*),Bash(git:*),Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr create:*),Bash(gh label list:*)"
-            --disallowedTools "Bash(gh pr merge:*),Bash(git push --force:*),Bash(git push -f:*)"
-
-      # Замер прогона (Ш-19, Ш-31): ходы и время — из итога Claude Code, а не
-      # со слов агента; команды, в которых ему отказали, — чтобы править
-      # список разрешённых. Только имя инструмента и начало команды.
-      - name: Замер прогона
-        if: always() && steps.claude.outputs.execution_file != ''
-        run: |
-          jq -r '
-            [.[] | select(.type == "result")] | last |
-            "### Замер прогона",
-            "",
-            "Ходов: \(.num_turns), минут: \((.duration_ms / 60000 * 10 | floor) / 10)",
-            "",
-            "Отказано в правах: \(.permission_denials | length)",
-            (.permission_denials[]? | "- \(.tool_name): \((.tool_input.command // .tool_input.file_path // "") | tostring | .[0:120])")
-          ' "${{ steps.claude.outputs.execution_file }}" | tee -a "$GITHUB_STEP_SUMMARY"
+    uses: goigolden88/Skills_Claude/.github/workflows/executor.yml@main
+    with:
+      node-version: "24"
+      chrome: true
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
