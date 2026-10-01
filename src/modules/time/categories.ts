@@ -395,6 +395,35 @@ export function presetRow(categories: readonly Category[], presets: readonly Pre
   )
 }
 
+/** Сколько кнопок категории видно в строке сразу; остальные раскрываются тапом. */
+export const PRESETS_VISIBLE = 2
+
+/** Строка категории на экране дня: её кнопки, видимые и скрытые. */
+export type PresetLine = {
+  category: Category
+  visible: PresetButton[]
+  hidden: PresetButton[]
+}
+
+/**
+ * Кнопки по строкам: одна строка на категорию (Р-81, уточнение вида).
+ * `presetRow` держит кнопки категории подряд, поэтому строки — это серии
+ * подряд идущих кнопок одной категории; порядок и состав те же.
+ */
+export function presetLines(buttons: readonly PresetButton[]): PresetLine[] {
+  const series: { category: Category; items: PresetButton[] }[] = []
+  for (const button of buttons) {
+    const last = series[series.length - 1]
+    if (last && last.category.id === button.category.id) last.items.push(button)
+    else series.push({ category: button.category, items: [button] })
+  }
+  return series.map(({ category, items }) => ({
+    category,
+    visible: items.slice(0, PRESETS_VISIBLE),
+    hidden: items.slice(PRESETS_VISIBLE),
+  }))
+}
+
 // ─── Стартовый набор ───────────────────────────────────────────────────────
 
 /** Набор без повторов названий, первое вхождение побеждает. */

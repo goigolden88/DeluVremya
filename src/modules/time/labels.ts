@@ -58,6 +58,11 @@ export function presetLabel(minutes: number): string {
   return `+${minutes}`
 }
 
+/** Кнопка раскрытия строки категории: сколько кнопок скрыто — или «свернуть». */
+export function moreLabel(hidden: number, open: boolean): string {
+  return open ? 'свернуть' : `ещё ${hidden}`
+}
+
 const MINUTES_PER_HOUR = 60
 
 /** `45` → `45 мин`, `60` → `1 ч`, `90` → `1 ч 30 мин`. */

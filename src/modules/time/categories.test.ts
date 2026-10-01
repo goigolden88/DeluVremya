@@ -14,6 +14,8 @@ import {
   MINUTES_PER_DAY,
   moveCategory,
   nameProblem,
+  PRESETS_VISIBLE,
+  presetLines,
   presetProblem,
   presetRow,
   presetsOf,
@@ -231,6 +233,28 @@ describe('кнопки', () => {
       'Чтение +60',
       'Бег +30',
     ])
+  })
+
+  it('строки дня: одна на категорию, видны первые кнопки, остальные скрыты по порядку', () => {
+    const categories = [cat('a', 'Чтение', 0), cat('b', 'Бег', 1), cat('c', 'Сон', 2)]
+    const presets = [
+      preset('a', 15),
+      preset('a', 30),
+      preset('a', 60),
+      preset('a', 90),
+      preset('b', 30),
+      preset('c', 20),
+      preset('c', 40),
+    ]
+    const lines = presetLines(presetRow(categories, presets))
+    expect(lines.map((line) => line.category.name)).toEqual(['Чтение', 'Бег', 'Сон'])
+    expect(PRESETS_VISIBLE).toBe(2)
+    expect(lines.map((line) => line.visible.map((each) => each.preset.minutes))).toEqual([[15, 30], [30], [20, 40]])
+    expect(lines.map((line) => line.hidden.map((each) => each.preset.minutes))).toEqual([[60, 90], [], []])
+  })
+
+  it('строки дня: нет кнопок — нет строк', () => {
+    expect(presetLines([])).toEqual([])
   })
 })
 

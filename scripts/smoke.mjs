@@ -233,6 +233,8 @@ const HELPERS = `
   }
   const byText = (tag, label) =>
     [...document.querySelectorAll(tag)].find((el) => el.textContent.trim() === label)
+  // Кнопки учёта подписаны «Категория +минуты», а в тексте только минуты.
+  const byLabel = (label) => document.querySelector('button[aria-label="' + label + '"]')
   const startsWith = (tag, prefix) =>
     [...document.querySelectorAll(tag)].find((el) => el.textContent.trim().startsWith(prefix))
 `
@@ -804,9 +806,9 @@ async function scenario() {
 
   // ─ Учёт времени (Этап 1, пп. 2 и 5): тап — блок, итог сразу, «Отменить».
   await go('/time')
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`byLabel('Чтение +30')?.click()`)
   await sleep(700)
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`byLabel('Чтение +30')?.click()`)
   await sleep(700)
   const tapped = await screen()
   check(
@@ -836,7 +838,7 @@ async function scenario() {
   check('блок снимается из списка дня', has(await screen(), 'За день ничего не учтено'))
 
   await go('/')
-  await act(`byText('button', 'Прогулка +30')?.click()`)
+  await act(`byLabel('Прогулка +30')?.click()`)
   await sleep(700)
   const today = await screen()
   check(
@@ -992,7 +994,7 @@ async function scenario() {
     `${yesterdayHash}; ${line(yesterday, 'Учтено')}; таймер ${yesterdayTimer ? 'есть' : 'нет'}`,
   )
 
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`byLabel('Чтение +30')?.click()`)
   await sleep(700)
   await reload(hasOnPage('Кнопки записывают на'))
   const reloaded = await screen()
@@ -2409,7 +2411,7 @@ async function syncScenario() {
   github.down = true
   const before = repoRecords(`time/${month}.json`)?.length ?? 0
   await go('/time')
-  await act(`byText('button', 'Прогулка +30')?.click()`)
+  await act(`byLabel('Прогулка +30')?.click()`)
   await sleep(6500)
   await go('/')
   const queued = await run(`document.querySelector('.gear .dot') !== null`)
@@ -2588,7 +2590,7 @@ async function polishScenario() {
   await sleep(700)
   const regrouped = await screen()
   await go('/time')
-  await act(`byText('button', 'Чтение +30')?.click()`)
+  await act(`byLabel('Чтение +30')?.click()`)
   await sleep(700)
   const dayGroups = await run(
     `[...document.querySelectorAll('.stats__group')].map((el) => el.innerText.replace(/\\s+/g, ' ')).join(' | ')`,

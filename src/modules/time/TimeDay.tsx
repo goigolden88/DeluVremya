@@ -4,13 +4,14 @@ import { db } from '../../app/core.ts'
 import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { BlockForm } from './BlockForm.tsx'
-import { presetRow, type PresetButton } from './categories.ts'
+import { presetLines, presetRow, type PresetButton, type PresetLine } from './categories.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { blockFromPreset, blocksOn, categoryName, daySummary, type DaySummary } from './day.ts'
 import {
   addedLine,
   blocksWord,
   formatMinutes,
+  moreLabel,
   NO_GROUP,
   presetLabel,
   savedLine,
@@ -96,10 +97,12 @@ export function TimeDay({
   const grouped = hasGroups(catalog.categories)
     ? byGroup(buttons, catalog.categories, (button) => button.category.id)
     : null
-  const presetButton = (button: PresetButton) => (
-    <button key={button.preset.id} type="button" className="preset" onClick={() => void add(button)}>
-      {button.category.name} {presetLabel(button.preset.minutes)}
-    </button>
+  const lines = (items: PresetButton[]) => (
+    <div className="presets">
+      {presetLines(items).map((line) => (
+        <PresetLineRow key={line.category.id} line={line} onAdd={(button) => void add(button)} />
+      ))}
+    </div>
   )
 
   return (
@@ -123,12 +126,12 @@ export function TimeDay({
                 summary={spent > 0 ? formatMinutes(spent) : undefined}
                 sub
               >
-                <div className="presets">{group.items.map(presetButton)}</div>
+                {lines(group.items)}
               </Fold>
             )
           })
         ) : (
-          <div className="presets">{buttons.map(presetButton)}</div>
+          lines(buttons)
         )}
 
         {last && undoable && (
@@ -181,6 +184,44 @@ export function TimeDay({
         </>
       )}
     </>
+  )
+}
+
+/**
+ * Строка категории: название и кнопки с минутами. Первые кнопки видны сразу,
+ * остальные раскрываются тапом — раскрытость живёт, пока открыт экран.
+ */
+function PresetLineRow({ line, onAdd }: { line: PresetLine; onAdd: (button: PresetButton) => void }) {
+  const [open, setOpen] = useState(false)
+  const button = (each: PresetButton) => (
+    <button
+      key={each.preset.id}
+      type="button"
+      className="preset"
+      aria-label={`${line.category.name} ${presetLabel(each.preset.minutes)}`}
+      onClick={() => onAdd(each)}
+    >
+      {presetLabel(each.preset.minutes)}
+    </button>
+  )
+  return (
+    <div className="preset-line">
+      <span className="preset-line__name">{line.category.name}</span>
+      <div className="preset-line__buttons">
+        {line.visible.map(button)}
+        {line.hidden.length > 0 && (
+          <button
+            type="button"
+            className="link-btn preset-line__more"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            {moreLabel(line.hidden.length, open)}
+          </button>
+        )}
+      </div>
+      {open && <div className="preset-line__buttons preset-line__rest">{line.hidden.map(button)}</div>}
+    </div>
   )
 }
 

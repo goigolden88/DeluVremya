@@ -349,16 +349,50 @@
 
 .presets {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-/* Кнопка «Чтение +30» — главный путь записи: пилюля в акцент, не меньше
+/* Строка категории: название слева, кнопки с минутами справа. Раскрытые
+   кнопки — второй строкой, у правого края. Название переносится, кнопки — нет. */
+.preset-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.preset-line__name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.preset-line__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.preset-line__rest {
+  flex-basis: 100%;
+}
+
+.preset-line__more {
+  min-height: 44px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* Кнопка «+30» — главный путь записи: пилюля в акцент, не меньше
    44 пикселей. Нажатие видно заливкой: тап должен читаться как действие. */
 .preset {
   min-height: 44px;
-  padding: 0 16px;
+  min-width: 56px;
+  padding: 0 14px;
   border: 1px solid var(--accent);
   border-radius: 999px;
   background: transparent;
