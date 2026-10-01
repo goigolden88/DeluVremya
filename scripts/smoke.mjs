@@ -273,14 +273,91 @@ async function unfold(title) {
   await sleep(400)
 }
 
+/** Сколько ждать появления проверяемого, мс. Дольше — проверка сама скажет, что не дождалась. */
+const WAIT_LIMIT = 15000
+
+/** Условие на странице: на экране есть такой текст (сравнение — как у `has`). */
+const hasOnPage = (needle) =>
+  `(document.querySelector('#root')?.innerText ?? '').replace(/ /g, ' ').toLowerCase()` +
+  `.includes(${JSON.stringify(needle.replace(/ /g, ' ').toLowerCase())})`
+
+/**
+ * Вычисляет выражение на странице, не считая сбой ошибкой прогона: пока
+ * страница загружается заново, у неё на миг нет контекста, и это ожидаемо.
+ */
+async function probe(expression) {
+  try {
+    const result = await send('Runtime.evaluate', { expression, returnByValue: true })
+    return result?.exceptionDetails ? null : (result?.result?.value ?? null)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Ждёт, пока выражение на странице станет истинным, но не дольше предела.
+ * Возвращает, дождались ли: проверка после него сама сообщит о неудаче
+ * с причиной, а прогон не повиснет и не упадёт на ровном месте.
+ */
+async function waitFor(expression, limit = WAIT_LIMIT) {
+  const until = Date.now() + limit
+  while (Date.now() < until) {
+    if (await probe(`Boolean(${expression})`)) return true
+    await sleep(100)
+  }
+  return false
+}
+
+/**
+ * Ждёт, пока заново загруженная страница нарисует экран.
+ *
+ * Фиксированная пауза падала на медленных серверах: приветствие приходило
+ * позже неё. Теперь ждём новую страницу (метка старой пропала), непустой
+ * экран и — если известно, что именно проверят, — само это. Когда
+ * проверяется отсутствие чего-то, ждать нечего, и тогда экран должен
+ * постоять неизменным: иначе «приветствия нет» прошло бы, не дав ему
+ * появиться.
+ *
+ * @param ready Выражение на странице — что должно появиться. Без него — тишина экрана.
+ */
+async function settle(ready) {
+  if (!(await waitFor('!window.__smokeOld && document.querySelector("#root")?.innerText'))) return false
+  if (ready) return waitFor(ready)
+
+  const quiet = 600
+  let last = null
+  let since = Date.now()
+  const until = Date.now() + WAIT_LIMIT
+  while (Date.now() < until) {
+    const text = await probe('document.querySelector("#root")?.innerText ?? ""')
+    if (text !== last) {
+      last = text
+      since = Date.now()
+    } else if (Date.now() - since >= quiet) {
+      return true
+    }
+    await sleep(100)
+  }
+  return false
+}
+
+/** Загружает страницу заново и ждёт её экран; `ready` — как у `settle`. */
+async function reload(ready) {
+  await probe('window.__smokeOld = true')
+  await send('Page.reload')
+  await settle(ready)
+}
+
 /**
  * Полная загрузка страницы по адресу — как её открывает Android из
  * «Поделиться» или ярлыка. Адрес должен отличаться от текущего не только
  * хешем: иначе браузер сменит хеш без загрузки, и приём проверен не будет.
+ * `ready` — как у `settle`.
  */
-async function open(url) {
+async function open(url, ready) {
+  await probe('window.__smokeOld = true')
   await send('Page.navigate', { url })
-  await sleep(2000)
+  await settle(ready)
 }
 
 /** Сеть вкл/выкл — для проверки работы из кеша service worker. */
@@ -587,7 +664,7 @@ async function scenario() {
   )
 
   // ─ Первый запуск: приветствие; «Понятно» убирает его насовсем.
-  await open(APP)
+  await open(APP, hasOnPage('С чего начать'))
   const start = await screen()
   check('главный экран открылся', has(start, 'Сегодня'), start.replace(/\s+/g, ' ').slice(0, 80))
   check(
@@ -602,8 +679,7 @@ async function scenario() {
   )
   await act(`byText('button', 'Понятно')?.click()`)
   await sleep(400)
-  await send('Page.reload')
-  await sleep(2000)
+  await reload()
   check('«Понятно» убирает приветствие и после перезапуска', !has(await screen(), 'С чего начать'))
 
   // ─ Входящие руками: одно поле и кнопка (Р-09).
@@ -623,7 +699,7 @@ async function scenario() {
   // ─ «Поделиться» (Р-16): Android открывает корень с параметрами.
   const title = 'Статья про сон'
   const link = 'https://example.com/son?a=1&b=2'
-  await open(`${APP}?title=${encodeURIComponent(title)}&text=${encodeURIComponent(link)}`)
+  await open(`${APP}?title=${encodeURIComponent(title)}&text=${encodeURIComponent(link)}`, `document.querySelector('textarea[name=text]')?.value`)
   const landed = await run(`({
     hash: location.hash,
     search: location.search,
@@ -645,13 +721,12 @@ async function scenario() {
     has(afterShare, 'example.com/son') && has(afterShare, '2 записи') && hashAfter === '#/inbox',
     `${line(afterShare, 'записи')}; хеш ${hashAfter}`,
   )
-  await send('Page.reload')
-  await sleep(2000)
+  await reload()
   const refilled = await captureField()
   check('после перезагрузки поле пустое — второй раз не принято', refilled === '', `в поле «${refilled}»`)
 
   // ─ Ярлыки: адрес с ?go=, а не с # (Р-16).
-  await open(`${APP}?go=inbox`)
+  await open(`${APP}?go=inbox`, `document.activeElement?.getAttribute('name') === 'text'`)
   const inboxHash = await run('location.hash')
   const focused = await run(`document.activeElement?.getAttribute('name') ?? ''`)
   check(
@@ -659,14 +734,14 @@ async function scenario() {
     inboxHash === '#/inbox' && focused === 'text',
     `хеш ${inboxHash}; в фокусе «${focused}»`,
   )
-  await open(`${APP}?go=time`)
+  await open(`${APP}?go=time`, hasOnPage('Окно дня'))
   const timeHash = await run('location.hash')
   check(
     'ярлык «Учесть время» открывает экран времени — Р-16',
     timeHash === '#/time' && has(await screen(), 'Окно дня'),
     `хеш ${timeHash}`,
   )
-  await open(`${APP}?go=nowhere`)
+  await open(`${APP}?go=nowhere`, hasOnPage('Сегодня'))
   const unknownHash = await run('location.hash')
   check(
     'ярлык на незнакомый экран открывает главный, а не пустоту',
@@ -778,8 +853,7 @@ async function scenario() {
   check('таймер запускается и виден идущим', has(started, 'Идёт: Зарядка'), line(started, 'Идёт'))
 
   await go('/')
-  await send('Page.reload')
-  await sleep(2000)
+  await reload(hasOnPage('Идёт: Зарядка'))
   check('идущий таймер виден на «Сегодня» и переживает перезапуск — Р-18', has(await screen(), 'Идёт: Зарядка'))
 
   await go('/time')
@@ -920,8 +994,7 @@ async function scenario() {
 
   await act(`byText('button', 'Чтение +30')?.click()`)
   await sleep(700)
-  await send('Page.reload')
-  await sleep(2000)
+  await reload(hasOnPage('Кнопки записывают на'))
   const reloaded = await screen()
   check(
     'тап на вчерашнем пишет во вчера, перезагрузка остаётся на нём',
@@ -1155,7 +1228,7 @@ async function scenario() {
   // ─ Без сети. Проверяется и то, что страницу отдал работник: иначе при
   // непойманном офлайне проверка прошла бы на обычной загрузке из сети.
   await offline(true)
-  await open(`${APP}?go=inbox`)
+  await open(`${APP}?go=inbox`, hasOnPage('Купить фильтр для воды'))
   const cached = await screen()
   const controlled = await run('navigator.serviceWorker.controller !== null')
   check(
@@ -1164,7 +1237,7 @@ async function scenario() {
     `работник ${controlled ? 'управляет' : 'не управляет'} страницей`,
   )
 
-  await open(`${APP}?text=${encodeURIComponent('без сети')}`)
+  await open(`${APP}?text=${encodeURIComponent('без сети')}`, `document.querySelector('textarea[name=text]')?.value`)
   const offlineShare = await captureField()
   check('«Поделиться» без сети тоже доезжает — Р-16', offlineShare === 'без сети', `в поле «${offlineShare}»`)
   await offline(false)
@@ -1286,13 +1359,11 @@ async function stageSixScenario() {
     }
   })`)
   await go('/')
-  await send('Page.reload')
-  await sleep(2000)
+  await reload(hasOnPage('Что нового'))
   const news = await screen()
   await act(`byText('button', 'Понятно')?.click()`)
   await sleep(500)
-  await send('Page.reload')
-  await sleep(2000)
+  await reload()
   const newsAfter = await screen()
   check(
     '«Что нового» — последняя запись на копии без прочитанного; «Понятно» убирает и после перезапуска — Р-65',
@@ -2681,8 +2752,7 @@ async function dataScenario(file) {
   await send('Page.enable')
   await send('DOM.enable')
 
-  await send('Page.navigate', { url: APP })
-  await sleep(2000)
+  await open(APP, hasOnPage('Сегодня'))
 
   await go('/settings')
   await unfold('Экспорт и импорт')
