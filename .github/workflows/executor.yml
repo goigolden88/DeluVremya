@@ -55,6 +55,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@v1
+        id: claude
         with:
           # Токен подписки (claude setup-token); ключ API не заводится (Ш-12, Ш-17).
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -68,10 +69,26 @@ jobs:
             и PR — через gh.
 
             ${{ steps.instruction.outputs.text }}
-          # Модель и усилие — по замерам 1Г (Ш-19); 50 ходов — Ш-07.
+          # Модель и усилие — по замерам 1Г (Ш-19); 80 ходов — Ш-07, Ш-31.
           claude_args: |
             --model claude-sonnet-5-5
             --effort high
-            --max-turns 50
+            --max-turns 80
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm ci),Bash(npm test),Bash(npm run:*),Bash(git:*),Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh pr list:*),Bash(gh pr view:*),Bash(gh pr create:*),Bash(gh label list:*)"
             --disallowedTools "Bash(gh pr merge:*),Bash(git push --force:*),Bash(git push -f:*)"
+
+      # Замер прогона (Ш-19, Ш-31): ходы и время — из итога Claude Code, а не
+      # со слов агента; команды, в которых ему отказали, — чтобы править
+      # список разрешённых. Только имя инструмента и начало команды.
+      - name: Замер прогона
+        if: always() && steps.claude.outputs.execution_file != ''
+        run: |
+          jq -r '
+            [.[] | select(.type == "result")] | last |
+            "### Замер прогона",
+            "",
+            "Ходов: \(.num_turns), минут: \((.duration_ms / 60000 * 10 | floor) / 10)",
+            "",
+            "Отказано в правах: \(.permission_denials | length)",
+            (.permission_denials[]? | "- \(.tool_name): \((.tool_input.command // .tool_input.file_path // "") | tostring | .[0:120])")
+          ' "${{ steps.claude.outputs.execution_file }}" | tee -a "$GITHUB_STEP_SUMMARY"
