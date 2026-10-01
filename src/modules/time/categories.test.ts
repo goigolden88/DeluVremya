@@ -8,6 +8,7 @@ import {
   categoryIdFor,
   createCategory,
   createPreset,
+  hiddenPresets,
   initialCategories,
   initialPresets,
   isMinutes,
@@ -15,10 +16,12 @@ import {
   moveCategory,
   nameProblem,
   presetProblem,
-  presetRow,
+  presetLines,
   presetsOf,
   restoreCategory,
   SEED_STAMP,
+  shownPresets,
+  SHOWN_PRESETS,
   sortCategories,
 } from './categories.ts'
 import { formatMinutes } from './labels.ts'
@@ -226,11 +229,38 @@ describe('кнопки', () => {
       cat('x', 'Старое', 3, { deleted: true }),
     ]
     const presets = [preset('b', 30), preset('a', 60), preset('a', 30), preset('z', 30), preset('x', 30), preset('нет', 30)]
-    expect(presetRow(categories, presets).map((each) => `${each.category.name} +${each.preset.minutes}`)).toEqual([
-      'Чтение +30',
-      'Чтение +60',
-      'Бег +30',
+    expect(
+      presetLines(categories, presets).map((each) => [each.category.name, each.presets.map((one) => one.minutes)]),
+    ).toEqual([
+      ['Чтение', [30, 60]],
+      ['Бег', [30]],
     ])
+  })
+
+  it('строка дня: категория без живых кнопок строки не получает', () => {
+    const categories = [cat('a', 'Чтение', 0), cat('b', 'Бег', 1)]
+    const presets = [preset('a', 30), preset('b', 30, { deleted: true })]
+    expect(presetLines(categories, presets).map((each) => each.category.name)).toEqual(['Чтение'])
+  })
+
+  it('одна и две кнопки — все видны, раскрывать нечего', () => {
+    const categories = [cat('a', 'Чтение', 0), cat('b', 'Бег', 1)]
+    const presets = [preset('a', 30), preset('a', 60), preset('b', 15)]
+    for (const line of presetLines(categories, presets)) {
+      expect(hiddenPresets(line)).toBe(0)
+      expect(shownPresets(line, false)).toEqual(line.presets)
+    }
+  })
+
+  it('больше двух кнопок — свёрнутая строка показывает первые по порядку, раскрытая — все', () => {
+    const categories = [cat('a', 'Чтение', 0)]
+    const presets = [preset('a', 90), preset('a', 15), preset('a', 60), preset('a', 30)]
+    const [line] = presetLines(categories, presets)
+    expect(line).toBeDefined()
+    if (!line) return
+    expect(hiddenPresets(line)).toBe(presets.length - SHOWN_PRESETS)
+    expect(shownPresets(line, false).map((each) => each.minutes)).toEqual([15, 30])
+    expect(shownPresets(line, true).map((each) => each.minutes)).toEqual([15, 30, 60, 90])
   })
 })
 

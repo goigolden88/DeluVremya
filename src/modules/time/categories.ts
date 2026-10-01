@@ -381,18 +381,33 @@ export function presetsOf(presets: readonly Preset[], categoryId: string): Prese
     .sort((a, b) => a.order - b.order || a.minutes - b.minutes)
 }
 
-export type PresetButton = { preset: Preset; category: Category }
+/** Строка кнопок категории на экране дня: название и её кнопки по порядку. */
+export type PresetLine = { category: Category; presets: Preset[] }
 
 /**
- * Строка кнопок на экране дня: категории по порядку, внутри — кнопки
- * по порядку. Кнопки архивных, удалённых и неизвестных категорий
- * не показываются: нажать их значит записать время туда, куда уже
- * не размечают.
+ * Кнопки на экране дня — строкой на категорию: категории по порядку,
+ * внутри — кнопки по порядку. Категория без кнопок строки не получает.
+ * Кнопки архивных, удалённых и неизвестных категорий не показываются:
+ * нажать их значит записать время туда, куда уже не размечают.
  */
-export function presetRow(categories: readonly Category[], presets: readonly Preset[]): PresetButton[] {
-  return activeCategories(categories).flatMap((category) =>
-    presetsOf(presets, category.id).map((preset) => ({ preset, category })),
-  )
+export function presetLines(categories: readonly Category[], presets: readonly Preset[]): PresetLine[] {
+  return activeCategories(categories).flatMap((category) => {
+    const own = presetsOf(presets, category.id)
+    return own.length === 0 ? [] : [{ category, presets: own }]
+  })
+}
+
+/** Сколько кнопок категории видно сразу; остальные раскрываются по нажатию. */
+export const SHOWN_PRESETS = 2
+
+/** Сколько кнопок строки спрятано, пока она свёрнута. Ноль — раскрывать нечего. */
+export function hiddenPresets(line: PresetLine): number {
+  return Math.max(0, line.presets.length - SHOWN_PRESETS)
+}
+
+/** Видимые кнопки строки: свёрнутая — первые по порядку, раскрытая — все. */
+export function shownPresets(line: PresetLine, open: boolean): Preset[] {
+  return open ? line.presets : line.presets.slice(0, SHOWN_PRESETS)
 }
 
 // ─── Стартовый набор ───────────────────────────────────────────────────────

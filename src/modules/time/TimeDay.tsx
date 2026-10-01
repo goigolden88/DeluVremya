@@ -4,14 +4,17 @@ import { db } from '../../app/core.ts'
 import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { BlockForm } from './BlockForm.tsx'
-import { presetRow, type PresetButton } from './categories.ts'
+import { hiddenPresets, presetLines, shownPresets, type PresetLine } from './categories.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { blockFromPreset, blocksOn, categoryName, daySummary, type DaySummary } from './day.ts'
 import {
   addedLine,
   blocksWord,
+  FEWER_PRESETS,
   formatMinutes,
+  morePresetsLabel,
   NO_GROUP,
+  presetFullLabel,
   presetLabel,
   savedLine,
   summaryLine,
@@ -57,12 +60,20 @@ export function TimeDay({
   /** Смена ключа сбрасывает форму «задним числом» после записи. */
   const [retroKey, setRetroKey] = useState(0)
   const [retroSaved, setRetroSaved] = useState('')
+  /** Категории, у которых раскрыты кнопки сверх первых. */
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set())
+  const toggle = (id: string) =>
+    setOpened((current) => {
+      const next = new Set(current)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
 
   if (catalog.status === 'failed') return <p className="error">Категории не прочитались: {catalog.error}</p>
   if (time.status === 'failed') return <p className="error">Блоки времени не прочитались: {time.error}</p>
   if (catalog.status !== 'ready' || time.status !== 'ready') return null
 
-  const buttons = presetRow(catalog.categories, catalog.presets)
+  const lines = presetLines(catalog.categories, catalog.presets)
   const summary = daySummary(time.blocks, catalog.categories, day, new Date())
   // Блок, снятый из списка, «Отменить» больше не предлагает.
   const undoable = last !== null && time.blocks.some((each) => each.id === last.block.id)
@@ -80,10 +91,10 @@ export function TimeDay({
     }
   }
 
-  const add = (button: PresetButton) =>
+  const add = (category: Category, preset: Preset) =>
     write(async () => {
-      const block = await db.put('time', blockFromPreset(button.preset, day))
-      setLast({ block, name: button.category.name })
+      const block = await db.put('time', blockFromPreset(preset, day))
+      setLast({ block, name: category.name })
     })
 
   const remove = (block: TimeBlock) =>
@@ -94,13 +105,46 @@ export function TimeDay({
 
   // По группам (Р-81), если они есть; у группы — сколько в ней учтено за день.
   const grouped = hasGroups(catalog.categories)
-    ? byGroup(buttons, catalog.categories, (button) => button.category.id)
+    ? byGroup(lines, catalog.categories, (line) => line.category.id)
     : null
-  const presetButton = (button: PresetButton) => (
-    <button key={button.preset.id} type="button" className="preset" onClick={() => void add(button)}>
-      {button.category.name} {presetLabel(button.preset.minutes)}
-    </button>
-  )
+  // Строка на категорию: название, рядом кнопки одними минутами.
+  const presetLine = (line: PresetLine) => {
+    const { category } = line
+    const hidden = hiddenPresets(line)
+    const open = hidden > 0 && opened.has(category.id)
+    return (
+      <div key={category.id} className="preset-line">
+        {/* «Ещё» — у названия, а не за кнопками: столбцы кнопок у строк ровные. */}
+        <span className="preset-line__name">
+          <span>{category.name}</span>
+          {hidden > 0 && (
+            <button
+              type="button"
+              className="link-btn preset-line__more"
+              aria-expanded={open}
+              aria-label={`${category.name}: ${open ? FEWER_PRESETS : morePresetsLabel(hidden)}`}
+              onClick={() => toggle(category.id)}
+            >
+              {open ? FEWER_PRESETS : morePresetsLabel(hidden)}
+            </button>
+          )}
+        </span>
+        <span className="preset-line__buttons">
+          {shownPresets(line, open).map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className="preset"
+              aria-label={presetFullLabel(category.name, preset.minutes)}
+              onClick={() => void add(category, preset)}
+            >
+              {presetLabel(preset.minutes)}
+            </button>
+          ))}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -108,7 +152,7 @@ export function TimeDay({
         {compact && <TimerLine timer={timer} categories={catalog.categories} />}
         {!isToday && <p className="muted">{writingFor(day)}</p>}
 
-        {buttons.length === 0 ? (
+        {lines.length === 0 ? (
           <p className="stub">
             Кнопок нет — заведите их в <Link to="/time/categories">категориях</Link>.
           </p>
@@ -123,12 +167,12 @@ export function TimeDay({
                 summary={spent > 0 ? formatMinutes(spent) : undefined}
                 sub
               >
-                <div className="presets">{group.items.map(presetButton)}</div>
+                <div className="presets">{group.items.map(presetLine)}</div>
               </Fold>
             )
           })
         ) : (
-          <div className="presets">{buttons.map(presetButton)}</div>
+          <div className="presets">{lines.map(presetLine)}</div>
         )}
 
         {last && undoable && (
