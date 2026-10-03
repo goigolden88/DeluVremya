@@ -99,8 +99,13 @@ describe('импорт записей', () => {
 })
 
 describe('реестр видов записей', () => {
-  it('все три вида записи на месте, в порядке модели', () => {
-    expect(KIND_ORDER).toEqual(['note', 'time', 'review'])
+  it('все четыре вида записи на месте, в порядке модели', () => {
+    expect(KIND_ORDER).toEqual(['note', 'time', 'review', 'special'])
+  })
+
+  it('особые дни не импортируются — отмечают на «Учёте» (Р-91)', () => {
+    expect(KINDS.special.label).toBe('Особые дни')
+    expect(KINDS.special.import).toBeUndefined()
   })
 
   it('подписи видов не пустые', () => {
@@ -126,6 +131,7 @@ describe('лента и выгрузка — Р-58…Р-60, Р-63', () => {
       ],
       time: [{ id: 't1', updatedAt: at, date: '2026-09-10', categoryId: 'cat:чтение', minutes: 30 }],
       reviews: [{ id: 'review:2026-09-07', updatedAt: at, weekStart: '2026-09-07', doneAt: at }],
+      specials: [{ id: 's1', updatedAt: at, from: '2026-09-11', to: '2026-09-13', title: 'Поездка в Казань' }],
     }
   }
 
@@ -142,7 +148,16 @@ describe('лента и выгрузка — Р-58…Р-60, Р-63', () => {
     expect(places.every((place) => place > 0)).toBe(true)
     expect(places).toEqual([...places].sort((a, b) => a - b))
     expect(text).toContain('Купить фильтр')
+    expect(text).toContain('## Особые дни\n\n- 11–13 сентября 2026, 3 дня — Поездка в Казань')
     expect(text.endsWith('\n')).toBe(true)
+  })
+
+  it('особые дни за период — в выгрузке, задевшие его; не выбранные — нет', () => {
+    const september = { period: { from: '2026-09-01', to: '2026-09-30' }, label: 'сентябрь 2026' }
+    expect(markdownExport(filled(), '2026-09-14', { span: september })).toContain('Поездка в Казань')
+    const october = { period: { from: '2026-10-01', to: '2026-10-31' }, label: 'октябрь 2026' }
+    expect(markdownExport(filled(), '2026-09-14', { span: october })).not.toContain('Поездка в Казань')
+    expect(markdownExport(filled(), '2026-09-14', { kinds: ['note'] })).not.toContain('## Особые дни')
   })
 
   it('пустая база — разделы на месте, и в каждом сказано, что записей нет', () => {

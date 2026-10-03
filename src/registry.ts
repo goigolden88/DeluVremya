@@ -8,8 +8,9 @@
  * пока здесь нет его строки.
  *
  * Рос по этапам (Р-23): с Этапа 1 — подпись и импорт, с Этапа 6 — лента
- * и markdown (Р-63). Импортируются заметки и учёт времени; обзор недели —
- * нет. Строки обзора — из `screens/reviewFeed.ts`: обзор не модуль (Р-60).
+ * и markdown (Р-63). Импортируются заметки и учёт времени; обзор недели
+ * и особые дни (Р-91) — нет. Строки обзора — из `screens/reviewFeed.ts`:
+ * обзор не модуль (Р-60).
  *
  * Чего здесь нет намеренно: маршрутов, вкладок и блоков «Сегодня» —
  * это продуктовые решения, из списка они не выводятся.
@@ -28,6 +29,7 @@ import { noteFeed, noteMarkdown } from './modules/notes/feed.ts'
 import { importNotes, notesImportSpec } from './modules/notes/import.ts'
 import { timeFeed, timeMarkdown } from './modules/time/feed.ts'
 import { importTime, timeImportSpec } from './modules/time/import.ts'
+import { SPECIAL_LABEL, specialFeed, specialMarkdown } from './modules/time/specials.ts'
 import { reviewFeed, reviewMarkdown } from './screens/reviewFeed.ts'
 
 /**
@@ -73,6 +75,12 @@ export const KINDS: { readonly [K in RecordKind]: KindEntry } = {
     label: 'Обзоры недели',
     feed: (data) => reviewFeed(data.reviews, data.notes),
     markdown: (data, _day, period) => reviewMarkdown(data.reviews, data.notes, period),
+  },
+  // Особые дни (Р-91): импорта нет — отмечают на «Учёте».
+  special: {
+    label: SPECIAL_LABEL,
+    feed: (data) => specialFeed(data.specials),
+    markdown: (data, _day, period) => specialMarkdown(data.specials, period),
   },
 }
 
