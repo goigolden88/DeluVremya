@@ -1261,6 +1261,8 @@ async function scenario() {
 
   await polishScenario()
 
+  await specialsScenario()
+
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
     navigator.serviceWorker.ready.then((r) => r.active?.state ?? 'нет'),
@@ -2775,6 +2777,94 @@ async function polishScenario() {
     '«↑ Выше» в карточке пункта ставит его выше соседа — Р-75',
     ordered.indexOf('Порядок два') !== -1 && ordered.indexOf('Порядок два') < ordered.indexOf('Порядок один'),
     `два на ${ordered.indexOf('Порядок два')}, один на ${ordered.indexOf('Порядок один')}`,
+  )
+}
+
+/**
+ * Особые дни на экране (Р-91): кнопка «Особый день» на «Учёте» и форма
+ * с показанным днём по умолчанию; пересечение и «по» раньше «с» не
+ * сохраняются — с причиной; плашка в дни периода на «Учёте» и на
+ * «Сегодня»; тап по плашке — правка и «Убрать». В конце период убран:
+ * сценарии после этого видят «Сегодня» без плашки.
+ */
+async function specialsScenario() {
+  const today = localDay(0)
+  const plate = () => run(`document.querySelector('.special')?.innerText.replace(/\\s+/g, ' ') ?? ''`)
+  const fields = () =>
+    run(`['special-from', 'special-to'].map((name) => document.querySelector('input[name=' + name + ']')?.value ?? '-').join(' ')`)
+
+  await go('/time')
+  await act(`byText('button', 'Особый день')?.click()`)
+  await sleep(400)
+  const defaults = await fields()
+  await act(`
+    set(document.querySelector('input[name=special-title]'), 'Сплав по реке');
+    set(document.querySelector('input[name=special-to]'), ${JSON.stringify(localDay(1))});
+  `)
+  await sleep(200)
+  await act(`byText('button', 'Отметить')?.click()`)
+  await sleep(700)
+  const marked = await plate()
+  const markedScreen = await screen()
+  check(
+    'особый день: кнопка на «Учёте», форма с показанным днём; после записи — плашка с названием и датами — Р-91',
+    defaults === `${today} ${today}` &&
+      has(marked, 'Сплав по реке') &&
+      has(marked, '2 дня') &&
+      !(await act(`return Boolean(byText('button', 'Особый день'))`)) &&
+      has(markedScreen, 'Отмечено: «Сплав по реке»'),
+    `поля ${defaults}; плашка «${marked}»`,
+  )
+
+  await go(`/time?day=${localDay(-3)}`)
+  await act(`byText('button', 'Особый день')?.click()`)
+  await sleep(400)
+  await act(`set(document.querySelector('input[name=special-to]'), ${JSON.stringify(today)})`)
+  await sleep(200)
+  await act(`byText('button', 'Отметить')?.click()`)
+  await sleep(500)
+  const overlap = await run(`document.querySelector('.special-day .error')?.innerText ?? ''`)
+  await act(`set(document.querySelector('input[name=special-to]'), ${JSON.stringify(localDay(-4))})`)
+  await sleep(200)
+  await act(`byText('button', 'Отметить')?.click()`)
+  await sleep(500)
+  const order = await run(`document.querySelector('.special-day .error')?.innerText ?? ''`)
+  await act(`byText('button', 'Отмена')?.click()`)
+  await sleep(400)
+  check(
+    'пересечение и «по» раньше «с» не сохраняются: причина словами, другой период назван — Р-91',
+    has(overlap, 'Задевает другой период: «Сплав по реке»') && has(order, 'раньше') && (await plate()) === '',
+    `${overlap} | ${order}`,
+  )
+
+  await go('/')
+  const todayPlate = await run(`document.querySelector('.special')?.getAttribute('href') ?? ''`)
+  const todayText = await plate()
+  check(
+    'на «Сегодня» — та же плашка, тап ведёт на «Учёт»; кнопки отметки нет — Р-91',
+    has(todayText, 'Сплав по реке') &&
+      todayPlate === '#/time' &&
+      !(await act(`return Boolean(byText('button', 'Особый день'))`)),
+    `${todayText}; ${todayPlate}`,
+  )
+
+  await go('/time')
+  await act(`document.querySelector('button.special')?.click()`)
+  await sleep(400)
+  const editing = await fields()
+  await act(`byText('button', 'Убрать')?.click()`)
+  await sleep(700)
+  const removedScreen = await screen()
+  const removedPlate = await plate()
+  await go('/')
+  const todayAfter = await plate()
+  check(
+    'тап по плашке — правка с датами периода; «Убрать» снимает плашку на «Учёте» и «Сегодня» — Р-91',
+    editing === `${today} ${localDay(1)}` &&
+      has(removedScreen, 'Убрано: «Сплав по реке»') &&
+      removedPlate === '' &&
+      todayAfter === '',
+    `поля ${editing}; после — «${removedPlate}», «${todayAfter}»`,
   )
 }
 
