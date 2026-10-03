@@ -38,6 +38,9 @@ export const config: AppConfig<StoreRecord> = {
     notes: ['capturedOn', 'plannedFor'],
     time: ['date'],
     reviews: ['weekStart'],
+    // Только держит таблицу полной: хранилище и его `updatedAt` заводит
+    // шаг миграции на версию 2.
+    specials: [],
   },
 
   // 02-Архитектура, «Раскладка данных в репозитории».
@@ -50,6 +53,8 @@ export const config: AppConfig<StoreRecord> = {
     notes: { split: 'month', dir: 'notes', dateOf: (note) => note.capturedOn },
     time: { split: 'month', dir: 'time', dateOf: (block) => block.date },
     reviews: { split: 'none', path: 'reviews.json' },
+    // Периодов — единицы в год: одного файла хватит навсегда (Р-91).
+    specials: { split: 'none', path: 'specials.json' },
   },
 
   storeNotes: {
@@ -59,6 +64,7 @@ export const config: AppConfig<StoreRecord> = {
     notes: 'заметки: дела, мысли, замыслы и пункты плана — по месяцу, когда записаны',
     time: 'блоки учтённого времени — по месяцу, к которому относятся',
     reviews: 'проведённые обзоры недели',
+    specials: 'особые дни — поездки, походы: периоды вне обычного учёта',
   },
 
   importFormat: 'deluvremya-import',
