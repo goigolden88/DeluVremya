@@ -5,6 +5,11 @@
  * потом (Р-52). Фоновая активность в сумму не входит и идёт у категории
  * отдельной строкой (Р-43) — так же, как в итоге дня.
  *
+ * Особые дни (Р-91): итог промежутка — только по обычным дням, особые
+ * названы числом и считаются отдельно, по периоду; неделя, задевшая хоть
+ * один особый день, не судится. Без списка особых дней — все дни: так
+ * считают срез итогов и выгрузка.
+ *
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
@@ -23,9 +28,34 @@ import {
   type MonthStr,
   type Period,
 } from '../../shared/core/dates.ts'
-import type { Category, TimeBlock } from '../../app/model.ts'
+import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
 import { activeCategories, MINUTES_PER_DAY, type CategoryKind } from './categories.ts'
 import { groupTotals, type GroupTotal } from './groups.ts'
+import { specialPeriod, specialsIn } from './specials.ts'
+
+// ─── Особые дни в промежутке (Р-91) ────────────────────────────────────────
+
+/** Часть периода внутри промежутка; не задевает или даты кривые — null. */
+function inside(special: SpecialDays, period: Period): Period | null {
+  const own = specialPeriod(special)
+  if (own === null || own.from > period.to || own.to < period.from) return null
+  return { from: own.from > period.from ? own.from : period.from, to: own.to < period.to ? own.to : period.to }
+}
+
+/** Особые дни промежутка — дни живых периодов внутри него. */
+function specialDaysIn(specials: readonly SpecialDays[], period: Period): Set<DateStr> {
+  const found = new Set<DateStr>()
+  for (const special of specialsIn(specials, period)) {
+    const part = inside(special, period)
+    if (part) for (const day of periodDays(part)) found.add(day)
+  }
+  return found
+}
+
+/** Задела ли неделя дня `day` хоть один особый день: такая неделя не судится. */
+export function specialWeek(specials: readonly SpecialDays[], day: DateStr): boolean {
+  return specialsIn(specials, weekPeriod(day)).length > 0
+}
 
 // ─── Итог промежутка ───────────────────────────────────────────────────────
 
@@ -58,8 +88,10 @@ export type PeriodSummary = {
   count: number
   /** В скольких днях учтено хоть что-то. */
   days: number
-  /** Сколько дней промежутка уже наступило — основание «в 5 днях из 7». */
+  /** Сколько обычных дней промежутка уже наступило — основание «в 5 днях из 7». */
   elapsedDays: number
+  /** Сколько наступивших дней — особые (Р-91): их блоки в итог не входят. */
+  specialDays: number
   byCategory: PeriodCategory[]
   /** По группам (Р-81): сумма, дни и фон группы — экраны и срез берут отсюда, а не складывают сами. */
   byGroup: GroupTotal[]
@@ -80,12 +112,18 @@ function categoryOrder(categories: readonly Category[]) {
     order(a.categoryId) - order(b.categoryId) || (a.name ?? '').localeCompare(b.name ?? '', 'ru')
 }
 
+/**
+ * Итог промежутка. С особыми днями — только по обычным: блоки особых дней
+ * не входят ни в сумму, ни в категории, ни в разбивки (Р-91).
+ */
 export function periodSummary(
   blocks: readonly TimeBlock[],
   categories: readonly Category[],
   period: Period,
   today: DateStr,
+  specials: readonly SpecialDays[] = [],
 ): PeriodSummary {
+  const special = specialDaysIn(specials, period)
   const known = new Map(categories.map((category) => [category.id, category]))
   const rows = new Map<string, PeriodCategory & { dates: Set<string> }>()
   const row = (id: string) => {
@@ -107,7 +145,7 @@ export function periodSummary(
     return entry
   }
 
-  const list = blocksIn(blocks, period)
+  const list = blocksIn(blocks, period).filter((block) => !special.has(block.date))
   const dates = new Set<string>()
   for (const block of list) {
     const main = row(block.categoryId)
@@ -129,15 +167,38 @@ export function periodSummary(
     return minutes > 0 ? [{ kind, minutes }] : []
   })
 
+  const elapsed = periodDays(period).filter((day) => day <= today)
   return {
     total: list.reduce((sum, block) => sum + block.minutes, 0),
     count: list.length,
     days: dates.size,
-    elapsedDays: periodDays(period).filter((day) => day <= today).length,
+    elapsedDays: elapsed.filter((day) => !special.has(day)).length,
+    specialDays: elapsed.filter((day) => special.has(day)).length,
     byCategory,
     byGroup: groupTotals(list, categories),
     byKind,
   }
+}
+
+/** Особый период в промежутке: его дни внутри и итог за них. */
+export type SpecialTime = { special: SpecialDays; period: Period; summary: PeriodSummary }
+
+/**
+ * Блок «Особые дни» под итогом (Р-91): каждый живой период, задевший
+ * промежуток, — с итогом за свои дни внутри него. Период, начатый раньше
+ * промежутка или кончающийся позже, считается только своей частью внутри.
+ */
+export function specialTime(
+  blocks: readonly TimeBlock[],
+  categories: readonly Category[],
+  specials: readonly SpecialDays[],
+  period: Period,
+  today: DateStr,
+): SpecialTime[] {
+  return specialsIn(specials, period).flatMap((special) => {
+    const part = inside(special, period)
+    return part ? [{ special, period: part, summary: periodSummary(blocks, categories, part, today) }] : []
+  })
 }
 
 /** Строка сравнения: категория этого промежутка и её минуты в прежнем. */
@@ -177,18 +238,19 @@ export type YearTime = {
   categories: YearCategory[]
 }
 
-/** Год по месяцам: итог каждого месяца и строки категорий с их месяцами. */
+/** Год по месяцам: итог каждого месяца и строки категорий с их месяцами; с особыми днями — по обычным. */
 export function yearTime(
   blocks: readonly TimeBlock[],
   categories: readonly Category[],
   year: number,
   today: DateStr,
+  specials: readonly SpecialDays[] = [],
 ): YearTime {
   const months = monthsOf(year).map((month) => ({
     month,
-    summary: periodSummary(blocks, categories, monthPeriod(month), today),
+    summary: periodSummary(blocks, categories, monthPeriod(month), today, specials),
   }))
-  const total = periodSummary(blocks, categories, yearPeriod(year), today)
+  const total = periodSummary(blocks, categories, yearPeriod(year), today, specials)
   return {
     months,
     total,
@@ -271,8 +333,10 @@ export function normSince(category: Category): DateStr | null {
 
 export type WeekMark = {
   week: Period
-  /** В счёт: закончилась, полная с `since` (Р-56), не раньше первого блока. */
+  /** В счёт: закончилась, полная с `since` (Р-56), не раньше первого блока, без особых дней (Р-91). */
   counted: boolean
+  /** Задела особые дни — не судится, ни «выполнена», ни «нет» (Р-91). */
+  special: boolean
   /** Выполнены все правила. У недели не в счёт не значит ничего. */
   met: boolean
 }
@@ -297,21 +361,28 @@ function firstBlock(blocks: readonly TimeBlock[]): DateStr | null {
   )
 }
 
-type WeekStat = { week: Period; summary: PeriodSummary }
+/** Факт недели — по всем её дням: особая неделя не судится вовсе, а не по обычным дням. */
+type WeekStat = { week: Period; summary: PeriodSummary; special: boolean }
 
 function weekStats(
   blocks: readonly TimeBlock[],
   categories: readonly Category[],
   weeks: readonly Period[],
   today: DateStr,
+  specials: readonly SpecialDays[],
 ): WeekStat[] {
-  return weeks.map((week) => ({ week, summary: periodSummary(blocks, categories, week, today) }))
+  return weeks.map((week) => ({
+    week,
+    summary: periodSummary(blocks, categories, week, today),
+    special: specialWeek(specials, week.from),
+  }))
 }
 
 /**
  * История нормы по неделям. В счёт — закончившиеся недели, не раньше первого
  * блока и только полные с `since`: с понедельника не раньше него. Норма,
- * заведённая в среду, в эту неделю не судится (Р-56).
+ * заведённая в среду, в эту неделю не судится (Р-56). Неделя с особыми днями
+ * не судится тоже и в «N из M» не входит (Р-91).
  */
 function historyOf(
   category: Category & { norm: Norm },
@@ -320,9 +391,11 @@ function historyOf(
   today: DateStr,
 ): NormHistory {
   const since = normSince(category)
-  const marks = stats.map(({ week, summary }) => ({
+  const marks = stats.map(({ week, summary, special }) => ({
     week,
-    counted: week.to <= today && first !== null && week.to >= first && (since === null || week.from >= since),
+    counted:
+      !special && week.to <= today && first !== null && week.to >= first && (since === null || week.from >= since),
+    special,
     met: checkNorm(category.norm, statOf(summary, category.id)).every((check) => check.met),
   }))
   const counted = marks.filter((mark) => mark.counted)
@@ -354,6 +427,7 @@ export function weekNorms(
   categories: readonly Category[],
   week: DateStr,
   today: DateStr,
+  specials: readonly SpecialDays[] = [],
 ): WeekNorm[] {
   const list = normed(categories, NORM_RULES)
   if (list.length === 0) return []
@@ -364,7 +438,7 @@ export function weekNorms(
   const weeks = Array.from({ length: NORM_HISTORY_WEEKS }, (_, index) =>
     weekPeriod(addDays(period.from, -7 * (NORM_HISTORY_WEEKS - 1 - index))),
   )
-  const stats = weekStats(blocks, categories, weeks, today)
+  const stats = weekStats(blocks, categories, weeks, today, specials)
   const first = firstBlock(blocks)
 
   return list.map((category) => ({
@@ -386,10 +460,11 @@ export function periodNorms(
   categories: readonly Category[],
   period: Period,
   today: DateStr,
+  specials: readonly SpecialDays[] = [],
 ): PeriodNorm[] {
   const list = normed(categories, NORM_RULES)
   if (list.length === 0) return []
-  const stats = weekStats(blocks, categories, weeksEndingIn(period), today)
+  const stats = weekStats(blocks, categories, weeksEndingIn(period), today, specials)
   const first = firstBlock(blocks)
   return list.map((category) => ({ category, history: historyOf(category, stats, first, today) }))
 }

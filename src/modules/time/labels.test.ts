@@ -4,6 +4,7 @@ import { MAX_NORM_DAYS, MAX_NORM_MINUTES, NORM_MIN_WEEKS } from './period.ts'
 import {
   addedLine,
   blocksWord,
+  categoriesLine,
   checkText,
   historyText,
   historyWaitText,
@@ -12,10 +13,14 @@ import {
   morePresetsLabel,
   NORM_PROBLEMS,
   normText,
+  periodLine,
   presetFullLabel,
   presetLabel,
   runningLine,
   savedLine,
+  SPECIAL_WEEK,
+  specialMarksText,
+  specialWeekText,
   startedLine,
   summaryLine,
   unaccountedLine,
@@ -106,12 +111,54 @@ describe('тексты норм недели — Р-45', () => {
 
   it('отметки по неделям — числа дней, через месяц тоже; не в счёт не показаны (Р-55)', () => {
     const marks = [
-      { week: { from: '2026-08-31', to: '2026-09-06' }, counted: true, met: true },
-      { week: { from: '2026-09-07', to: '2026-09-13' }, counted: true, met: false },
-      { week: { from: '2026-09-14', to: '2026-09-20' }, counted: false, met: false },
+      { week: { from: '2026-08-31', to: '2026-09-06' }, counted: true, met: true, special: false },
+      { week: { from: '2026-09-07', to: '2026-09-13' }, counted: true, met: false, special: false },
+      { week: { from: '2026-09-14', to: '2026-09-20' }, counted: false, met: false, special: false },
     ]
     expect(weekCell(marks[0]!.week)).toBe('31–6')
     expect(marksLine(marks)).toBe('31–6 ✓ · 7–13 —')
+    expect(specialMarksText(marks, true)).toBeNull()
+  })
+
+  it('особая неделя — не судится: без галочки, подпись с периодом (Р-91)', () => {
+    expect(checkText({ rule: 'minMinutes', target: 300, actual: 330, met: true }, false)).toBe('5 ч 30 мин из 5 ч')
+    expect(SPECIAL_WEEK).toBe('особая неделя — не судится')
+    const trip = { id: 's1', updatedAt: '2026-09-13T10:00:00.000Z', from: '2026-09-11', to: '2026-09-13', title: 'Поездка' }
+    expect(specialWeekText([trip])).toBe('Особая неделя — не судится: «Поездка», 11–13 сентября 2026, 3 дня')
+  })
+
+  it('особые недели месяца — числами дней, года — числом; в отметки не входят (Р-91)', () => {
+    const week = (from: string, to: string, special: boolean) => ({ week: { from, to }, counted: !special, met: true, special })
+    const one = [week('2026-08-31', '2026-09-06', false), week('2026-09-07', '2026-09-13', true)]
+    expect(marksLine(one)).toBe('31–6 ✓')
+    expect(specialMarksText(one, true)).toBe('Особая неделя 7–13 — не судится')
+    expect(specialMarksText(one, false)).toBe('1 особая неделя — не судится')
+    const two = [...one, week('2026-09-14', '2026-09-20', true)]
+    expect(specialMarksText(two, true)).toBe('Особые недели 7–13, 14–20 — не судятся')
+    expect(specialMarksText(two, false)).toBe('2 особые недели — не судятся')
+  })
+
+  it('итог промежутка с особыми днями — по обычным, особые названы (Р-91)', () => {
+    const base = { total: 300, count: 5, days: 5, elapsedDays: 5, byCategory: [], byGroup: [], byKind: [] }
+    expect(periodLine({ ...base, specialDays: 0 })).toBe('Учтено 5 ч · 5 блоков · учёт был в 5 днях из 5')
+    expect(periodLine({ ...base, specialDays: 2 })).toBe(
+      'Учтено 5 ч · 5 блоков · учёт был в 5 днях из 5 обычных; особых — 2',
+    )
+    expect(periodLine({ ...base, days: 1, elapsedDays: 1, specialDays: 6 })).toContain('из 1 обычного; особых — 6')
+    expect(periodLine({ ...base, total: 0, count: 0, days: 0, elapsedDays: 0, specialDays: 7 })).toBe(
+      'Ничего не учтено в обычные дни · особых — 7',
+    )
+    expect(periodLine({ ...base, total: 0, count: 0, days: 0, specialDays: 0 })).toBe('Ничего не учтено')
+  })
+
+  it('категории особого периода — строкой, без нулей', () => {
+    expect(
+      categoriesLine([
+        { name: 'Чтение', minutes: 60 },
+        { name: 'Покер', minutes: 0 },
+        { name: null, minutes: 15 },
+      ]),
+    ).toBe('Чтение 1 ч · без категории 15 мин')
   })
 
   it('пределы в причинах — из констант', () => {

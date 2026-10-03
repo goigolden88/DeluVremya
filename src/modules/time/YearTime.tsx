@@ -1,13 +1,22 @@
 import { Fragment } from 'react'
-import { formatMonth, monthName, monthPeriod, MONTHS_SHORT, type DateStr, type MonthStr } from '../../shared/core/dates.ts'
+import {
+  formatMonth,
+  monthName,
+  monthPeriod,
+  MONTHS_SHORT,
+  yearPeriod,
+  type DateStr,
+  type MonthStr,
+} from '../../shared/core/dates.ts'
 import { BarChart, MiniBars } from '../../shared/ui/BarChart.tsx'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { backgroundText, formatMinutes, kindLine, lowerFirst, NO_GROUP, periodLine, UNKNOWN_CATEGORY } from './labels.ts'
-import { yearTime } from './period.ts'
-import { Unready } from './Period.tsx'
+import { specialTime, yearTime } from './period.ts'
+import { ready, SpecialTimeList, Unready } from './Period.tsx'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
+import { useSpecials } from './useSpecials.ts'
 
 /** Деления оси — целыми часами. */
 const HOUR = 60
@@ -20,7 +29,8 @@ function capitalized(text: string): string {
  * Время года (Р-57): итог с основанием, столбцы месяцев — тап открывает
  * месяц, — те же числа таблицей в свёрнутом блоке, категории строками
  * с малыми столбиками по месяцам. Признак не красит (Р-05); фоновое —
- * отдельно и в сумму не входит (Р-43).
+ * отдельно и в сумму не входит (Р-43). Итог, столбцы и категории — по
+ * обычным дням; особые — ниже, своим блоком (Р-91).
  *
  * Адрес месяца даёт экран: модуль маршрутов не знает.
  */
@@ -35,9 +45,11 @@ export function YearTime({
 }) {
   const catalog = useCatalog()
   const time = useBlocks()
-  if (catalog.status !== 'ready' || time.status !== 'ready') return <Unready catalog={catalog} time={time} />
+  const specials = useSpecials()
+  if (!ready(catalog, time, specials)) return <Unready catalog={catalog} time={time} specials={specials} />
 
-  const data = yearTime(time.blocks, catalog.categories, year, today)
+  const data = yearTime(time.blocks, catalog.categories, year, today, specials.specials)
+  const special = specialTime(time.blocks, catalog.categories, specials.specials, yearPeriod(year), today)
   const past = data.months.filter(({ month }) => monthPeriod(month).from <= today)
   const items = data.months.map(({ month, summary }, index) => {
     const future = monthPeriod(month).from > today
@@ -102,6 +114,7 @@ export function YearTime({
                   <td className="num">{summary.count > 0 ? formatMinutes(summary.total) : '—'}</td>
                   <td className="num muted">
                     {summary.days} из {summary.elapsedDays}
+                    {summary.specialDays > 0 && ` · особых ${summary.specialDays}`}
                   </td>
                 </tr>
               ))}
@@ -140,6 +153,7 @@ export function YearTime({
         </>
       )}
       {data.total.byKind.length > 0 && <p className="muted">По признаку: {kindLine(data.total.byKind)}</p>}
+      <SpecialTimeList rows={special} />
     </div>
   )
 }
