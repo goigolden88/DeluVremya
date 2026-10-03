@@ -4,8 +4,10 @@ import type { SpecialDays } from '../../app/model.ts'
 import {
   checkSpecial,
   datesText,
+  draftOf,
   SPECIAL_LABEL,
   specialFeed,
+  specialFromDraft,
   specialMarkdown,
   specialOn,
   specialProblemText,
@@ -100,6 +102,34 @@ describe('правила периода — Р-91', () => {
       'Задевает другой период: «Поездка в Казань», 5–7 октября 2026, 3 дня.',
     )
     expect(specialProblemText({ reason: 'order' })).toContain('раньше')
+  })
+})
+
+describe('форма периода — Р-91', () => {
+  it('новый период — с показанного дня по него же, без названия', () => {
+    expect(draftOf('2026-10-03')).toEqual({ from: '2026-10-03', to: '2026-10-03', title: '' })
+  })
+
+  it('правка — даты и название записи, а не показанный день', () => {
+    expect(draftOf('2026-10-06', kazan)).toEqual({ from: '2026-10-05', to: '2026-10-07', title: 'Поездка в Казань' })
+    expect(draftOf('2026-10-06', special('x', '2026-10-05', '2026-10-07')).title).toBe('')
+  })
+
+  it('новая запись — свой id, даты, название без пробелов по краям', () => {
+    const created = specialFromDraft({ from: '2026-10-20', to: '2026-10-22', title: '  Дача ' })
+    expect(created).toMatchObject({ from: '2026-10-20', to: '2026-10-22', title: 'Дача' })
+    expect(created.id).toBeTruthy()
+    expect(created.deleted).toBeUndefined()
+  })
+
+  it('пустое название не хранится', () => {
+    expect(specialFromDraft({ from: '2026-10-20', to: '2026-10-20', title: '   ' })).not.toHaveProperty('title')
+  })
+
+  it('правка — тот же id; стёртое название снимается', () => {
+    const edited = specialFromDraft({ from: '2026-10-04', to: '2026-10-07', title: '' }, kazan)
+    expect(edited).toEqual({ id: 's1', updatedAt: at, from: '2026-10-04', to: '2026-10-07' })
+    expect(kazan.title).toBe('Поездка в Казань')
   })
 })
 

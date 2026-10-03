@@ -744,6 +744,51 @@ span.plan-item__text {
   text-align: center;
 }
 
+/* Особые дни (Р-91): плашка с названием и датами — на «Учёте» кнопкой
+   правки, на «Сегодня» ссылкой на «Учёт». Нейтральная: не «вредное» (Р-05). */
+.special {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.special__title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.special__dates {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.special-day {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.special-day .form {
+  align-self: stretch;
+}
+
+.special-form__date {
+  flex: 1 1 9em;
+}
+
 /* Обзор недели: мысль возврата и наблюдение — как записаны, с переносами строк. */
 .recall {
   white-space: pre-wrap;

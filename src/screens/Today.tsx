@@ -9,6 +9,7 @@ import { useToday } from '../shared/ui/useToday.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { PlanDay } from '../modules/notes/PlanDay.tsx'
 import { windowLeft } from '../modules/time/day.ts'
+import { SpecialToday } from '../modules/time/Special.tsx'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
 import { ReviewCall } from './Review.tsx'
 import { useFirstRun } from '../shared/screens/useFirstRun.ts'
@@ -55,6 +56,9 @@ export function Today() {
         </div>
         <p className="muted">{formatDateLong(day)}</p>
       </header>
+
+      {/* Сегодня особый день — плашкой; отмечают на «Учёте» (Р-91). */}
+      <SpecialToday day={day} />
 
       {/* Первый запуск: пока база пуста и приветствие не закрыли. */}
       {first.welcome && <Welcome onDone={first.dismissWelcome} />}

@@ -4,6 +4,7 @@ import { useToday } from '../../shared/ui/useToday.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
 import { viewedDay } from './day.ts'
 import { windowNote } from './labels.ts'
+import { SpecialDay } from './Special.tsx'
 import { TimeDay } from './TimeDay.tsx'
 import { WeekProgress } from './Week.tsx'
 
@@ -74,6 +75,9 @@ export function TimeScreen() {
           </button>
         )}
       </header>
+
+      {/* Особые дни (Р-91): плашка периода или кнопка отметки — про показанный день. */}
+      <SpecialDay key={`special:${day}`} day={day} />
 
       {/* Ключ — день: отклик «Отменить» и форма «задним числом» — про свой день. */}
       <TimeDay key={day} day={day} today={today} />
