@@ -2,6 +2,7 @@ import { days, plural, timeSpan } from '../shared/core/dates.ts'
 import { QUIET_MS, RETRY_MS } from '../shared/core/sync.ts'
 import { RECALL_WEEKS, STALE_BATCH } from '../modules/notes/review.ts'
 import { DAY_WINDOW } from '../modules/time/day.ts'
+import { SPECIAL_WEEK } from '../modules/time/labels.ts'
 import { NORM_HISTORY_WEEKS, NORM_MIN_WEEKS } from '../modules/time/period.ts'
 import { DEFAULT_WINDOW } from '../shared/notify.ts'
 import { STALE_DAYS as BACKUP_DAYS } from '../shared/ui/backup.ts'
@@ -143,6 +144,16 @@ export function Help() {
           В дни периода на экране {quoted(names.time)} — плашка с названием и датами, тап по ней — правка и
           «Убрать». На экране {quoted(names.today)} та же плашка видна, если сегодня особый день; тап по ней
           ведёт к правке. Кнопки отметки там нет: отмечают редко.
+        </p>
+        <p>
+          Неделя, задевшая хоть один особый день, не судится: в обзоре недели, в блоке «Неделя» на экране{' '}
+          {quoted(names.time)}, в нормах месяца и года — подпись «{SPECIAL_WEEK}». В «выполнена в N из M
+          недель» такая неделя не входит, и история нормы ждёт недель без особых дней.
+        </p>
+        <p>
+          Итоги недели, месяца и года — учтено, категории, фон, признак — считаются по обычным дням; рядом
+          сказано, сколько было особых. Ниже итога — блок «Особые дни»: что учтено за каждый период. Месяц
+          сравнивается с прошлым тоже по обычным дням. План против факта считается как раньше, по всем дням.
         </p>
       </Fold>
 

@@ -47,6 +47,8 @@ export const OWN_UNKNOWN = {
   noMain: 'no-main',
   /** Ни у одного пункта нет оценки. */
   noEstimates: 'no-estimates',
+  /** В неделе особые дни — не судится (Р-91). */
+  specialDays: 'special-days',
 } as const
 
 // ─── Ключи (Р-87) ──────────────────────────────────────────────────────────
@@ -246,6 +248,15 @@ function normMetric(row: WeekNorm, running: string | null): Metric {
   }
   // Последняя отметка истории — сама неделя (`weekNorms`).
   const mark = row.history.marks[row.history.marks.length - 1]
+  if (mark?.special) {
+    // Названий и дат периода в срезе нет: это текст человека (Я-14 «FamilyCore»).
+    return {
+      key,
+      label,
+      value: { unknown: OWN_UNKNOWN.specialDays, text: 'В неделе особые дни — неделя не судится' },
+      basis: `${rules}; в неделе особые дни — не судится`,
+    }
+  }
   if (!mark?.counted) {
     const since = row.history.since
     if (since !== null && mark !== undefined && mark.week.from < since) {
@@ -266,7 +277,7 @@ function normMetric(row: WeekNorm, running: string | null): Metric {
       basis: rules,
     }
   }
-  const facts = row.checks.map(checkText).join('; ')
+  const facts = row.checks.map((check) => checkText(check)).join('; ')
   const background = row.background > 0 ? `; ещё ${formatMinutes(row.background)} фоном в норму не входят` : ''
   return {
     key,
@@ -280,12 +291,15 @@ function normMetric(row: WeekNorm, running: string | null): Metric {
 
 function periodOf(data: SummaryData, period: SummaryPeriod, day: DateStr): PeriodSummary {
   const running = period.from <= day && day <= period.to
+  // Время — по всем дням, особые тоже: состав среза — договор ядра (Р-91, Я-19 «FamilyCore»).
   const time = periodSummary(data.time, data.categories, period, day)
   const length = periodDays(period).length
   const metrics = [...timeMetrics(data, time, length), ...planMetrics(planFact(data.notes, period, day))]
   if (period.grain === 'week') {
     const runningText = running ? `неделя идёт: прошло ${days(time.elapsedDays)} из ${length}` : null
-    for (const row of weekNorms(data.time, data.categories, period.from, day)) metrics.push(normMetric(row, runningText))
+    for (const row of weekNorms(data.time, data.categories, period.from, day, data.specials)) {
+      metrics.push(normMetric(row, runningText))
+    }
   }
   // Идущий отрезок верен по день расчёта; прошлый — окончательный по форме,
   // хотя ретро-ввод (Р-19) может его поправить: это видно по `lastEdit`.

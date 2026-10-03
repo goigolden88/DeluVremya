@@ -21,6 +21,8 @@ import {
   type WeekMark,
 } from './period.ts'
 import type { BlockProblem } from './retro.ts'
+import { datesText, specialTitle } from './specials.ts'
+import type { SpecialDays } from '../../app/model.ts'
 
 /**
  * Признак категории. Нужен только обзору недели (Р-05): на экране дня
@@ -187,15 +189,44 @@ export function normText(norm: Norm): string {
 /**
  * Как идёт правило: «2 из 3 дней», «4 ч из 5 ч», «11 ч при пределе 10 ч».
  * Выполненное — галочкой; невыполненное — без цвета и без упрёка (Р-05).
+ * Неделя не судится (`judged` ложно) — одни числа, без галочки (Р-91).
  */
-export function checkText(check: NormCheck): string {
+export function checkText(check: NormCheck, judged = true): string {
   const text =
     check.rule === 'minDays'
       ? `${check.actual} из ${check.target} ${daysAfter(check.target)}`
       : check.rule === 'minMinutes'
         ? `${formatMinutes(check.actual)} из ${formatMinutes(check.target)}`
         : `${formatMinutes(check.actual)} при пределе ${formatMinutes(check.target)}`
-  return check.met ? `${text} ✓` : text
+  return judged && check.met ? `${text} ✓` : text
+}
+
+/** Подпись недели, задевшей особые дни (Р-91). */
+export const SPECIAL_WEEK = 'особая неделя — не судится'
+
+function upperFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/** «Особая неделя — не судится: «Поездка», 7–9 октября 2026, 3 дня» — почему она не судится. */
+export function specialWeekText(specials: readonly SpecialDays[]): string {
+  const list = specials.map((special) => `«${specialTitle(special)}», ${datesText(special)}`).join('; ')
+  return `${upperFirst(SPECIAL_WEEK)}: ${list}`
+}
+
+/**
+ * Особые недели среди недель промежутка (Р-91): месяц — числами дней,
+ * «Особая неделя 7–13 — не судится»; год — числом, «3 особые недели —
+ * не судятся». Нет — null.
+ */
+export function specialMarksText(marks: readonly WeekMark[], cells: boolean): string | null {
+  const special = marks.filter((mark) => mark.special)
+  const count = special.length
+  if (count === 0) return null
+  const verb = plural(count, ['не судится', 'не судятся', 'не судятся'])
+  if (!cells) return `${count} ${plural(count, ['особая неделя', 'особые недели', 'особых недель'])} — ${verb}`
+  const list = special.map((mark) => weekCell(mark.week)).join(', ')
+  return `${count === 1 ? 'Особая неделя' : 'Особые недели'} ${list} — ${verb}`
 }
 
 /** Вместо серии (Р-45): в скольких из последних недель норма выполнена. */
@@ -233,12 +264,13 @@ export function marksLine(marks: readonly WeekMark[]): string {
     .join(' · ')
 }
 
-/** Как читать отметки по неделям месяца (Р-55, Р-56). */
+/** Как читать отметки по неделям месяца (Р-55, Р-56, Р-91). */
 export const MARKS_BASIS =
-  'Недели — те, чьё воскресенье в этом месяце. В счёт — закончившиеся и полные с дня нормы; ✓ — норма выполнена, «—» — нет.'
+  'Недели — те, чьё воскресенье в этом месяце. В счёт — закончившиеся, полные с дня нормы и без особых дней; ✓ — норма выполнена, «—» — нет.'
 
 /** Как считаются нормы за год. */
-export const YEAR_NORMS_BASIS = 'Недели — те, чьё воскресенье в этом году. В счёт — закончившиеся и полные с дня нормы.'
+export const YEAR_NORMS_BASIS =
+  'Недели — те, чьё воскресенье в этом году. В счёт — закончившиеся, полные с дня нормы и без особых дней.'
 
 /** История нормы словами: «выполнена в N из M недель» или когда появится. */
 export function historyText(history: NormHistory): string {
@@ -252,11 +284,25 @@ export function lowerFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1)
 }
 
-/** Итог промежутка — с основанием: сколько блоков и в скольких днях из наступивших. */
+/**
+ * Итог промежутка — с основанием: сколько блоков и в скольких днях из
+ * наступивших. Были особые дни — итог по обычным, и особые названы (Р-91):
+ * «учёт был в 5 днях из 5 обычных; особых — 2».
+ */
 export function periodLine(summary: PeriodSummary): string {
-  if (summary.count === 0) return 'Ничего не учтено'
-  const days = `учёт был в ${summary.days} ${plural(summary.days, ['дне', 'днях', 'днях'])} из ${summary.elapsedDays}`
+  const special = `особых — ${summary.specialDays}`
+  if (summary.count === 0) return summary.specialDays === 0 ? 'Ничего не учтено' : `Ничего не учтено в обычные дни · ${special}`
+  let days = `учёт был в ${summary.days} ${plural(summary.days, ['дне', 'днях', 'днях'])} из ${summary.elapsedDays}`
+  if (summary.specialDays > 0) days += ` ${plural(summary.elapsedDays, ['обычного', 'обычных', 'обычных'])}; ${special}`
   return `Учтено ${formatMinutes(summary.total)} · ${summary.count} ${blocksWord(summary.count)} · ${days}`
+}
+
+/** Категории строкой — «Чтение 1 ч · Ходьба 3 ч»: для особого периода, где таблица была бы лишней. */
+export function categoriesLine(byCategory: readonly { name: string | null; minutes: number }[]): string {
+  return byCategory
+    .filter((row) => row.minutes > 0)
+    .map((row) => `${row.name ?? UNKNOWN_CATEGORY} ${formatMinutes(row.minutes)}`)
+    .join(' · ')
 }
 
 /** По признаку категории — только в обзоре (Р-05). */

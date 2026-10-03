@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildSummary, checkSummary, type Metric, type PeriodSummary } from '../shared/core/summary.ts'
-import type { Category, Note, Review, TimeBlock } from '../app/model.ts'
+import type { Category, Note, Review, SpecialDays, TimeBlock } from '../app/model.ts'
 import { importTime } from '../modules/time/import.ts'
 import { summary, type SummaryData } from './summary.ts'
 
@@ -226,6 +226,41 @@ describe('нормы недели — вердиктом (Р-45, Р-56)', () => 
     const renamed = data()
     renamed.categories = renamed.categories.map((each) => (each.id === 'cat:чтение' ? { ...each, name: 'Книги' } : each))
     expect(byKey(sliced(renamed, MONDAY).periods[0])['norm.cat:чтение']?.label).toBe('Норма: Книги')
+  })
+})
+
+describe('особые дни — Р-91', () => {
+  const trip: SpecialDays = { id: 's1', updatedAt: AT, from: '2026-09-19', to: '2026-09-21', title: 'Поездка в Казань' }
+  function withTrip(): SummaryData {
+    const input = data({ specials: [trip] })
+    return { ...input, time: [...input.time, block('7', 'cat:шахматы', '2026-09-19', 60)] }
+  }
+
+  it('время — как было, по всем дням: особые тоже в сумме', () => {
+    const week = byKey(sliced(withTrip(), MONDAY).periods[0])
+    expect(week['time.total']?.value).toEqual({ n: 240, unit: 'minutes' })
+    expect(week['time.total']?.basis).toContain('учёт в 4 днях из 7')
+    expect(week['time.total']?.basis).not.toContain('особых')
+  })
+
+  it('норма особой недели — «не известно» с кодом special-days и основанием', () => {
+    const week = byKey(sliced(withTrip(), MONDAY).periods[0])
+    for (const key of ['norm.cat:чтение', 'norm.cat:шахматы', 'norm.cat:ютуб']) {
+      expect(week[key]?.value).toMatchObject({ unknown: 'special-days' })
+      expect(week[key]?.basis).toContain('в неделе особые дни — не судится')
+    }
+  })
+
+  it('идущая неделя с особым днём — «не ясно», как всякая идущая', () => {
+    const week = byKey(sliced(withTrip(), MONDAY).periods[1])
+    expect(week['norm.cat:чтение']?.value).toEqual({ verdict: 'open' })
+  })
+
+  it('состав и ключи среза — те же; названия периода в срезе нет', () => {
+    const keys = (input: SummaryData) => sliced(input, MONDAY).periods.map((period) => metrics(period).map((m) => m.key))
+    const plain = data({ time: withTrip().time })
+    expect(keys(withTrip())).toEqual(keys(plain))
+    expect(JSON.stringify(sliced(withTrip(), MONDAY))).not.toContain('Казань')
   })
 })
 

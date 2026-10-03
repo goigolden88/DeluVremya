@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Category, TimeBlock } from '../../app/model.ts'
+import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
 import {
   checkNorm,
   compareRows,
@@ -8,6 +8,8 @@ import {
   periodNorms,
   periodSummary,
   readNorm,
+  specialTime,
+  specialWeek,
   weekNorms,
   weekProgress,
   withNorm,
@@ -188,6 +190,103 @@ describe('нормы недели — Р-45', () => {
     const list = weekProgress([block('1', 'a', '2026-09-14', 30), block('2', 'b', '2026-09-14', 90)], [both, youtube], '2026-09-15')
     expect(list.map((each) => each.category.name)).toEqual(['Чтение'])
     expect(list[0]?.checks).toEqual([{ rule: 'minDays', target: 3, actual: 1, met: false }])
+  })
+})
+
+describe('особые дни в итогах и нормах — Р-91', () => {
+  const categories = [cat('a', 'Чтение', 0, { kind: 'useful' }), cat('b', 'Ходьба', 1, { kind: 'neutral' }), cat('p', 'Покер', 2)]
+  const trip: SpecialDays = { id: 's1', updatedAt: AT, from: '2026-09-11', to: '2026-09-13', title: 'Поездка' }
+  const gone: SpecialDays = { id: 's2', updatedAt: AT, from: '2026-09-07', to: '2026-09-07', deleted: true }
+  const blocks = [
+    block('1', 'a', '2026-09-07', 30),
+    block('2', 'a', '2026-09-09', 45),
+    block('3', 'b', '2026-09-12', 120),
+    block('4', 'a', '2026-09-13', 60, { bgCategoryId: 'p' }),
+  ]
+
+  it('итог — только по обычным дням: сумма, категории, фон, признак; особые названы числом', () => {
+    const summary = periodSummary(blocks, categories, WEEK, SUNDAY, [trip, gone])
+    expect(summary).toMatchObject({ total: 75, count: 2, days: 2, elapsedDays: 4, specialDays: 3 })
+    expect(summary.byCategory.map((row) => [row.name, row.minutes, row.background])).toEqual([['Чтение', 75, 0]])
+    expect(summary.byKind).toEqual([{ kind: 'useful', minutes: 75 }])
+  })
+
+  it('без особых дней — как было; будущие особые дни ещё не названы', () => {
+    expect(periodSummary(blocks, categories, WEEK, SUNDAY)).toMatchObject({ total: 255, elapsedDays: 7, specialDays: 0 })
+    expect(periodSummary(blocks, categories, WEEK, '2026-09-11', [trip])).toMatchObject({ elapsedDays: 4, specialDays: 1 })
+    expect(periodSummary(blocks, categories, WEEK, '2026-09-09', [trip])).toMatchObject({ elapsedDays: 3, specialDays: 0 })
+  })
+
+  it('блок «Особые дни» — каждый период со своими днями внутри промежутка', () => {
+    const early: SpecialDays = { id: 's0', updatedAt: AT, from: '2026-09-05', to: '2026-09-07' }
+    const rows = specialTime(blocks, categories, [trip, early, gone], WEEK, SUNDAY)
+    expect(rows.map((row) => [row.special.id, row.period])).toEqual([
+      ['s0', { from: '2026-09-07', to: '2026-09-07' }],
+      ['s1', { from: '2026-09-11', to: '2026-09-13' }],
+    ])
+    expect(rows[0]?.summary).toMatchObject({ total: 30, elapsedDays: 1 })
+    expect(rows[1]?.summary).toMatchObject({ total: 180, count: 2, days: 2, elapsedDays: 3 })
+    expect(rows[1]?.summary.byCategory.map((row) => [row.name, row.minutes, row.background])).toEqual([
+      ['Чтение', 60, 0],
+      ['Ходьба', 120, 0],
+      ['Покер', 0, 60],
+    ])
+    expect(specialTime(blocks, categories, [trip], { from: '2026-09-14', to: '2026-09-20' }, SUNDAY)).toEqual([])
+  })
+
+  it('месяц против прошлого — обычные дни с обеих сторон', () => {
+    const august: SpecialDays = { id: 's3', updatedAt: AT, from: '2026-08-10', to: '2026-08-10' }
+    const list = [...blocks, block('5', 'a', '2026-08-10', 500), block('6', 'a', '2026-08-11', 20)]
+    const current = periodSummary(list, categories, { from: '2026-09-01', to: '2026-09-30' }, SUNDAY, [trip, august])
+    const before = periodSummary(list, categories, { from: '2026-08-01', to: '2026-08-31' }, SUNDAY, [trip, august])
+    expect(compareRows(current, before, categories).map((row) => [row.name, row.minutes, row.before])).toEqual([
+      ['Чтение', 75, 20],
+    ])
+  })
+
+  it('год — столбцы и категории по обычным дням', () => {
+    const data = yearTime(blocks, categories, 2026, SUNDAY, [trip])
+    expect(data.months[8]?.summary).toMatchObject({ total: 75, specialDays: 3 })
+    expect(data.total).toMatchObject({ total: 75, specialDays: 3 })
+    expect(data.categories.map((row) => row.name)).toEqual(['Чтение'])
+  })
+
+  // Два дня чтения в каждой неделе с 17.08 по 13.09.
+  const reading = cat('a', 'Чтение', 0, { norm: { minDays: 2, since: '2026-08-01' } })
+  const weekly = ['2026-08-17', '2026-08-18', '2026-08-24', '2026-08-25', '2026-08-31', '2026-09-01', '2026-09-07', '2026-09-08'].map(
+    (date, index) => block(String(index), 'a', date, 30),
+  )
+  const hike: SpecialDays = { id: 'h', updatedAt: AT, from: '2026-08-30', to: '2026-08-31' }
+
+  it('неделя, задевшая особый день, не судится и в «N из M» не входит', () => {
+    expect(specialWeek([hike], '2026-08-27')).toBe(true)
+    expect(specialWeek([hike], '2026-09-02')).toBe(true)
+    expect(specialWeek([hike, gone], '2026-09-10')).toBe(false)
+    const history = weekNorms(weekly, [reading], SUNDAY, SUNDAY, [hike])[0]?.history
+    // 24.08 задета воскресеньем 30.08, 31.08 — понедельником.
+    expect(history?.marks.map((mark) => [mark.counted, mark.special])).toEqual([
+      [true, false],
+      [false, true],
+      [false, true],
+      [true, false],
+    ])
+    expect(history).toMatchObject({ kept: 2, weeks: 2, enough: false })
+  })
+
+  it('порог истории — только недели в счёт (Р-53)', () => {
+    expect(weekNorms(weekly, [reading], SUNDAY, SUNDAY)[0]?.history).toMatchObject({ weeks: 4, enough: true })
+    expect(weekNorms(weekly, [reading], SUNDAY, SUNDAY, [hike])[0]?.history.enough).toBe(false)
+  })
+
+  it('нормы месяца — особая неделя отмечена и не в счёт', () => {
+    const [row] = periodNorms(weekly, [reading], { from: '2026-09-01', to: '2026-09-30' }, '2026-09-15', [hike])
+    expect(row?.history.marks.map((mark) => [mark.week.to, mark.counted, mark.special])).toEqual([
+      ['2026-09-06', false, true],
+      ['2026-09-13', true, false],
+      ['2026-09-20', false, false],
+      ['2026-09-27', false, false],
+    ])
+    expect(row?.history).toMatchObject({ kept: 1, weeks: 1 })
   })
 })
 
