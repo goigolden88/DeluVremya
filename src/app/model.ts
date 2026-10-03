@@ -16,7 +16,7 @@ import type { Base, Migration } from '../shared/core/model.ts'
  * Версия схемы. Растёт с каждым шагом в `migrations` — и с добавлением
  * хранилища тоже: IndexedDB заводит хранилище только при смене версии.
  */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 // ─── Справочники ───────────────────────────────────────────────────────────
 
@@ -109,8 +109,21 @@ export type Review = Base & {
   refs?: string[]
 }
 
-/** Вид записи. Три значения — ровно то, что описано выше. */
-export type RecordKind = 'note' | 'time' | 'review'
+/**
+ * Особые дни — поездка, поход: период, когда обычный учёт времени не имеет
+ * смысла (Р-91). Периоды не пересекаются; один день — `from` = `to`.
+ */
+export type SpecialDays = Base & {
+  /** YYYY-MM-DD, первый особый день */
+  from: string
+  /** YYYY-MM-DD, последний, включительно */
+  to: string
+  /** «Поездка в Казань»; нет — подпись «Особые дни» */
+  title?: string
+}
+
+/** Вид записи. Четыре значения — ровно то, что описано выше. */
+export type RecordKind = 'note' | 'time' | 'review' | 'special'
 
 // ─── Хранилища ─────────────────────────────────────────────────────────────
 
@@ -121,7 +134,7 @@ export type RecordKind = 'note' | 'time' | 'review'
  * пишут импорт и слепок: справочники раньше записей, что на них ссылаются.
  * Локальные `meta`, `settings`, `dirty` — ядра, одинаковы у всей семьи.
  */
-export const SYNCED_STORES = ['categories', 'presets', 'templates', 'notes', 'time', 'reviews'] as const
+export const SYNCED_STORES = ['categories', 'presets', 'templates', 'notes', 'time', 'reviews', 'specials'] as const
 
 export type SyncedStore = (typeof SYNCED_STORES)[number]
 
@@ -136,6 +149,7 @@ export type StoreRecord = {
   notes: Note
   time: TimeBlock
   reviews: Review
+  specials: SpecialDays
 }
 
 /** Любая синхронизируемая запись. */
@@ -156,4 +170,16 @@ export const OWN_STORES = ['notes', 'time', 'reviews'] as const satisfies readon
  * в `app/config.ts` после первого релиза заморожен. Что такое шаг и как он
  * применяется — `Migration` ядра.
  */
-export const migrations: Migration[] = []
+export const migrations: Migration[] = [
+  {
+    to: 2,
+    note: 'хранилище specials — особые дни (Р-91)',
+    // Только новое хранилище: прежние записи не трогаются, и слепок
+    // версии 1 принимается как есть.
+    additive: true,
+    run: (database) => {
+      const specials = database.createObjectStore('specials', { keyPath: 'id' })
+      specials.createIndex('updatedAt', 'updatedAt') // нужен слиянию
+    },
+  },
+]

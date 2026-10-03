@@ -32,6 +32,7 @@ const LABELS: Record<SyncedStore, string> = {
   notes: 'Заметки и план',
   time: 'Блоки времени',
   reviews: 'Обзоры недели',
+  specials: 'Особые дни',
 }
 
 type Row = { store: SyncedStore; live: number; total: number }

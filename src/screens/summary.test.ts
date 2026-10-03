@@ -21,7 +21,7 @@ function item(id: string, text: string, plannedFor: string, extra: Partial<Note>
 }
 
 function empty(): SummaryData {
-  return { categories: [], presets: [], templates: [], notes: [], time: [], reviews: [] }
+  return { categories: [], presets: [], templates: [], notes: [], time: [], reviews: [], specials: [] }
 }
 
 function data(extra: Partial<SummaryData> = {}): SummaryData {

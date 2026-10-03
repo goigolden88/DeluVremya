@@ -41,24 +41,42 @@ function block(id: string, date: string): TimeBlock {
   return { id, updatedAt: AT, date, categoryId: 'cat:Чтение', minutes: 30 }
 }
 
-function data(parts: { notes?: Note[]; time?: TimeBlock[] }): { [S in SyncedStore]: StoreRecord[S][] } {
-  return { categories: [], presets: [], templates: [], notes: parts.notes ?? [], time: parts.time ?? [], reviews: [] }
+function data(parts: Partial<{ [S in SyncedStore]: StoreRecord[S][] }>): { [S in SyncedStore]: StoreRecord[S][] } {
+  return {
+    categories: [],
+    presets: [],
+    templates: [],
+    notes: [],
+    time: [],
+    reviews: [],
+    specials: [],
+    ...parts,
+  }
 }
+
+/** Записи всех видов версии 1 — так лежат на телефоне до обновления. */
+function v1Records(): Partial<{ [S in SyncedStore]: StoreRecord[S][] }> {
+  return {
+    categories: [{ id: 'cat:Чтение', updatedAt: AT, name: 'Чтение', order: 1, kind: 'useful', norm: { minDays: 3 } }],
+    presets: [{ id: 'p1', updatedAt: AT, categoryId: 'cat:Чтение', minutes: 30, order: 1 }],
+    templates: [{ id: 'tpl1', updatedAt: AT, name: 'Рабочий', items: [{ title: 'Почта', estMin: 20 }], order: 1 }],
+    notes: [note('n1', '2026-09-10'), { ...note('n2', null), deleted: true }],
+    time: [block('t1', '2026-09-11')],
+    reviews: [{ id: 'review:2026-09-07', updatedAt: AT, weekStart: '2026-09-07', doneAt: AT }],
+  }
+}
+
+const V1_STORES = ['categories', 'presets', 'templates', 'notes', 'time', 'reviews'] as const
 
 describe('данные не трогаются переводом', () => {
   it('база называется deluvremya — на общем origin только имя разводит приложения семьи', () => {
     expect(config.dbName).toBe('deluvremya')
   })
 
-  it('версия схемы 1, миграций нет', () => {
-    expect(config.schemaVersion).toBe(1)
-    expect(SCHEMA_VERSION).toBe(1)
-    expect(config.migrations).toEqual([])
-  })
-
-  it('шесть хранилищ, все — в раскладке версии 1; импорт пишет справочники первыми', () => {
-    expect([...config.stores]).toEqual(['categories', 'presets', 'templates', 'notes', 'time', 'reviews'])
-    expect([...config.v1Stores]).toEqual([...SYNCED_STORES])
+  it('шесть хранилищ версии 1 — в замороженной раскладке; особые дни — после них, не в ней', () => {
+    expect([...config.stores]).toEqual([...V1_STORES, 'specials'])
+    expect([...config.v1Stores]).toEqual([...V1_STORES])
+    expect([...SYNCED_STORES]).toEqual([...config.stores])
   })
 
   it('формат импорта прежний', () => {
@@ -67,19 +85,21 @@ describe('данные не трогаются переводом', () => {
 })
 
 describe('схема базы', () => {
-  it('заводит все хранилища; индексы сверх updatedAt — прежние', async () => {
+  it('свежая база доезжает до версии 2 теми же шагами: все хранилища; индексы сверх updatedAt — прежние', async () => {
     await db.ready()
     await db.close()
     const raw = await openRaw()
     try {
-      expect(raw.version).toBe(1)
+      expect(raw.version).toBe(2)
       for (const store of [...SYNCED_STORES, ...LOCAL_STORES]) expect(raw.objectStoreNames.contains(store)).toBe(true)
       const tx = raw.transaction([...SYNCED_STORES], 'readonly')
       const indexes = (store: SyncedStore) => [...tx.objectStore(store).indexNames].sort()
       expect(indexes('notes')).toEqual(['capturedOn', 'plannedFor', 'updatedAt'])
       expect(indexes('time')).toEqual(['date', 'updatedAt'])
       expect(indexes('reviews')).toEqual(['updatedAt', 'weekStart'])
-      for (const store of ['categories', 'presets', 'templates'] as const) expect(indexes(store)).toEqual(['updatedAt'])
+      for (const store of ['categories', 'presets', 'templates', 'specials'] as const) {
+        expect(indexes(store)).toEqual(['updatedAt'])
+      }
     } finally {
       raw.close()
     }
@@ -99,8 +119,75 @@ describe('схема базы', () => {
   })
 })
 
+describe('миграция на версию 2 — особые дни (Р-91)', () => {
+  it('один шаг: на версию 2, только добавляет', () => {
+    expect(SCHEMA_VERSION).toBe(2)
+    expect(config.schemaVersion).toBe(2)
+    expect(config.migrations.map((step) => ({ to: step.to, additive: step.additive }))).toEqual([
+      { to: 2, additive: true },
+    ])
+  })
+
+  it('база версии 1 с записями всех видов открывается на версии 2: записи на месте, хранилище specials есть', async () => {
+    const records = v1Records()
+    await legacyBase(records)
+
+    await db.ready()
+    await db.close()
+    const raw = await openRaw()
+    try {
+      expect(raw.version).toBe(2)
+      expect(raw.objectStoreNames.contains('specials')).toBe(true)
+      const indexes = [...raw.transaction('specials', 'readonly').objectStore('specials').indexNames]
+      expect(indexes).toEqual(['updatedAt'])
+    } finally {
+      raw.close()
+    }
+
+    // Каждая запись — как лежала, с надгробиями: без них второе устройство воскресит удалённое.
+    for (const store of V1_STORES) {
+      expect(await db.getAll(store, { includeDeleted: true })).toEqual(records[store])
+    }
+    expect(await db.getAll('specials')).toEqual([])
+    expect(await db.meta.get('schemaVersion')).toBe(2)
+    expect(await db.settings.get('syncRepo')).toBe('me/DeluVremyaData')
+    expect(await db.listDirty()).toEqual([{ store: 'time', id: 't1', at: AT }])
+
+    // В новое хранилище пишется и читается.
+    await db.put('specials', { id: 's1', updatedAt: AT, from: '2026-10-05', to: '2026-10-07', title: 'Поездка' })
+    expect(await db.get('specials', 's1')).toMatchObject({ from: '2026-10-05', to: '2026-10-07', title: 'Поездка' })
+  })
+
+  it('та же база версии 1 путём ядра — тем же шагом доезжает до версии 2', async () => {
+    const records = v1Records()
+    expect(await db.createLegacyBase(1, records)).toEqual([])
+    await db.ready()
+    for (const store of V1_STORES) {
+      expect(await db.getAll(store, { includeDeleted: true })).toEqual(records[store])
+    }
+    expect(await db.getAll('specials')).toEqual([])
+  })
+
+  it('слепок версии 1 принимается: особых дней в нём нет — хранилище пустое', async () => {
+    const snapshot = db.parseSnapshot(
+      JSON.stringify({ schemaVersion: 1, exportedAt: AT, data: { notes: [note('n1', '2026-09-10')] } }),
+    )
+    expect(snapshot.data.specials).toEqual([])
+    expect(() => db.checkSnapshotVersion(1)).not.toThrow()
+    expect(await db.importAll(snapshot)).toBe(1)
+    expect(await db.get('notes', 'n1')).toMatchObject({ text: 'Мысль' })
+  })
+
+  it('слепок версии 2 с особыми днями — туда и обратно', async () => {
+    await db.put('specials', { id: 's1', updatedAt: AT, from: '2026-10-05', to: '2026-10-07' })
+    const snapshot = await db.exportAll()
+    expect(snapshot.schemaVersion).toBe(2)
+    expect(snapshot.data.specials).toMatchObject([{ id: 's1', from: '2026-10-05', to: '2026-10-07' }])
+  })
+})
+
 describe('раскладка репозитория данных', () => {
-  it('справочники и обзоры — одним файлом, заметки и учёт — по месяцам', () => {
+  it('справочники, обзоры и особые дни — одним файлом, заметки и учёт — по месяцам', () => {
     const paths = layout
       .buildFiles(data({ notes: [note('a', '2026-01-31')], time: [block('b', '2026-02-01')] }))
       .map((file) => file.path)
@@ -110,9 +197,20 @@ describe('раскладка репозитория данных', () => {
       'notes/2026-01.json',
       'presets.json',
       'reviews.json',
+      'specials.json',
       'templates.json',
       'time/2026-02.json',
     ])
+  })
+
+  it('особые дни уезжают в specials.json; meta.json — версия 2', () => {
+    const trip = { id: 's1', updatedAt: AT, from: '2026-10-05', to: '2026-10-07', title: 'Поездка в Казань' }
+    const files = layout.buildFiles(data({ specials: [trip] }))
+    expect(files.find((file) => file.path === 'specials.json')?.content).toContain('Поездка в Казань')
+    expect(JSON.parse(files.find((file) => file.path === 'meta.json')?.content ?? '{}')).toEqual({
+      app: 'deluvremya',
+      schemaVersion: 2,
+    })
   })
 
   it('заметка — по дню записи; без даты и с испорченной датой — в undated, не пропадает (Р-08)', () => {
@@ -132,6 +230,7 @@ describe('раскладка репозитория данных', () => {
       'notes/ГГГГ-ММ.json',
       'time/ГГГГ-ММ.json',
       'reviews.json',
+      'specials.json',
     ]) {
       expect(text).toContain(`\`${path}\``)
     }
@@ -160,7 +259,7 @@ function openRaw(): Promise<IDBDatabase> {
   })
 }
 
-const LEGACY_INDEXES: Record<SyncedStore, readonly string[]> = {
+const LEGACY_INDEXES: Record<(typeof V1_STORES)[number], readonly string[]> = {
   categories: [],
   presets: [],
   templates: [],
@@ -169,12 +268,12 @@ const LEGACY_INDEXES: Record<SyncedStore, readonly string[]> = {
   reviews: ['weekStart'],
 }
 
-function legacyBase(records: { notes: Note[]; time: TimeBlock[] }): Promise<void> {
+function legacyBase(records: Partial<{ [S in SyncedStore]: StoreRecord[S][] }>): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('deluvremya', 1)
     request.onupgradeneeded = () => {
       const database = request.result
-      for (const store of ['categories', 'presets', 'templates', 'notes', 'time', 'reviews'] as const) {
+      for (const store of V1_STORES) {
         const created = database.createObjectStore(store, { keyPath: 'id' })
         created.createIndex('updatedAt', 'updatedAt')
         for (const field of LEGACY_INDEXES[store]) created.createIndex(field, field)
@@ -185,9 +284,10 @@ function legacyBase(records: { notes: Note[]; time: TimeBlock[] }): Promise<void
     }
     request.onsuccess = () => {
       const database = request.result
-      const tx = database.transaction(['notes', 'time', 'meta', 'settings', 'dirty'], 'readwrite')
-      for (const record of records.notes) tx.objectStore('notes').put(record)
-      for (const record of records.time) tx.objectStore('time').put(record)
+      const tx = database.transaction([...V1_STORES, 'meta', 'settings', 'dirty'], 'readwrite')
+      for (const store of V1_STORES) {
+        for (const record of records[store] ?? []) tx.objectStore(store).put(record)
+      }
       tx.objectStore('meta').put({ key: 'schemaVersion', value: 1 })
       tx.objectStore('settings').put({ key: 'syncRepo', value: 'me/DeluVremyaData' })
       tx.objectStore('dirty').put({ store: 'time', id: 't1', at: AT })

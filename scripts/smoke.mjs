@@ -1158,14 +1158,15 @@ async function scenario() {
   }
   check(
     'в файле копии — схема и обе записи, токена нет',
-    snapshot?.schemaVersion === 1 &&
+    snapshot?.schemaVersion === 2 &&
       snapshot?.data?.notes?.length === 2 &&
       !JSON.stringify(snapshot).includes('syncToken'),
     saved ?? `файла нет: ${readdirSync(profile).filter((name) => name.endsWith('.json')).join(', ')}`,
   )
 
   // Запись с другого устройства, без даты: её загрузка — тем же путём, что
-  // у человека, «Восстановить из копии».
+  // у человека, «Восстановить из копии». Схема 1 — нарочно: копия, снятая
+  // до особых дней, принимается (шаг на версию 2 только добавляет, Р-91).
   const restore = join(profile, 'restore.json')
   writeFileSync(
     restore,
@@ -1434,7 +1435,7 @@ async function stageSixScenario() {
       has(report, ' · #/inbox · ') &&
       // Текст в адресе закодирован: ищется не он, а сам параметр.
       !has(report, 'shared') &&
-      has(report, 'Схема данных: 1') &&
+      has(report, 'Схема данных: 2') &&
       has(cleared, 'Ошибок приложение не записало'),
     line(report, 'проверка журнала') || report.slice(0, 120),
   )
@@ -2341,7 +2342,7 @@ async function syncScenario() {
     `коммитов ${commitCount()}; ${line(first, 'отправлено файлов')}`,
   )
   const expected = ['meta.json', 'categories.json', 'presets.json', 'templates.json', 'reviews.json',
-    'time/2026-02.json', `time/${month}.json`, `notes/${month}.json`, 'notes/undated.json']
+    'specials.json', 'time/2026-02.json', `time/${month}.json`, `notes/${month}.json`, 'notes/undated.json']
   check(
     'раскладка по месяцам, годовых файлов нет — Р-28',
     expected.every((path) => paths.includes(path)) && !paths.some((path) => /^(time|notes)\/\d{4}\.json$/.test(path)),
@@ -2746,7 +2747,7 @@ async function polishScenario() {
   const chosen = chosenName ? readFileSync(join(profile, chosenName), 'utf8') : ''
   check(
     'markdown на выбор: без обзоров, за февраль — шапка называет разделы и период — Р-79',
-    chosen.includes('Разделы: Заметки и план, Учёт времени.') &&
+    chosen.includes('Разделы: Заметки и план, Учёт времени, Особые дни.') &&
       chosen.includes('Период: февраль 2026.') &&
       chosen.includes('## Учёт времени') &&
       !chosen.includes('## Обзоры недели'),
