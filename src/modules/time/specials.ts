@@ -9,8 +9,9 @@
  * Чистые функции, без React и без базы.
  */
 
-import { formatPeriod, isDateStr, periodDays, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
+import { formatPeriod, isDateStr, nowIso, periodDays, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { escapeMarkdown as md, type FeedItem } from '../../shared/core/feed.ts'
+import { ulid } from '../../shared/core/id.ts'
 import type { SpecialDays } from '../../app/model.ts'
 
 /** Подпись вида и периода без названия. */
@@ -89,6 +90,30 @@ export function specialProblemText(problem: SpecialProblem): string {
     case 'overlap':
       return `Задевает другой период: «${specialTitle(problem.other)}», ${datesText(problem.other)}.`
   }
+}
+
+/** Что ввёл человек в форме: «с», «по», название. */
+export type SpecialDraft = Pick<SpecialDays, 'from' | 'to'> & { title: string }
+
+/** Форма нового периода — с показанного дня по него же, без названия. */
+export function draftOf(day: DateStr, existing?: SpecialDays): SpecialDraft {
+  return existing ? { from: existing.from, to: existing.to, title: existing.title ?? '' } : { from: day, to: day, title: '' }
+}
+
+/**
+ * Запись из формы: новая — со своим `id`, правка — поверх прежней. Название
+ * без пробелов по краям; пустое не хранится — подпись тогда «Особые дни».
+ */
+export function specialFromDraft(draft: SpecialDraft, existing?: SpecialDays): SpecialDays {
+  const special: SpecialDays = {
+    ...(existing ?? { id: ulid(), updatedAt: nowIso() }),
+    from: draft.from,
+    to: draft.to,
+  }
+  const title = draft.title.trim()
+  if (title) special.title = title
+  else delete special.title
+  return special
 }
 
 /** «7–13 сентября 2026, 7 дней»; один день — без числа дней. Кривые даты — как лежат. */
