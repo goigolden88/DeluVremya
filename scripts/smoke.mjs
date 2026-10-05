@@ -914,6 +914,27 @@ async function scenario() {
   await sleep(700)
   check('блок снимается из списка дня', has(await screen(), 'За день ничего не учтено'))
 
+  // ─ «Очистить день»: все блоки дня одной записью, после подтверждения.
+  await act(`preset('Чтение +30')?.click()`)
+  await sleep(700)
+  await act(`preset('Чтение +60')?.click()`)
+  await sleep(700)
+  await act(`window.confirm = (text) => { window.__asked = text; return false }; byText('button', 'Очистить день')?.click()`)
+  await sleep(500)
+  const clearAsked = await run(`window.__asked ?? ''`)
+  const kept = await screen()
+  await act(`window.confirm = () => true; byText('button', 'Очистить день')?.click()`)
+  await sleep(700)
+  const clearedDay = await screen()
+  check(
+    '«Очистить день»: подтверждение называет число блоков, «Отмена» не трогает, «Да» убирает все',
+    has(clearAsked, 'Убрать 2 блока за') &&
+      has(kept, 'Учтено 1 ч 30 мин · 2 блока') &&
+      has(clearedDay, 'За день ничего не учтено') &&
+      !has(clearedDay, 'Очистить день'),
+    `${clearAsked} | ${line(kept, 'Учтено')} → ${line(clearedDay, 'За день')}`,
+  )
+
   await go('/')
   await act(`preset('Прогулка +30')?.click()`)
   await sleep(700)

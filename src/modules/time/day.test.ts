@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, TimeBlock } from '../../app/model.ts'
 import { createPreset } from './categories.ts'
-import { blockFromPreset, blocksOn, daySummary, DAY_WINDOW, viewedDay, windowElapsed, windowLeft } from './day.ts'
+import { blockFromPreset, blocksOn, clearDayBlocks, daySummary, DAY_WINDOW, viewedDay, windowElapsed, windowLeft } from './day.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
 const DAY = '2026-09-13'
@@ -37,6 +37,29 @@ describe('блоки дня', () => {
       block('01D', 'a', 30, { date: '2026-09-12' }),
     ]
     expect(blocksOn(blocks, DAY).map((each) => each.id)).toEqual(['01C', '01A'])
+  })
+})
+
+describe('очистить день', () => {
+  it('надгробия только живых блоков этого дня, остальные поля как были', () => {
+    const blocks = [
+      block('01A', 'a', 30, { note: 'заметка', bgCategoryId: 'b' }),
+      block('01B', 'a', 30, { deleted: true }),
+      block('01C', 'b', 45),
+      block('01D', 'a', 30, { date: '2026-09-12' }),
+    ]
+    const cleared = clearDayBlocks(blocks, DAY)
+    expect(cleared).toEqual([
+      { ...blocks[2], deleted: true },
+      { ...blocks[0], deleted: true },
+    ])
+    // Исходные блоки не тронуты: надгробия — новые записи.
+    expect(blocks.filter((each) => each.deleted).map((each) => each.id)).toEqual(['01B'])
+  })
+
+  it('пустой день — пустой список', () => {
+    expect(clearDayBlocks([block('01D', 'a', 30, { date: '2026-09-12' })], DAY)).toEqual([])
+    expect(clearDayBlocks([], DAY)).toEqual([])
   })
 })
 

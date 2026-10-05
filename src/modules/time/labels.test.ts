@@ -6,6 +6,7 @@ import {
   blocksWord,
   categoriesLine,
   checkText,
+  clearDayConfirm,
   DAY_LABEL_STEP,
   dayLabel,
   dayTitle,
@@ -101,6 +102,14 @@ describe('тексты таймера и ретро-ввода', () => {
   it('записано не сегодня — с датой, а не молча', () => {
     expect(savedLine('Чтение', 30, TODAY, TODAY)).toBe('Записано: Чтение, 30 мин')
     expect(savedLine('Чтение', 30, '2026-09-12', TODAY)).toBe('Записано на 12 сентября 2026: Чтение, 30 мин')
+  })
+
+  it('очистить день — сколько блоков и за какой день', () => {
+    expect(clearDayConfirm(3, '2026-09-12')).toBe(
+      'Убрать 3 блока за 12 сентября 2026? Блоки других дней, таймер и особые дни не тронутся.',
+    )
+    expect(clearDayConfirm(1, '2026-09-12')).toContain('Убрать 1 блок за')
+    expect(clearDayConfirm(5, '2026-09-12')).toContain('Убрать 5 блоков за')
   })
 })
 
