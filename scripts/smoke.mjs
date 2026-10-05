@@ -2034,6 +2034,36 @@ async function monthScenario() {
     `${line(imported, 'Загружено')}; ${line(august, 'Учтено')}; ${line(august, 'Июль:')}`,
   )
 
+  // ─ График дней: тридцать один столбец со ссылками на дни, у 1-го и 31-го — столбец, наибольший подписан (Р-92).
+  const dayBars = await run(`JSON.stringify({
+    columns: document.querySelectorAll('svg.chart__svg .chart__col').length,
+    links: document.querySelectorAll('svg.chart__svg a.chart__col').length,
+    bars: document.querySelectorAll('svg.chart__svg .chart__bar').length,
+    first: document.querySelector('svg.chart__svg a[href="#/time?day=2024-08-01"] .chart__bar') !== null,
+    last: document.querySelector('svg.chart__svg a[href="#/time?day=2024-08-31"] .chart__bar') !== null,
+    peak: document.querySelector('svg.chart__svg .chart__value')?.textContent ?? '',
+  })`)
+  const days = JSON.parse(dayBars ?? '{}')
+  check(
+    'итоги месяца: график дней — тридцать один столбец со ссылками на дни, столбцы у 1-го и 31-го, наибольший подписан — Р-92',
+    days.columns === 31 && days.links === 31 && days.bars === 2 && days.first && days.last && days.peak === '1 ч 10 мин',
+    dayBars,
+  )
+
+  // ─ Тап по столбцу дня — этот день в учёте.
+  await act(`
+    document.querySelector('svg.chart__svg a[href="#/time?day=2024-08-01"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  `)
+  await sleep(900)
+  const dayHash = await run('location.hash')
+  const dayScreen = await screen()
+  check(
+    'тап по столбцу месяца открывает этот день в учёте — Р-92',
+    dayHash === '#/time?day=2024-08-01' && has(dayScreen, 'Учтено 1 ч 10 мин'),
+    `${dayHash}; ${line(dayScreen, 'Учтено')}`,
+  )
+
   // ─ Неделя, закрывшая июль: карточка в обзоре ведёт к итогам июля; другая неделя — без неё (Р-54).
   await go('/review?week=2024-08-05')
   const plainWeek = await screen()

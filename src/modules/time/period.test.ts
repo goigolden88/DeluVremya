@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
+import { daySummary } from './day.ts'
 import {
   checkNorm,
   compareRows,
+  monthDays,
   normInput,
   normSince,
   periodNorms,
@@ -120,6 +122,69 @@ describe('год по месяцам — Р-57', () => {
       ['Чтение', 90, 45, 90, 0],
       ['Ютуб', 45, 0, 0, 45],
     ])
+  })
+})
+
+describe('месяц по дням — Р-92', () => {
+  const categories = [cat('a', 'Чтение', 0), cat('b', 'Ютуб', 1)]
+  /** Итог дня — тот, что на экране учёта; час дня на сумму не влияет. */
+  const dayTotal = (list: readonly TimeBlock[], date: string) =>
+    daySummary(list, categories, date, new Date(2026, 9, 5, 12)).total
+
+  it('значения по дням — как итог дня: фоновое, удалённое и соседний месяц не входят', () => {
+    const blocks = [
+      block('1', 'a', '2026-09-01', 30),
+      block('2', 'b', '2026-09-01', 45, { bgCategoryId: 'a' }),
+      block('3', 'a', '2026-09-15', 60),
+      block('4', 'a', '2026-09-15', 20, { deleted: true }),
+      block('5', 'a', '2026-09-30', 10),
+      block('6', 'a', '2026-08-31', 100),
+      block('7', 'a', '2026-10-01', 100),
+    ]
+    const days = monthDays(blocks, '2026-09', '2026-10-05')
+    expect(days.map((day) => day.value)).toEqual(days.map((day) => dayTotal(blocks, day.date)))
+    expect(days[0]).toMatchObject({ date: '2026-09-01', value: 75, count: 2, muted: false, future: false, special: null })
+    expect(days[14]).toMatchObject({ date: '2026-09-15', value: 60, count: 1, muted: false })
+    // День без учёта — ноль, подпись серым: столбца нет, но день был.
+    expect(days[1]).toMatchObject({ date: '2026-09-02', value: 0, count: 0, muted: true })
+  })
+
+  it('месяц из двадцати восьми, тридцати и тридцати одного дня — столбец на каждый день', () => {
+    const days = (month: string) => monthDays([], month, '2026-12-31').map((day) => day.date)
+    expect(days('2026-02')).toHaveLength(28)
+    expect(days('2026-02').at(-1)).toBe('2026-02-28')
+    expect(days('2026-09')).toHaveLength(30)
+    expect(days('2026-09').at(-1)).toBe('2026-09-30')
+    expect(days('2026-08')).toHaveLength(31)
+    expect(days('2026-08')[0]).toBe('2026-08-01')
+    expect(days('2026-08').at(-1)).toBe('2026-08-31')
+  })
+
+  it('будущие дни — без значения и серым; сегодня — со значением', () => {
+    const blocks = [block('1', 'a', '2026-10-05', 40)]
+    const days = monthDays(blocks, '2026-10', '2026-10-05')
+    expect(days[4]).toMatchObject({ date: '2026-10-05', value: 40, future: false, muted: false })
+    expect(days[5]).toMatchObject({ date: '2026-10-06', value: null, future: true, muted: true })
+    expect(days.filter((day) => day.future)).toHaveLength(26)
+    expect(days.filter((day) => day.future).every((day) => day.value === null && day.muted)).toBe(true)
+  })
+
+  it('особые дни — без значения и серым, период назван; удалённый период — обычные дни — Р-91', () => {
+    const trip: SpecialDays = { id: 't', updatedAt: AT, from: '2026-08-30', to: '2026-09-02', title: 'Поездка' }
+    const gone: SpecialDays = { id: 'g', updatedAt: AT, from: '2026-09-10', to: '2026-09-10', deleted: true }
+    const blocks = [block('1', 'a', '2026-09-02', 90), block('2', 'a', '2026-09-03', 15), block('3', 'a', '2026-09-10', 5)]
+    const days = monthDays(blocks, '2026-09', '2026-10-05', [trip, gone])
+    // Период начат в августе: в сентябре — его 1-е и 2-е.
+    expect(days.slice(0, 3).map((day) => [day.value, day.muted, day.special?.id ?? null])).toEqual([
+      [null, true, 't'],
+      [null, true, 't'],
+      [15, false, null],
+    ])
+    expect(days[1]?.count).toBe(1)
+    expect(days[9]).toMatchObject({ value: 5, special: null })
+    // Сумма столбцов — итог месяца по обычным дням.
+    const total = days.reduce((sum, day) => sum + (day.value ?? 0), 0)
+    expect(total).toBe(periodSummary(blocks, [], { from: '2026-09-01', to: '2026-09-30' }, '2026-10-05', [trip]).total)
   })
 })
 
