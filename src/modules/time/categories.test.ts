@@ -5,6 +5,8 @@ import {
   archivedCategories,
   blocksUsing,
   removeCategoryPlan,
+  CATEGORY_PARAM,
+  categoryEditPath,
   categoryIdFor,
   createCategory,
   createPreset,
@@ -36,6 +38,16 @@ function cat(id: string, name: string, order: number, extra: Partial<Category> =
 function preset(categoryId: string, minutes: number, extra: Partial<Preset> = {}): Preset {
   return { ...createPreset(categoryId, minutes), updatedAt: AT, ...extra }
 }
+
+describe('адрес правки категории', () => {
+  it('ведёт в «Категории», id читается обратно как был', () => {
+    const id = 'cat:чтение и письмо'
+    const path = categoryEditPath(id)
+    const [screen, query] = path.split('?')
+    expect(screen).toBe('/time/categories')
+    expect(new URLSearchParams(query).get(CATEGORY_PARAM)).toBe(id)
+  })
+})
 
 describe('стартовый набор', () => {
   const seed = [
