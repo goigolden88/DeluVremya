@@ -154,6 +154,14 @@ export function writingFor(day: DateStr): string {
   return `Кнопки записывают на ${formatDateLong(day)}`
 }
 
+/** Кнопка под «Блоками дня»: снять все блоки показанного дня. */
+export const CLEAR_DAY = 'Очистить день'
+
+/** Подтверждение «Очистить день»: сколько блоков и за какой день — с основанием. */
+export function clearDayConfirm(count: number, day: DateStr): string {
+  return `Убрать ${count} ${blocksWord(count)} за ${formatDateLong(day)}? Блоки других дней, таймер и особые дни не тронутся.`
+}
+
 /** Пояснение к «неучтено» под итогом дня. */
 export function windowNote(): string {
   return `Окно дня — с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}: неучтённое считается от прошедшей его части, а не от суток.`

@@ -450,6 +450,11 @@
   overflow-wrap: anywhere;
 }
 
+/* «Очистить день» — под списком, с отступом от последнего блока. */
+.day-clear {
+  margin-top: 12px;
+}
+
 .tblock__main {
   min-width: 0;
   min-height: 44px;

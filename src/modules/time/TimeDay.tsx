@@ -6,10 +6,12 @@ import { Fold } from '../../shared/ui/Fold.tsx'
 import { BlockForm } from './BlockForm.tsx'
 import { hiddenPresets, presetLines, shownPresets, type PresetLine } from './categories.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
-import { blockFromPreset, blocksOn, categoryName, daySummary, type DaySummary } from './day.ts'
+import { blockFromPreset, blocksOn, categoryName, clearDayBlocks, daySummary, type DaySummary } from './day.ts'
 import {
   addedLine,
   blocksWord,
+  CLEAR_DAY,
+  clearDayConfirm,
   FEWER_PRESETS,
   formatMinutes,
   morePresetsLabel,
@@ -102,6 +104,16 @@ export function TimeDay({
       await db.remove('time', block.id)
       if (last?.block.id === block.id) setLast(null)
     })
+
+  // Все блоки дня одной записью — после подтверждения, чтобы не стереть случайно.
+  const clear = () => {
+    const cleared = clearDayBlocks(time.blocks, day)
+    if (cleared.length === 0 || !window.confirm(clearDayConfirm(cleared.length, day))) return
+    void write(async () => {
+      await db.putMany('time', cleared)
+      if (last && cleared.some((block) => block.id === last.block.id)) setLast(null)
+    })
+  }
 
   // По группам (Р-81), если они есть; у группы — сколько в ней учтено за день.
   const grouped = hasGroups(catalog.categories)
@@ -221,6 +233,7 @@ export function TimeDay({
             presets={catalog.presets}
             today={today}
             onRemove={(block) => void remove(block)}
+            onClear={clear}
           />
         </>
       )}
@@ -281,6 +294,7 @@ function DayBlocks({
   presets,
   today,
   onRemove,
+  onClear,
 }: {
   blocks: TimeBlock[]
   all: TimeBlock[]
@@ -288,6 +302,8 @@ function DayBlocks({
   presets: Preset[]
   today: string
   onRemove: (block: TimeBlock) => void
+  /** «Очистить день»: подтверждение и запись — у вызывающего. */
+  onClear: () => void
 }) {
   const [editing, setEditing] = useState<string | null>(null)
   if (blocks.length === 0) return null
@@ -335,6 +351,9 @@ function DayBlocks({
           )
         })}
       </ul>
+      <button type="button" className="btn btn--danger day-clear" onClick={onClear}>
+        {CLEAR_DAY}
+      </button>
     </Fold>
   )
 }

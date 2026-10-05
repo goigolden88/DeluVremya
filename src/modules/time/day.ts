@@ -40,6 +40,15 @@ export function blocksOn(blocks: readonly TimeBlock[], date: DateStr): TimeBlock
 }
 
 /**
+ * «Очистить день»: надгробия живых блоков этого дня — то же мягкое
+ * удаление, что у `db.remove`, только одной записью. Другие дни и уже
+ * удалённые не трогаются; пустой день — пустой список.
+ */
+export function clearDayBlocks(blocks: readonly TimeBlock[], date: DateStr): TimeBlock[] {
+  return blocksOn(blocks, date).map((block) => ({ ...block, deleted: true }))
+}
+
+/**
  * Название категории по id. Удалённая называется своим последним именем —
  * блок её помнит. Неизвестная — null: подпись решает экран.
  */
