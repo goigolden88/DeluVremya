@@ -1,17 +1,21 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { addMonths, monthOf, monthPeriod } from '../shared/core/dates.ts'
 import { PlanPeriod } from '../modules/notes/PlanPeriod.tsx'
+import { MonthDays } from '../modules/time/MonthDays.tsx'
 import { PeriodNorms, PeriodTime } from '../modules/time/Period.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../shared/ui/useToday.ts'
 import { monthChoices, monthLabel, monthTitle, runningText, viewedMonth } from './period.ts'
 import { useRecordDates } from './useRecordDates.ts'
 
+/** Адрес дня в учёте — у экрана, а не у модуля: модули маршрутов не знают. */
+const dayHref = (day: string) => `#/time?day=${day}`
+
 /**
  * Итоги месяца — экран `#/month?m=` (Р-54). Читает оба модуля и потому живёт
  * в `screens/` (Р-10). Записи о проведении нет: месяц читают, а решения
- * принимает обзор недели. Время против прошлого месяца, нормы по неделям
- * месяца, план против факта (Р-55).
+ * принимает обзор недели. Время против прошлого месяца с графиком по дням
+ * (Р-92), нормы по неделям месяца, план против факта (Р-55).
  */
 export function Month() {
   const today = useToday()
@@ -72,6 +76,7 @@ export function Month() {
           period={period}
           today={today}
           compare={{ period: monthPeriod(previous), label: monthLabel(previous), own: monthLabel(month) }}
+          chart={<MonthDays month={month} today={today} dayHref={dayHref} />}
         />
       </section>
 

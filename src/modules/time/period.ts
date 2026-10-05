@@ -263,6 +263,44 @@ export function yearTime(
   }
 }
 
+// ─── Месяц по дням (Р-92) ──────────────────────────────────────────────────
+
+export type MonthDay = {
+  date: DateStr
+  /** Учтено за день — по основной, как итог дня; особый и будущий — null: столбца нет. */
+  value: number | null
+  /** Сколько блоков — основание числа. */
+  count: number
+  /** Период, в который попал день (Р-91); обычный день — null. */
+  special: SpecialDays | null
+  future: boolean
+  /** Подпись серым: столбца нет или день без учёта. */
+  muted: boolean
+}
+
+/**
+ * Месяц по дням для графика: каждый день — учтено за него тем же расчётом,
+ * что итог дня (живые блоки дня, по основной, фоновое не входит — Р-43).
+ * Особый день и будущий — без значения: в итог месяца не входят (Р-91).
+ */
+export function monthDays(
+  blocks: readonly TimeBlock[],
+  month: MonthStr,
+  today: DateStr,
+  specials: readonly SpecialDays[] = [],
+): MonthDay[] {
+  const period = monthPeriod(month)
+  const list = blocksIn(blocks, period)
+  const live = specialsIn(specials, period)
+  return periodDays(period).map((date) => {
+    const special = live.find((each) => inside(each, { from: date, to: date }) !== null) ?? null
+    const future = date > today
+    const own = list.filter((block) => block.date === date)
+    const value = special || future ? null : own.reduce((sum, block) => sum + block.minutes, 0)
+    return { date, value, count: own.length, special, future, muted: value === null || own.length === 0 }
+  })
+}
+
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────
 
 export type Norm = NonNullable<Category['norm']>

@@ -12,6 +12,7 @@ import {
   NORM_MIN_WEEKS,
   NORM_RULES,
   type KindTotal,
+  type MonthDay,
   type Norm,
   type NormCheck,
   type NormHistory,
@@ -303,6 +304,28 @@ export function periodLine(summary: PeriodSummary): string {
   let days = `учёт был в ${summary.days} ${plural(summary.days, ['дне', 'днях', 'днях'])} из ${summary.elapsedDays}`
   if (summary.specialDays > 0) days += ` ${plural(summary.elapsedDays, ['обычного', 'обычных', 'обычных'])}; ${special}`
   return `Учтено ${formatMinutes(summary.total)} · ${summary.count} ${blocksWord(summary.count)} · ${days}`
+}
+
+// ─── Месяц по дням (Р-92) ──────────────────────────────────────────────────
+
+/**
+ * Подписан первый день и каждый `DAY_LABEL_STEP`-й: столбцов до тридцати
+ * одного, и на телефоне подпись каждого налезла бы на соседнюю.
+ */
+export const DAY_LABEL_STEP = 5
+
+/** Подпись под столбцом дня — число дня или пусто. */
+export function dayLabel(date: DateStr): string {
+  const day = Number(date.slice(8, 10))
+  return day === 1 || day % DAY_LABEL_STEP === 0 ? String(day) : ''
+}
+
+/** Подсказка столбца дня: учтено с основанием; особый и будущий — словами, почему столбца нет. */
+export function dayTitle(day: MonthDay): string {
+  const date = formatDateLong(day.date)
+  if (day.special) return `${date}: особый день «${specialTitle(day.special)}» — в итог месяца не входит`
+  if (day.future) return `${date}: ещё не наступил`
+  return `${date}: ${lowerFirst(summaryLine(day.value ?? 0, day.count))}`
 }
 
 /** Категории строкой — «Чтение 1 ч · Ходьба 3 ч»: для особого периода, где таблица была бы лишней. */

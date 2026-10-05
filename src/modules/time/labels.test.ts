@@ -7,6 +7,9 @@ import {
   categoriesLine,
   checkText,
   clearDayConfirm,
+  DAY_LABEL_STEP,
+  dayLabel,
+  dayTitle,
   historyText,
   historyWaitText,
   keptText,
@@ -29,6 +32,25 @@ import {
   windowNote,
   writingFor,
 } from './labels.ts'
+
+describe('подписи месяца по дням — Р-92', () => {
+  it('подписан первый день и каждый пятый', () => {
+    const labels = Array.from({ length: 31 }, (_, index) => dayLabel(`2026-08-${String(index + 1).padStart(2, '0')}`))
+    expect(labels.filter(Boolean)).toEqual(['1', '5', '10', '15', '20', '25', '30'])
+    expect(dayLabel('2026-08-05')).toBe(String(DAY_LABEL_STEP))
+  })
+
+  it('подсказка — учтено с основанием; особый и будущий — почему столбца нет', () => {
+    const base = { date: '2026-09-07', count: 0, special: null, future: false, muted: true }
+    expect(dayTitle({ ...base, value: 90, count: 2, muted: false })).toBe('7 сентября 2026: учтено 1 ч 30 мин · 2 блока')
+    expect(dayTitle({ ...base, value: 0 })).toBe('7 сентября 2026: за день ничего не учтено')
+    expect(dayTitle({ ...base, value: null, future: true })).toBe('7 сентября 2026: ещё не наступил')
+    const special = { id: 't', updatedAt: '2026-09-01T00:00:00.000Z', from: '2026-09-07', to: '2026-09-07', title: 'Поход' }
+    expect(dayTitle({ ...base, value: null, special })).toBe(
+      '7 сентября 2026: особый день «Поход» — в итог месяца не входит',
+    )
+  })
+})
 
 describe('тексты итога дня', () => {
   it('сумма идёт с основанием, склонение по числу блоков', () => {

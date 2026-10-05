@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { formatPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { quoted } from '../../ui/screenNames.ts'
@@ -95,8 +95,20 @@ export type Compare = { period: Period; label: string; own: string }
  *
  * Итог и сравнение — по обычным дням с обеих сторон; особые — ниже, своим
  * блоком (Р-91).
+ *
+ * `chart` — график над таблицей: у месяца — дни (Р-92).
  */
-export function PeriodTime({ period, today, compare }: { period: Period; today: DateStr; compare?: Compare }) {
+export function PeriodTime({
+  period,
+  today,
+  compare,
+  chart,
+}: {
+  period: Period
+  today: DateStr
+  compare?: Compare
+  chart?: ReactNode
+}) {
   const catalog = useCatalog()
   const time = useBlocks()
   const specials = useSpecials()
@@ -133,6 +145,7 @@ export function PeriodTime({ period, today, compare }: { period: Period; today: 
           {compare.label}: {lowerFirst(periodLine(before))}
         </p>
       )}
+      {chart}
       {rows.length > 0 && (
         <table className="stats">
           {compare && (
