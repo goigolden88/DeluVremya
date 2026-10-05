@@ -844,6 +844,43 @@ async function scenario() {
   await act(`document.querySelector('[aria-label="Убрать кнопку +90"]')?.click()`)
   await sleep(700)
 
+  // ─ Долгий тап по строке категории — её правка; блок не пишется (#25).
+  const editingName = () => run(`document.querySelector('input[name=name]')?.value ?? ''`)
+  await go('/time')
+  await act(`preset('Чтение +30')?.dispatchEvent(
+    new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 }))`)
+  await sleep(700)
+  const menuHash = await run('location.hash')
+  const menuName = await editingName()
+  await go('/time')
+  await act(`preset('Прогулка +30')?.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, isPrimary: true, pointerType: 'touch' }))`)
+  await sleep(900)
+  await act(`
+    const el = preset('Прогулка +30');
+    el?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerId: 1, isPrimary: true, pointerType: 'touch' }));
+    el?.click();
+  `)
+  await sleep(700)
+  const holdName = await editingName()
+  await go('/time')
+  const afterLong = await screen()
+  check(
+    'долгий тап и правая кнопка по строке категории открывают её карточку, блок не пишется',
+    menuHash.startsWith('#/time/categories') &&
+      menuName === 'Чтение' &&
+      holdName === 'Прогулка' &&
+      has(afterLong, 'За день ничего не учтено'),
+    `${menuHash} «${menuName}», удержание «${holdName}»; ${line(afterLong, 'учтено')}`,
+  )
+  await go('/time/categories?c=nope')
+  const unknownCategory = await screen()
+  check(
+    'неизвестная категория в адресе — экран категорий как обычно',
+    has(unknownCategory, 'Чтение') && (await editingName()) === '',
+    line(unknownCategory, 'Чтение'),
+  )
+
   // ─ Учёт времени (Этап 1, пп. 2 и 5): тап — блок, итог сразу, «Отменить».
   await go('/time')
   await act(`preset('Чтение +30')?.click()`)

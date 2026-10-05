@@ -50,6 +50,17 @@ export function categoryIdFor(categories: readonly Category[], name: string, suf
   return taken && !taken.deleted ? `${base}:${suffix}` : base
 }
 
+/** Параметр адреса «Категорий»: id категории, чья карточка раскрыта. */
+export const CATEGORY_PARAM = 'c'
+
+/**
+ * Адрес правки категории — «Категории» с её раскрытой карточкой. Туда ведёт
+ * долгий тап по строке кнопок. Id стартовых — из названия, по-русски: кодируется.
+ */
+export function categoryEditPath(id: string): string {
+  return `/time/categories?${new URLSearchParams({ [CATEGORY_PARAM]: id })}`
+}
+
 /** Почему название не годится. */
 export type NameProblem = 'empty' | 'duplicate' | 'archived'
 

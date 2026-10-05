@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { db } from '../../app/core.ts'
 import { ulid } from '../../shared/core/id.ts'
 import type { Category, Preset } from '../../app/model.ts'
@@ -9,6 +9,7 @@ import {
   activeCategories,
   archivedCategories,
   blocksUsing,
+  CATEGORY_PARAM,
   createCategory,
   createPreset,
   MINUTES_PER_DAY,
@@ -61,6 +62,11 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
 }
 
+/** Якорь карточки категории — к ней прокручивает `?c=<id>`. */
+function categoryAnchor(id: string): string {
+  return `category-${id}`
+}
+
 /** Блоки — первыми: прерванная посередине запись оставит живую категорию без блоков, а не блоки без категории. */
 async function writeRemoval(plan: RemovePlan): Promise<void> {
   await db.putMany('time', plan.blocks)
@@ -83,6 +89,34 @@ export function Categories() {
   const names = useScreenNames()
   const [open, setOpen] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [params, setParams] = useSearchParams()
+
+  // Долгий тап по строке кнопок: `?c=<id>` раскрывает карточку категории.
+  // Параметр снимается, как `open` в «Заметках»: «назад» и перезагрузка его
+  // не повторяют. Неизвестный id ничего не раскроет — экран как обычно.
+  const wanted = params.get(CATEGORY_PARAM)
+  const [scrollTo, setScrollTo] = useState<string | null>(null)
+  useEffect(() => {
+    if (!wanted) return
+    setOpen(wanted)
+    setScrollTo(wanted)
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete(CATEGORY_PARAM)
+        return next
+      },
+      { replace: true },
+    )
+  }, [wanted, setParams])
+
+  const loaded = catalog.status === 'ready' && time.status === 'ready'
+  useEffect(() => {
+    if (scrollTo === null || !loaded) return
+    const target = scrollTo
+    setScrollTo(null)
+    requestAnimationFrame(() => document.getElementById(categoryAnchor(target))?.scrollIntoView({ block: 'start' }))
+  }, [scrollTo, loaded])
 
   const save: Save = async (write) => {
     setError('')
@@ -249,7 +283,7 @@ function CategoryRow({
   }
 
   return (
-    <li className="cat">
+    <li className="cat" id={categoryAnchor(category.id)}>
       <div className="cat__head">
         <button type="button" className="plain-btn cat__name" aria-expanded={open} onClick={onToggle}>
           {category.name}

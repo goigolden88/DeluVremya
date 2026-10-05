@@ -1,10 +1,11 @@
 import { Fragment, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { db } from '../../app/core.ts'
 import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
+import { useLongPress } from '../../ui/useLongPress.ts'
 import { BlockForm } from './BlockForm.tsx'
-import { hiddenPresets, presetLines, shownPresets, type PresetLine } from './categories.ts'
+import { categoryEditPath, hiddenPresets, presetLines, shownPresets, type PresetLine } from './categories.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { blockFromPreset, blocksOn, categoryName, clearDayBlocks, daySummary, type DaySummary } from './day.ts'
 import {
@@ -56,6 +57,8 @@ export function TimeDay({
   const catalog = useCatalog()
   const time = useBlocks()
   const timer = useTimer()
+  const navigate = useNavigate()
+  const longPress = useLongPress()
   /** Последний тап — его снимает «Отменить» (Р-20). */
   const [last, setLast] = useState<{ block: TimeBlock; name: string } | null>(null)
   const [error, setError] = useState('')
@@ -119,13 +122,18 @@ export function TimeDay({
   const grouped = hasGroups(catalog.categories)
     ? byGroup(lines, catalog.categories, (line) => line.category.id)
     : null
-  // Строка на категорию: название, рядом кнопки одними минутами.
+  // Строка на категорию: название, рядом кнопки одними минутами. Долгий тап
+  // по строке — по названию или кнопке — правка категории; блок не пишется.
   const presetLine = (line: PresetLine) => {
     const { category } = line
     const hidden = hiddenPresets(line)
     const open = hidden > 0 && opened.has(category.id)
     return (
-      <div key={category.id} className="preset-line">
+      <div
+        key={category.id}
+        className="preset-line"
+        {...longPress(() => void navigate(categoryEditPath(category.id)))}
+      >
         {/* «Ещё» — у названия, а не за кнопками: столбцы кнопок у строк ровные. */}
         <span className="preset-line__name">
           <span>{category.name}</span>
