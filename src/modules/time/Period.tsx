@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
-import { formatPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
+import { formatPeriod, type DateStr, type MonthStr, type Period } from '../../shared/core/dates.ts'
+import { MiniBars } from '../../shared/ui/BarChart.tsx'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { quoted } from '../../ui/screenNames.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
@@ -17,10 +18,20 @@ import {
   periodLine,
   specialMarksText,
   UNKNOWN_CATEGORY,
+  weekBarTitle,
   YEAR_NORMS_BASIS,
 } from './labels.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
-import { compareRows, periodNorms, periodSummary, specialTime, type SpecialTime } from './period.ts'
+import {
+  categoryWeeks,
+  compareRows,
+  groupWeeks,
+  monthWeeks,
+  periodNorms,
+  periodSummary,
+  specialTime,
+  type SpecialTime,
+} from './period.ts'
 import { datesText, specialTitle } from './specials.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
@@ -97,17 +108,22 @@ export type Compare = { period: Period; label: string; own: string }
  * блоком (Р-91).
  *
  * `chart` — график над таблицей: у месяца — дни (Р-92).
+ *
+ * `weeks` — месяц, по чьим неделям у категорий и групп малые столбики
+ * (Р-93); только у итогов месяца, обзор недели их не передаёт.
  */
 export function PeriodTime({
   period,
   today,
   compare,
   chart,
+  weeks,
 }: {
   period: Period
   today: DateStr
   compare?: Compare
   chart?: ReactNode
+  weeks?: MonthStr
 }) {
   const catalog = useCatalog()
   const time = useBlocks()
@@ -126,12 +142,28 @@ export function PeriodTime({
   // По группам (Р-81): строка группы с суммой в каждом столбце, под ней её категории.
   const groups = hasGroups(catalog.categories) ? byGroup(rows, catalog.categories, (row) => row.categoryId) : null
   const dash = (minutes: number) => (minutes > 0 ? formatMinutes(minutes) : '—')
+  const weekly = weeks
+    ? monthWeeks(time.blocks, catalog.categories, weeks, today, specials.specials)
+    : null
+  const bars = (values: number[]) =>
+    weekly && (
+      <td className="minibars-cell">
+        <MiniBars
+          values={values}
+          titles={values.map((minutes, index) => {
+            const week = weekly[index]
+            return week ? weekBarTitle(week.period, minutes) : ''
+          })}
+        />
+      </td>
+    )
   const line = (row: (typeof rows)[number], sub: boolean) => (
     <tr key={row.categoryId}>
       <td className={sub ? 'stats__sub' : undefined}>
         {row.name ?? UNKNOWN_CATEGORY}
         {row.background > 0 && <span className="muted"> · {backgroundText(row.background)}</span>}
       </td>
+      {weekly && bars(categoryWeeks(weekly, row.categoryId))}
       <td className="num">{dash(row.minutes)}</td>
       {compare && <td className="num muted">{dash(row.before)}</td>}
     </tr>
@@ -152,6 +184,7 @@ export function PeriodTime({
             <thead>
               <tr>
                 <th />
+                {weekly && <th />}
                 <th className="num">{compare.own}</th>
                 <th className="num">{compare.label}</th>
               </tr>
@@ -163,6 +196,7 @@ export function PeriodTime({
                   <Fragment key={group.key ?? ''}>
                     <tr className="stats__group">
                       <td>{group.name ?? NO_GROUP}</td>
+                      {weekly && bars(groupWeeks(weekly, group.key))}
                       <td className="num">{dash(groupMinutes(summary.byGroup, group.key))}</td>
                       {compare && (
                         <td className="num muted">{dash(before ? groupMinutes(before.byGroup, group.key) : 0)}</td>
@@ -174,6 +208,12 @@ export function PeriodTime({
               : rows.map((row) => line(row, false))}
           </tbody>
         </table>
+      )}
+      {weekly && rows.length > 0 && (
+        <p className="muted">
+          Малые столбики — недели этого месяца с понедельника, у каждой строки своя шкала. Первая и последняя
+          недели обрезаны по месяцу и бывают короче.
+        </p>
       )}
       {withBackground && <p className="muted">Фоновое в сумму не входит: час ютуба под покер — один час.</p>}
       {summary.byKind.length > 0 && <p className="muted">По признаку: {kindLine(summary.byKind)}</p>}

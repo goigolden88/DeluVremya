@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
 import { daySummary } from './day.ts'
 import {
+  categoryWeeks,
   checkNorm,
   compareRows,
+  groupWeeks,
   monthDays,
+  monthWeeks,
   normInput,
   normSince,
   periodNorms,
@@ -122,6 +125,80 @@ describe('год по месяцам — Р-57', () => {
       ['Чтение', 90, 45, 90, 0],
       ['Ютуб', 45, 0, 0, 45],
     ])
+  })
+})
+
+describe('месяц по неделям — Р-93', () => {
+  const categories = [
+    cat('a', 'Чтение', 0, { group: 'Развитие' }),
+    cat('b', 'Ходьба', 1, { group: 'Развитие' }),
+    cat('c', 'Ютуб', 2),
+  ]
+  const spans = (month: string, today = '2026-12-31') =>
+    monthWeeks([], categories, month, today).map((week) => [week.period.from, week.period.to])
+  const sum = (values: number[]) => values.reduce((total, each) => total + each, 0)
+
+  it('месяц с понедельника — недели целые, последняя обрезана', () => {
+    expect(spans('2026-06')).toEqual([
+      ['2026-06-01', '2026-06-07'],
+      ['2026-06-08', '2026-06-14'],
+      ['2026-06-15', '2026-06-21'],
+      ['2026-06-22', '2026-06-28'],
+      ['2026-06-29', '2026-06-30'],
+    ])
+  })
+
+  it('месяц с воскресенья — первая неделя в один день; февраль', () => {
+    expect(spans('2026-02')).toEqual([
+      ['2026-02-01', '2026-02-01'],
+      ['2026-02-02', '2026-02-08'],
+      ['2026-02-09', '2026-02-15'],
+      ['2026-02-16', '2026-02-22'],
+      ['2026-02-23', '2026-02-28'],
+    ])
+    // Февраль 2027 — с понедельника, ровно четыре недели.
+    expect(spans('2027-02')).toEqual([
+      ['2027-02-01', '2027-02-07'],
+      ['2027-02-08', '2027-02-14'],
+      ['2027-02-15', '2027-02-21'],
+      ['2027-02-22', '2027-02-28'],
+    ])
+  })
+
+  it('сумма недель — итог месяца по категории и группе; фоновое и соседние месяцы не входят', () => {
+    const blocks = [
+      block('1', 'a', '2026-02-01', 30),
+      block('2', 'a', '2026-02-10', 45),
+      block('3', 'b', '2026-02-28', 20, { bgCategoryId: 'c' }),
+      block('4', 'c', '2026-02-16', 60),
+      block('5', 'a', '2026-01-31', 100),
+      block('6', 'a', '2026-03-01', 100),
+    ]
+    const weeks = monthWeeks(blocks, categories, '2026-02', '2026-03-05')
+    const month = periodSummary(blocks, categories, { from: '2026-02-01', to: '2026-02-28' }, '2026-03-05')
+    expect(categoryWeeks(weeks, 'a')).toEqual([30, 0, 45, 0, 0])
+    expect(categoryWeeks(weeks, 'c')).toEqual([0, 0, 0, 60, 0])
+    for (const row of month.byCategory) expect(sum(categoryWeeks(weeks, row.categoryId))).toBe(row.minutes)
+    for (const group of month.byGroup) expect(sum(groupWeeks(weeks, group.key))).toBe(group.minutes)
+    expect(groupWeeks(weeks, 'развитие')).toEqual([30, 0, 45, 0, 20])
+    expect(groupWeeks(weeks, null)).toEqual([0, 0, 0, 60, 0])
+  })
+
+  it('особые дни не входят, как в итоге месяца — Р-91', () => {
+    const trip: SpecialDays = { id: 't', updatedAt: AT, from: '2026-02-09', to: '2026-02-10', title: 'Поездка' }
+    const blocks = [block('1', 'a', '2026-02-10', 45), block('2', 'a', '2026-02-11', 15)]
+    const weeks = monthWeeks(blocks, categories, '2026-02', '2026-03-05', [trip])
+    expect(categoryWeeks(weeks, 'a')).toEqual([0, 0, 15, 0, 0])
+    const month = periodSummary(blocks, categories, { from: '2026-02-01', to: '2026-02-28' }, '2026-03-05', [trip])
+    expect(sum(categoryWeeks(weeks, 'a'))).toBe(month.total)
+  })
+
+  it('будущие недели — без столбика; идущая — по наступившим дням', () => {
+    const blocks = [block('1', 'a', '2026-10-13', 40), block('2', 'a', '2026-10-20', 25)]
+    const weeks = monthWeeks(blocks, categories, '2026-10', '2026-10-14')
+    expect(weeks.map((week) => week.future)).toEqual([false, false, false, true, true])
+    expect(categoryWeeks(weeks, 'a')).toEqual([0, 0, 40, 0, 0])
+    expect(groupWeeks(weeks, 'развитие')).toEqual([0, 0, 40, 0, 0])
   })
 })
 
