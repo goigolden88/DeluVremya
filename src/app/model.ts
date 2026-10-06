@@ -16,7 +16,7 @@ import type { Base, Migration } from '../shared/core/model.ts'
  * Версия схемы. Растёт с каждым шагом в `migrations` — и с добавлением
  * хранилища тоже: IndexedDB заводит хранилище только при смене версии.
  */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 // ─── Справочники ───────────────────────────────────────────────────────────
 
@@ -122,7 +122,27 @@ export type SpecialDays = Base & {
   title?: string
 }
 
-/** Вид записи. Четыре значения — ровно то, что описано выше. */
+/**
+ * Распорядок и сон (Р-94): подъём и отбой, время — `"ЧЧ:ММ"`. Без `day` —
+ * распорядок, действует с дня `since` до следующего распорядка, id —
+ * `routine:<since>`; с `day` — отметка одного дня, id — `sleep:<day>`.
+ * Отбой не позже подъёма по часам — после полуночи.
+ */
+export type Sleep = Base & {
+  /** YYYY-MM-DD, с какого дня действует распорядок */
+  since?: string
+  /** YYYY-MM-DD, день отметки */
+  day?: string
+  /** подъём, `"ЧЧ:ММ"` */
+  wake: string
+  /** отбой, `"ЧЧ:ММ"` */
+  bed: string
+}
+
+/**
+ * Вид записи. Четыре значения — ровно то, что описано выше; распорядок
+ * и сон (Р-94) — не вид: в ленте и выгрузке markdown их нет.
+ */
 export type RecordKind = 'note' | 'time' | 'review' | 'special'
 
 // ─── Хранилища ─────────────────────────────────────────────────────────────
@@ -134,7 +154,7 @@ export type RecordKind = 'note' | 'time' | 'review' | 'special'
  * пишут импорт и слепок: справочники раньше записей, что на них ссылаются.
  * Локальные `meta`, `settings`, `dirty` — ядра, одинаковы у всей семьи.
  */
-export const SYNCED_STORES = ['categories', 'presets', 'templates', 'notes', 'time', 'reviews', 'specials'] as const
+export const SYNCED_STORES = ['categories', 'presets', 'templates', 'notes', 'time', 'reviews', 'specials', 'sleep'] as const
 
 export type SyncedStore = (typeof SYNCED_STORES)[number]
 
@@ -150,6 +170,7 @@ export type StoreRecord = {
   time: TimeBlock
   reviews: Review
   specials: SpecialDays
+  sleep: Sleep
 }
 
 /** Любая синхронизируемая запись. */
@@ -180,6 +201,16 @@ export const migrations: Migration[] = [
     run: (database) => {
       const specials = database.createObjectStore('specials', { keyPath: 'id' })
       specials.createIndex('updatedAt', 'updatedAt') // нужен слиянию
+    },
+  },
+  {
+    to: 3,
+    note: 'хранилище sleep — распорядок и сон (Р-94)',
+    // Так же только новое хранилище: слепки версий 1 и 2 принимаются как есть.
+    additive: true,
+    run: (database) => {
+      const sleep = database.createObjectStore('sleep', { keyPath: 'id' })
+      sleep.createIndex('updatedAt', 'updatedAt') // нужен слиянию
     },
   },
 ]

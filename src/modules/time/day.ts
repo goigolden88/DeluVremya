@@ -4,19 +4,32 @@
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
-import { isDateStr, nowIso, toDateStr, type DateStr } from '../../shared/core/dates.ts'
+import { daysBetween, isDateStr, nowIso, toDateStr, type DateStr } from '../../shared/core/dates.ts'
 import { ulid } from '../../shared/core/id.ts'
 import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import { groupTotals, type GroupTotal } from './groups.ts'
 
 /**
- * Окно дня в часах, с `from` до `to` (Р-21). Неучтённое считается от
- * прошедшей его части, а не от суток: требование закрыть все двадцать
- * четыре часа — самый быстрый способ бросить учёт.
+ * Окно дня в часах от полуночи этого дня, с `from` до `to` (Р-21). Часы
+ * дробные, когда есть минуты: подъём 7:30 — 7.5. `to` больше 24 — отбой
+ * после полуночи, 0:30 следующих суток — 24.5 (Р-94).
+ */
+export type DayWindow = { from: number; to: number }
+
+/**
+ * Окно дня по умолчанию — без распорядка и отметок (Р-21, Р-94).
+ * Неучтённое считается от прошедшей части окна, а не от суток: требование
+ * закрыть все двадцать четыре часа — самый быстрый способ бросить учёт.
  */
 export const DAY_WINDOW = { from: 8, to: 24 } as const
 
 const MINUTES_PER_HOUR = 60
+const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
+
+/** Часы окна — в целые минуты: дробь от «ЧЧ:ММ» не копит ошибку. */
+function minutesOf(hours: number): number {
+  return Math.round(hours * MINUTES_PER_HOUR)
+}
 
 /**
  * Какой день показать на «Времени» (Р-25): из адреса — прошлый или
@@ -90,25 +103,29 @@ function totals(
   )
 }
 
+/** Длина окна, минут. */
+export function windowLength(window: DayWindow): number {
+  return minutesOf(window.to) - minutesOf(window.from)
+}
+
 /**
- * Сколько минут окна дня уже прошло. Прошедший день — всё окно, будущий —
- * ноль, сегодня — от начала окна до сейчас, не больше окна.
+ * Сколько минут окна дня уже прошло: от начала окна до сейчас, не меньше
+ * нуля и не больше окна. Сейчас считается по часам от полуночи этого дня —
+ * окно с отбоем после полуночи идёт и в первые часы следующих суток (Р-94).
+ * Отсюда прошедший день — всё окно, как только оно кончилось, будущий — ноль.
  */
-export function windowElapsed(date: DateStr, now: Date, window: { from: number; to: number } = DAY_WINDOW): number {
-  const length = (window.to - window.from) * MINUTES_PER_HOUR
-  const today = toDateStr(now)
-  if (date < today) return length
-  if (date > today) return 0
-  const passed = now.getHours() * MINUTES_PER_HOUR + now.getMinutes() - window.from * MINUTES_PER_HOUR
-  return Math.min(length, Math.max(0, passed))
+export function windowElapsed(date: DateStr, now: Date, window: DayWindow = DAY_WINDOW): number {
+  const sinceMidnight =
+    daysBetween(date, toDateStr(now)) * MINUTES_PER_DAY + now.getHours() * MINUTES_PER_HOUR + now.getMinutes()
+  return Math.min(windowLength(window), Math.max(0, sinceMidnight - minutesOf(window.from)))
 }
 
 /**
  * Сколько минут окна дня осталось до его конца: основание реализма плана
  * (Р-35). Прошедший день — ноль, будущий — всё окно.
  */
-export function windowLeft(date: DateStr, now: Date, window: { from: number; to: number } = DAY_WINDOW): number {
-  return (window.to - window.from) * MINUTES_PER_HOUR - windowElapsed(date, now, window)
+export function windowLeft(date: DateStr, now: Date, window: DayWindow = DAY_WINDOW): number {
+  return windowLength(window) - windowElapsed(date, now, window)
 }
 
 export type DaySummary = {
@@ -127,16 +144,17 @@ export type DaySummary = {
   unaccounted: number
 }
 
-/** Итог дня — то, что видно сразу после записи. */
+/** Итог дня — то, что видно сразу после записи. Окно — этого дня (Р-94); не задано — по умолчанию. */
 export function daySummary(
   blocks: readonly TimeBlock[],
   categories: readonly Category[],
   date: DateStr,
   now: Date,
+  window: DayWindow = DAY_WINDOW,
 ): DaySummary {
   const day = blocksOn(blocks, date)
   const total = day.reduce((sum, block) => sum + block.minutes, 0)
-  const elapsed = windowElapsed(date, now)
+  const elapsed = windowElapsed(date, now, window)
   return {
     total,
     count: day.length,

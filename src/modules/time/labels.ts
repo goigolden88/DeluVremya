@@ -5,7 +5,8 @@
 
 import { formatDateLong, MONTHS_SHORT, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
-import { DAY_WINDOW } from './day.ts'
+import { DAY_WINDOW, type DayWindow } from './day.ts'
+import { clockMinutes, type SleepProblem } from './sleep.ts'
 import {
   MAX_NORM_DAYS,
   MAX_NORM_MINUTES,
@@ -23,7 +24,7 @@ import {
 } from './period.ts'
 import type { BlockProblem } from './retro.ts'
 import { datesText, specialTitle } from './specials.ts'
-import type { SpecialDays } from '../../app/model.ts'
+import type { Sleep, SpecialDays } from '../../app/model.ts'
 
 /**
  * Признак категории. Нужен только обзору недели (Р-05): на экране дня
@@ -163,9 +164,51 @@ export function clearDayConfirm(count: number, day: DateStr): string {
   return `Убрать ${count} ${blocksWord(count)} за ${formatDateLong(day)}? Блоки других дней, таймер и особые дни не тронутся.`
 }
 
-/** Пояснение к «неучтено» под итогом дня. */
-export function windowNote(): string {
-  return `Окно дня — с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}: неучтённое считается от прошедшей его части, а не от суток.`
+/**
+ * Час окна словами: 8 → «8», 7.5 → «7:30». За полночью — по часам
+ * следующих суток: 24.5 → «0:30». Ровно 24 — «24», как в окне по умолчанию.
+ */
+function windowHour(hours: number): string {
+  const total = Math.round(hours * MINUTES_PER_HOUR)
+  const after = total > MINUTES_PER_DAY ? total - MINUTES_PER_DAY : total
+  const hour = Math.floor(after / MINUTES_PER_HOUR)
+  const minutes = after % MINUTES_PER_HOUR
+  return minutes === 0 ? String(hour) : `${hour}:${String(minutes).padStart(2, '0')}`
+}
+
+/** Окно дня словами (Р-94): «с 8 до 24», «с 7:30 до 0:30 следующих суток». */
+export function windowText(window: DayWindow): string {
+  const next = Math.round(window.to * MINUTES_PER_HOUR) > MINUTES_PER_DAY ? ' следующих суток' : ''
+  return `с ${windowHour(window.from)} до ${windowHour(window.to)}${next}`
+}
+
+/** Пояснение к «неучтено» под итогом дня: окно показанного дня (Р-94). */
+export function windowNote(window: DayWindow = DAY_WINDOW): string {
+  return `Окно дня — ${windowText(window)}: неучтённое считается от прошедшей его части, а не от суток.`
+}
+
+// ─── Распорядок (Р-94) ─────────────────────────────────────────────────────
+
+export const SLEEP_PROBLEMS: Record<SleepProblem, string> = {
+  clock: 'Нужны оба времени: подъём и отбой',
+  same: 'Подъём и отбой совпадают — окна дня не выйдет',
+}
+
+/** Время записи для глаз: `"07:30"` → «7:30», `"00:30"` → «0:30»; кривое — как лежит. */
+export function clockText(value: string): string {
+  const minutes = clockMinutes(value)
+  if (minutes === null) return value
+  return `${Math.floor(minutes / MINUTES_PER_HOUR)}:${String(minutes % MINUTES_PER_HOUR).padStart(2, '0')}`
+}
+
+/** Итог у свёрнутого «Распорядка»: «подъём 7:30, отбой 0:30». */
+export function routineLine(entry: Pick<Sleep, 'wake' | 'bed'>): string {
+  return `подъём ${clockText(entry.wake)}, отбой ${clockText(entry.bed)}`
+}
+
+/** Что записано: с какого дня действует распорядок. */
+export function routineSavedLine(since: DateStr): string {
+  return `Сохранено: распорядок с ${formatDateLong(since)}. Прошлые дни остаются со своим.`
 }
 
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────

@@ -41,6 +41,8 @@ export const config: AppConfig<StoreRecord> = {
     // Только держит таблицу полной: хранилище и его `updatedAt` заводит
     // шаг миграции на версию 2.
     specials: [],
+    // То же: `sleep` и его `updatedAt` заводит шаг на версию 3.
+    sleep: [],
   },
 
   // 02-Архитектура, «Раскладка данных в репозитории».
@@ -55,6 +57,9 @@ export const config: AppConfig<StoreRecord> = {
     reviews: { split: 'none', path: 'reviews.json' },
     // Периодов — единицы в год: одного файла хватит навсегда (Р-91).
     specials: { split: 'none', path: 'specials.json' },
+    // Одним файлом, как особые дни (Р-94): распорядков — единицы, отметок —
+    // не больше дня в день.
+    sleep: { split: 'none', path: 'sleep.json' },
   },
 
   storeNotes: {
@@ -65,6 +70,7 @@ export const config: AppConfig<StoreRecord> = {
     time: 'блоки учтённого времени — по месяцу, к которому относятся',
     reviews: 'проведённые обзоры недели',
     specials: 'особые дни — поездки, походы: периоды вне обычного учёта',
+    sleep: 'распорядок — подъём и отбой с какого дня — и отметки сна по дням: окно дня учёта',
   },
 
   importFormat: 'deluvremya-import',

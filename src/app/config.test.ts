@@ -6,7 +6,15 @@ import { createImporting } from '../shared/core/importing.ts'
 import { createLayout } from '../shared/core/layout.ts'
 import { LOCAL_STORES } from '../shared/core/model.ts'
 import { config } from './config.ts'
-import { SCHEMA_VERSION, SYNCED_STORES, type Note, type StoreRecord, type SyncedStore, type TimeBlock } from './model.ts'
+import {
+  SCHEMA_VERSION,
+  SYNCED_STORES,
+  type Note,
+  type Sleep,
+  type StoreRecord,
+  type SyncedStore,
+  type TimeBlock,
+} from './model.ts'
 
 /**
  * Конфиг «Делу Время» для ядра (Р-83, Р-84).
@@ -50,6 +58,7 @@ function data(parts: Partial<{ [S in SyncedStore]: StoreRecord[S][] }>): { [S in
     time: [],
     reviews: [],
     specials: [],
+    sleep: [],
     ...parts,
   }
 }
@@ -73,8 +82,8 @@ describe('данные не трогаются переводом', () => {
     expect(config.dbName).toBe('deluvremya')
   })
 
-  it('шесть хранилищ версии 1 — в замороженной раскладке; особые дни — после них, не в ней', () => {
-    expect([...config.stores]).toEqual([...V1_STORES, 'specials'])
+  it('шесть хранилищ версии 1 — в замороженной раскладке; особые дни и сон — после них, не в ней', () => {
+    expect([...config.stores]).toEqual([...V1_STORES, 'specials', 'sleep'])
     expect([...config.v1Stores]).toEqual([...V1_STORES])
     expect([...SYNCED_STORES]).toEqual([...config.stores])
   })
@@ -85,19 +94,19 @@ describe('данные не трогаются переводом', () => {
 })
 
 describe('схема базы', () => {
-  it('свежая база доезжает до версии 2 теми же шагами: все хранилища; индексы сверх updatedAt — прежние', async () => {
+  it('свежая база доезжает до версии 3 теми же шагами: все хранилища; индексы сверх updatedAt — прежние', async () => {
     await db.ready()
     await db.close()
     const raw = await openRaw()
     try {
-      expect(raw.version).toBe(2)
+      expect(raw.version).toBe(3)
       for (const store of [...SYNCED_STORES, ...LOCAL_STORES]) expect(raw.objectStoreNames.contains(store)).toBe(true)
       const tx = raw.transaction([...SYNCED_STORES], 'readonly')
       const indexes = (store: SyncedStore) => [...tx.objectStore(store).indexNames].sort()
       expect(indexes('notes')).toEqual(['capturedOn', 'plannedFor', 'updatedAt'])
       expect(indexes('time')).toEqual(['date', 'updatedAt'])
       expect(indexes('reviews')).toEqual(['updatedAt', 'weekStart'])
-      for (const store of ['categories', 'presets', 'templates', 'specials'] as const) {
+      for (const store of ['categories', 'presets', 'templates', 'specials', 'sleep'] as const) {
         expect(indexes(store)).toEqual(['updatedAt'])
       }
     } finally {
@@ -119,16 +128,19 @@ describe('схема базы', () => {
   })
 })
 
-describe('миграция на версию 2 — особые дни (Р-91)', () => {
-  it('один шаг: на версию 2, только добавляет', () => {
-    expect(SCHEMA_VERSION).toBe(2)
-    expect(config.schemaVersion).toBe(2)
+describe('шаги схемы', () => {
+  it('два шага: на версию 2 и на версию 3, оба только добавляют', () => {
+    expect(SCHEMA_VERSION).toBe(3)
+    expect(config.schemaVersion).toBe(3)
     expect(config.migrations.map((step) => ({ to: step.to, additive: step.additive }))).toEqual([
       { to: 2, additive: true },
+      { to: 3, additive: true },
     ])
   })
+})
 
-  it('база версии 1 с записями всех видов открывается на версии 2: записи на месте, хранилище specials есть', async () => {
+describe('миграция на версию 2 — особые дни (Р-91)', () => {
+  it('база версии 1 с записями всех видов открывается на текущей версии: записи на месте, хранилища specials и sleep есть', async () => {
     const records = v1Records()
     await legacyBase(records)
 
@@ -136,10 +148,11 @@ describe('миграция на версию 2 — особые дни (Р-91)',
     await db.close()
     const raw = await openRaw()
     try {
-      expect(raw.version).toBe(2)
-      expect(raw.objectStoreNames.contains('specials')).toBe(true)
-      const indexes = [...raw.transaction('specials', 'readonly').objectStore('specials').indexNames]
-      expect(indexes).toEqual(['updatedAt'])
+      expect(raw.version).toBe(3)
+      for (const store of ['specials', 'sleep']) {
+        expect(raw.objectStoreNames.contains(store)).toBe(true)
+        expect([...raw.transaction(store, 'readonly').objectStore(store).indexNames]).toEqual(['updatedAt'])
+      }
     } finally {
       raw.close()
     }
@@ -149,7 +162,8 @@ describe('миграция на версию 2 — особые дни (Р-91)',
       expect(await db.getAll(store, { includeDeleted: true })).toEqual(records[store])
     }
     expect(await db.getAll('specials')).toEqual([])
-    expect(await db.meta.get('schemaVersion')).toBe(2)
+    expect(await db.getAll('sleep')).toEqual([])
+    expect(await db.meta.get('schemaVersion')).toBe(3)
     expect(await db.settings.get('syncRepo')).toBe('me/DeluVremyaData')
     expect(await db.listDirty()).toEqual([{ store: 'time', id: 't1', at: AT }])
 
@@ -158,7 +172,7 @@ describe('миграция на версию 2 — особые дни (Р-91)',
     expect(await db.get('specials', 's1')).toMatchObject({ from: '2026-10-05', to: '2026-10-07', title: 'Поездка' })
   })
 
-  it('та же база версии 1 путём ядра — тем же шагом доезжает до версии 2', async () => {
+  it('та же база версии 1 путём ядра — теми же шагами доезжает до текущей версии', async () => {
     const records = v1Records()
     expect(await db.createLegacyBase(1, records)).toEqual([])
     await db.ready()
@@ -178,16 +192,91 @@ describe('миграция на версию 2 — особые дни (Р-91)',
     expect(await db.get('notes', 'n1')).toMatchObject({ text: 'Мысль' })
   })
 
-  it('слепок версии 2 с особыми днями — туда и обратно', async () => {
+  it('слепок с особыми днями — туда и обратно', async () => {
     await db.put('specials', { id: 's1', updatedAt: AT, from: '2026-10-05', to: '2026-10-07' })
     const snapshot = await db.exportAll()
-    expect(snapshot.schemaVersion).toBe(2)
+    expect(snapshot.schemaVersion).toBe(3)
     expect(snapshot.data.specials).toMatchObject([{ id: 's1', from: '2026-10-05', to: '2026-10-07' }])
   })
 })
 
+describe('миграция на версию 3 — распорядок и сон (Р-94)', () => {
+  const ROUTINE: Sleep = { id: 'routine:2026-10-06', updatedAt: AT, since: '2026-10-06', wake: '07:30', bed: '00:30' }
+
+  it('база версии 2 с записями всех видов открывается на версии 3: записи на месте, хранилище sleep есть', async () => {
+    const records = { ...v1Records(), specials: [{ id: 's1', updatedAt: AT, from: '2026-10-05', to: '2026-10-07', title: 'Поездка' }] }
+    await legacyBase(records, 2)
+
+    await db.ready()
+    await db.close()
+    const raw = await openRaw()
+    try {
+      expect(raw.version).toBe(3)
+      expect(raw.objectStoreNames.contains('sleep')).toBe(true)
+      expect([...raw.transaction('sleep', 'readonly').objectStore('sleep').indexNames]).toEqual(['updatedAt'])
+    } finally {
+      raw.close()
+    }
+
+    for (const store of [...V1_STORES, 'specials'] as const) {
+      expect(await db.getAll(store, { includeDeleted: true })).toEqual(records[store])
+    }
+    expect(await db.getAll('sleep')).toEqual([])
+    expect(await db.meta.get('schemaVersion')).toBe(3)
+    expect(await db.settings.get('syncRepo')).toBe('me/DeluVremyaData')
+    expect(await db.listDirty()).toEqual([{ store: 'time', id: 't1', at: AT }])
+
+    // В новое хранилище пишется и читается.
+    await db.put('sleep', ROUTINE)
+    expect(await db.get('sleep', ROUTINE.id)).toMatchObject({ since: '2026-10-06', wake: '07:30', bed: '00:30' })
+  })
+
+  it('слепок версии 2 принимается: распорядка в нём нет — хранилище пустое', async () => {
+    const snapshot = db.parseSnapshot(
+      JSON.stringify({
+        schemaVersion: 2,
+        exportedAt: AT,
+        data: { specials: [{ id: 's1', updatedAt: AT, from: '2026-10-05', to: '2026-10-07' }] },
+      }),
+    )
+    expect(snapshot.data.sleep).toEqual([])
+    expect(() => db.checkSnapshotVersion(2)).not.toThrow()
+    expect(await db.importAll(snapshot)).toBe(1)
+    expect(await db.get('specials', 's1')).toMatchObject({ from: '2026-10-05' })
+  })
+
+  it('слепок с распорядком и отметкой — туда и обратно', async () => {
+    const mark: Sleep = { id: 'sleep:2026-10-07', updatedAt: AT, day: '2026-10-07', wake: '09:00', bed: '01:00' }
+    await db.putMany('sleep', [ROUTINE, mark])
+    const snapshot = await db.exportAll()
+    expect(snapshot.schemaVersion).toBe(3)
+    expect(snapshot.data.sleep).toMatchObject([
+      { id: 'routine:2026-10-06', since: '2026-10-06', wake: '07:30', bed: '00:30' },
+      { id: 'sleep:2026-10-07', day: '2026-10-07', wake: '09:00', bed: '01:00' },
+    ])
+
+    // Другое устройство: чистая база, та же копия.
+    await db.close()
+    globalThis.indexedDB = new IDBFactory()
+    expect(await db.importAll(db.parseSnapshot(JSON.stringify(snapshot)))).toBe(2)
+    expect(await db.get('sleep', 'routine:2026-10-06')).toMatchObject({ wake: '07:30', bed: '00:30' })
+  })
+
+  it('два устройства — одна дата: одна запись по id из даты, побеждает поздняя правка', async () => {
+    // Телефон сохранил распорядок утром, компьютер — тот же день позже.
+    await db.put('sleep', { ...ROUTINE, wake: '07:00', bed: '23:00' })
+    const later: Sleep = { ...ROUTINE, updatedAt: '2999-01-01T00:00:00.000Z', wake: '06:30', bed: '00:00' }
+    expect(await db.merge('sleep', [later], 'remote')).toBe(1)
+    expect(await db.getAll('sleep')).toEqual([later])
+
+    // Пришедшая с опозданием старая правка не побеждает.
+    expect(await db.merge('sleep', [{ ...ROUTINE, updatedAt: AT }], 'remote')).toBe(0)
+    expect(await db.getAll('sleep')).toEqual([later])
+  })
+})
+
 describe('раскладка репозитория данных', () => {
-  it('справочники, обзоры и особые дни — одним файлом, заметки и учёт — по месяцам', () => {
+  it('справочники, обзоры, особые дни и сон — одним файлом, заметки и учёт — по месяцам', () => {
     const paths = layout
       .buildFiles(data({ notes: [note('a', '2026-01-31')], time: [block('b', '2026-02-01')] }))
       .map((file) => file.path)
@@ -197,20 +286,28 @@ describe('раскладка репозитория данных', () => {
       'notes/2026-01.json',
       'presets.json',
       'reviews.json',
+      'sleep.json',
       'specials.json',
       'templates.json',
       'time/2026-02.json',
     ])
   })
 
-  it('особые дни уезжают в specials.json; meta.json — версия 2', () => {
+  it('особые дни уезжают в specials.json; meta.json — версия 3', () => {
     const trip = { id: 's1', updatedAt: AT, from: '2026-10-05', to: '2026-10-07', title: 'Поездка в Казань' }
     const files = layout.buildFiles(data({ specials: [trip] }))
     expect(files.find((file) => file.path === 'specials.json')?.content).toContain('Поездка в Казань')
     expect(JSON.parse(files.find((file) => file.path === 'meta.json')?.content ?? '{}')).toEqual({
       app: 'deluvremya',
-      schemaVersion: 2,
+      schemaVersion: 3,
     })
+  })
+
+  it('распорядок и отметки сна уезжают в sleep.json — Р-94', () => {
+    const routine: Sleep = { id: 'routine:2026-10-06', updatedAt: AT, since: '2026-10-06', wake: '07:30', bed: '00:30' }
+    const content = layout.buildFiles(data({ sleep: [routine] })).find((file) => file.path === 'sleep.json')?.content
+    expect(content).toContain('routine:2026-10-06')
+    expect(content).toContain('00:30')
   })
 
   it('заметка — по дню записи; без даты и с испорченной датой — в undated, не пропадает (Р-08)', () => {
@@ -231,6 +328,7 @@ describe('раскладка репозитория данных', () => {
       'time/ГГГГ-ММ.json',
       'reviews.json',
       'specials.json',
+      'sleep.json',
     ]) {
       expect(text).toContain(`\`${path}\``)
     }
@@ -259,7 +357,7 @@ function openRaw(): Promise<IDBDatabase> {
   })
 }
 
-const LEGACY_INDEXES: Record<(typeof V1_STORES)[number], readonly string[]> = {
+const LEGACY_INDEXES: Partial<Record<SyncedStore, readonly string[]>> = {
   categories: [],
   presets: [],
   templates: [],
@@ -268,15 +366,21 @@ const LEGACY_INDEXES: Record<(typeof V1_STORES)[number], readonly string[]> = {
   reviews: ['weekStart'],
 }
 
-function legacyBase(records: Partial<{ [S in SyncedStore]: StoreRecord[S][] }>): Promise<void> {
+/**
+ * База прежней версии — так она лежит на телефоне до обновления. Версия 1 —
+ * как её заводил `createStores` до перевода; версия 2 — та же плюс `specials`
+ * с индексом `updatedAt`, как её оставил шаг на версию 2.
+ */
+function legacyBase(records: Partial<{ [S in SyncedStore]: StoreRecord[S][] }>, version: 1 | 2 = 1): Promise<void> {
+  const stores: SyncedStore[] = version === 1 ? [...V1_STORES] : [...V1_STORES, 'specials']
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('deluvremya', 1)
+    const request = indexedDB.open('deluvremya', version)
     request.onupgradeneeded = () => {
       const database = request.result
-      for (const store of V1_STORES) {
+      for (const store of stores) {
         const created = database.createObjectStore(store, { keyPath: 'id' })
         created.createIndex('updatedAt', 'updatedAt')
-        for (const field of LEGACY_INDEXES[store]) created.createIndex(field, field)
+        for (const field of LEGACY_INDEXES[store] ?? []) created.createIndex(field, field)
       }
       database.createObjectStore('meta', { keyPath: 'key' })
       database.createObjectStore('settings', { keyPath: 'key' })
@@ -284,11 +388,11 @@ function legacyBase(records: Partial<{ [S in SyncedStore]: StoreRecord[S][] }>):
     }
     request.onsuccess = () => {
       const database = request.result
-      const tx = database.transaction([...V1_STORES, 'meta', 'settings', 'dirty'], 'readwrite')
-      for (const store of V1_STORES) {
+      const tx = database.transaction([...stores, 'meta', 'settings', 'dirty'], 'readwrite')
+      for (const store of stores) {
         for (const record of records[store] ?? []) tx.objectStore(store).put(record)
       }
-      tx.objectStore('meta').put({ key: 'schemaVersion', value: 1 })
+      tx.objectStore('meta').put({ key: 'schemaVersion', value: version })
       tx.objectStore('settings').put({ key: 'syncRepo', value: 'me/DeluVremyaData' })
       tx.objectStore('dirty').put({ store: 'time', id: 't1', at: AT })
       tx.oncomplete = () => {

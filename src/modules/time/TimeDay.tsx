@@ -25,9 +25,11 @@ import {
   unaccountedLine,
   writingFor,
 } from './labels.ts'
+import { dayWindow } from './sleep.ts'
 import { TimerLine, TimerPanel } from './Timer.tsx'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
+import { useSleep } from './useSleep.ts'
 import { useTimer } from './useTimer.ts'
 
 function describe(error: unknown): string {
@@ -56,6 +58,7 @@ export function TimeDay({
 }) {
   const catalog = useCatalog()
   const time = useBlocks()
+  const sleep = useSleep()
   const timer = useTimer()
   const navigate = useNavigate()
   const longPress = useLongPress()
@@ -79,7 +82,8 @@ export function TimeDay({
   if (catalog.status !== 'ready' || time.status !== 'ready') return null
 
   const lines = presetLines(catalog.categories, catalog.presets)
-  const summary = daySummary(time.blocks, catalog.categories, day, new Date())
+  // Окно — показанного дня (Р-94): прошлый день — со своим распорядком.
+  const summary = daySummary(time.blocks, catalog.categories, day, new Date(), dayWindow(sleep.records, day))
   // Блок, снятый из списка, «Отменить» больше не предлагает.
   const undoable = last !== null && time.blocks.some((each) => each.id === last.block.id)
   const categoryTotal =

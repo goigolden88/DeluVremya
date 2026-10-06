@@ -1216,7 +1216,8 @@ async function scenario() {
   }
   check(
     'в файле копии — схема и обе записи, токена нет',
-    snapshot?.schemaVersion === 2 &&
+    snapshot?.schemaVersion === 3 &&
+      Array.isArray(snapshot?.data?.sleep) &&
       snapshot?.data?.notes?.length === 2 &&
       !JSON.stringify(snapshot).includes('syncToken'),
     saved ?? `файла нет: ${readdirSync(profile).filter((name) => name.endsWith('.json')).join(', ')}`,
@@ -1320,6 +1321,8 @@ async function scenario() {
   await polishScenario()
 
   await specialsScenario()
+
+  await routineScenario()
 
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
@@ -1495,7 +1498,7 @@ async function stageSixScenario() {
       has(report, ' · #/inbox · ') &&
       // Текст в адресе закодирован: ищется не он, а сам параметр.
       !has(report, 'shared') &&
-      has(report, 'Схема данных: 2') &&
+      has(report, 'Схема данных: 3') &&
       has(cleared, 'Ошибок приложение не записало'),
     line(report, 'проверка журнала') || report.slice(0, 120),
   )
@@ -2456,7 +2459,7 @@ async function syncScenario() {
     `коммитов ${commitCount()}; ${line(first, 'отправлено файлов')}`,
   )
   const expected = ['meta.json', 'categories.json', 'presets.json', 'templates.json', 'reviews.json',
-    'specials.json', 'time/2026-02.json', `time/${month}.json`, `notes/${month}.json`, 'notes/undated.json']
+    'specials.json', 'sleep.json', 'time/2026-02.json', `time/${month}.json`, `notes/${month}.json`, 'notes/undated.json']
   check(
     'раскладка по месяцам, годовых файлов нет — Р-28',
     expected.every((path) => paths.includes(path)) && !paths.some((path) => /^(time|notes)\/\d{4}\.json$/.test(path)),
@@ -2977,6 +2980,62 @@ async function specialsScenario() {
       removedPlate === '' &&
       todayAfter === '',
     `поля ${editing}; после — «${removedPlate}», «${todayAfter}»`,
+  )
+}
+
+/**
+ * Распорядок (Р-94): блок в «Настройках», подъём и отбой с отбоем после
+ * полуночи; окно на «Учёте» сегодня — новое, у вчерашнего дня — прежнее.
+ * Идёт последним из сценариев с окном дня: дальше окно — уже из распорядка.
+ */
+async function routineScenario() {
+  const fields = () =>
+    run(`['routine-wake', 'routine-bed'].map((name) => document.querySelector('input[name=' + name + ']')?.value ?? '-').join(' ')`)
+  const note = () => run(`[...document.querySelectorAll('p.muted')].map((el) => el.innerText).find((text) => text.startsWith('Окно дня')) ?? ''`)
+
+  await go('/settings')
+  const folded = await screen()
+  await unfold('Распорядок')
+  const defaults = await fields()
+  await act(`
+    set(document.querySelector('input[name=routine-wake]'), '07:30');
+    set(document.querySelector('input[name=routine-bed]'), '00:30');
+  `)
+  await sleep(200)
+  // «Сохранить» в «Настройках» не один — жмётся кнопка своей формы.
+  const submit = `document.querySelector('[name=routine-wake]')?.closest('form')?.querySelector('button[type=submit]')?.click()`
+  await act(submit)
+  await sleep(700)
+  const saved = await screen()
+  check(
+    'распорядок: блок в «Настройках», по умолчанию 8:00 и 0:00; сохранение — с сегодня, отбой после полуночи — Р-94',
+    has(folded, 'Распорядок') &&
+      has(folded, 'не задан — окно по умолчанию') &&
+      defaults === '08:00 00:00' &&
+      has(saved, 'Сохранено: распорядок с') &&
+      has(saved, 'подъём 7:30, отбой 0:30') &&
+      has(saved, 'Сегодня окно с 7:30 до 0:30 следующих суток'),
+    `поля ${defaults}; ${line(saved, 'Сохранено')}`,
+  )
+
+  // Правка в тот же день — та же запись: в «О приложении» одна строка.
+  await act(`set(document.querySelector('input[name=routine-bed]'), '23:45')`)
+  await sleep(200)
+  await act(submit)
+  await sleep(700)
+  await go('/time')
+  const todayNote = await note()
+  await go(`/time?day=${localDay(-1)}`)
+  const yesterdayNote = await note()
+  await go('/settings')
+  await unfold('О приложении')
+  const about = await screen()
+  check(
+    'окно на «Учёте»: сегодня — из распорядка, вчера — прежнее; правка в тот же день — одна запись — Р-94',
+    has(todayNote, 'с 7:30 до 23:45') &&
+      has(yesterdayNote, 'с 8 до 24') &&
+      /^Распорядок и сон\s+1\s*$/.test(line(about, 'Распорядок и сон')),
+    `сегодня «${todayNote}»; вчера «${yesterdayNote}»; ${line(about, 'Распорядок и сон')}`,
   )
 }
 

@@ -2,11 +2,14 @@ import { days, plural, timeSpan } from '../shared/core/dates.ts'
 import { QUIET_MS, RETRY_MS } from '../shared/core/sync.ts'
 import { RECALL_WEEKS, STALE_BATCH } from '../modules/notes/review.ts'
 import { DAY_WINDOW } from '../modules/time/day.ts'
-import { SPECIAL_WEEK } from '../modules/time/labels.ts'
+import { SPECIAL_WEEK, windowText } from '../modules/time/labels.ts'
+import { dayWindow } from '../modules/time/sleep.ts'
+import { useSleep } from '../modules/time/useSleep.ts'
 import { NORM_HISTORY_WEEKS, NORM_MIN_WEEKS } from '../modules/time/period.ts'
 import { DEFAULT_WINDOW } from '../shared/notify.ts'
 import { STALE_DAYS as BACKUP_DAYS } from '../shared/ui/backup.ts'
 import { Fold } from '../shared/ui/Fold.tsx'
+import { useToday } from '../shared/ui/useToday.ts'
 import { quoted } from '../ui/screenNames.ts'
 import { WARN_DAYS } from '../shared/ui/SyncSettings.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
@@ -32,6 +35,10 @@ function weeks(count: number): string {
  */
 export function Help() {
   const names = useScreenNames()
+  // Окно дня — сегодняшнее, из распорядка (Р-94), а не константа.
+  const sleep = useSleep()
+  const day = useToday()
+  const todayWindow = windowText(dayWindow(sleep.records, day))
 
   return (
     <>
@@ -96,9 +103,8 @@ export function Help() {
           пункта.
         </p>
         <p>
-          Сразу под заголовком плана — влезает ли намеченное в остаток дня. Считается по оценкам пунктов против окна дня
-          с {DAY_WINDOW.from} до {DAY_WINDOW.to}. Работу и дорогу стоит вписать пунктами с оценкой — иначе
-          сравнивать не с чем.
+          Сразу под заголовком плана — влезает ли намеченное в остаток дня. Считается по оценкам пунктов против окна дня,
+          сегодня — {todayWindow}. Работу и дорогу стоит вписать пунктами с оценкой — иначе сравнивать не с чем.
         </p>
         <p>
           Шаблон дня — «Сохранить план как шаблон», дальше одним тапом. То, что в этот день уже стоит,
@@ -120,8 +126,12 @@ export function Help() {
           показывается отдельно.
         </p>
         <p>
-          Неучтённое считается от прошедшей части окна дня, с {DAY_WINDOW.from} до {DAY_WINDOW.to}, а не
-          от суток: закрывать все часы не нужно.
+          Неучтённое считается от прошедшей части окна дня, а не от суток: закрывать все часы не нужно.
+        </p>
+        <p>
+          Окно дня — с подъёма до отбоя: «Настройки» → «Распорядок». Отбой раньше подъёма по часам — после
+          полуночи. Новый распорядок действует с того дня, когда сохранён; прошлые дни остаются со своим. Без
+          распорядка окно — {windowText(DAY_WINDOW)}; сегодня — {todayWindow}.
         </p>
         <p>
           Категорию можно переименовать, убрать в архив, удалить: пустую — сразу, с блоками — переносом их
