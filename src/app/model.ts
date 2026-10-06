@@ -16,7 +16,7 @@ import type { Base, Migration } from '../shared/core/model.ts'
  * Версия схемы. Растёт с каждым шагом в `migrations` — и с добавлением
  * хранилища тоже: IndexedDB заводит хранилище только при смене версии.
  */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 // ─── Справочники ───────────────────────────────────────────────────────────
 
@@ -122,7 +122,27 @@ export type SpecialDays = Base & {
   title?: string
 }
 
-/** Вид записи. Четыре значения — ровно то, что описано выше. */
+/**
+ * Подъём и отбой — окно дня (Р-94). Без `day` — распорядок: действует с дня
+ * `since` до следующего распорядка, id — `routine:<since>`. С `day` —
+ * отметка одного дня, id — `sleep:<day>`. Одна дата на двух устройствах —
+ * одна запись. Отбой не позже подъёма по часам — после полуночи.
+ */
+export type Sleep = Base & {
+  /** YYYY-MM-DD, с какого дня действует распорядок */
+  since?: string
+  /** YYYY-MM-DD, день отметки; нет — это распорядок */
+  day?: string
+  /** "ЧЧ:ММ", подъём */
+  wake: string
+  /** "ЧЧ:ММ", отбой; не совпадает с подъёмом */
+  bed: string
+}
+
+/**
+ * Вид записи — для ленты и выгрузки markdown. Четыре значения: распорядок
+ * и отметки сна (`Sleep`) в них не идут (Р-94).
+ */
 export type RecordKind = 'note' | 'time' | 'review' | 'special'
 
 // ─── Хранилища ─────────────────────────────────────────────────────────────
@@ -134,7 +154,16 @@ export type RecordKind = 'note' | 'time' | 'review' | 'special'
  * пишут импорт и слепок: справочники раньше записей, что на них ссылаются.
  * Локальные `meta`, `settings`, `dirty` — ядра, одинаковы у всей семьи.
  */
-export const SYNCED_STORES = ['categories', 'presets', 'templates', 'notes', 'time', 'reviews', 'specials'] as const
+export const SYNCED_STORES = [
+  'categories',
+  'presets',
+  'templates',
+  'notes',
+  'time',
+  'reviews',
+  'specials',
+  'sleep',
+] as const
 
 export type SyncedStore = (typeof SYNCED_STORES)[number]
 
@@ -150,6 +179,7 @@ export type StoreRecord = {
   time: TimeBlock
   reviews: Review
   specials: SpecialDays
+  sleep: Sleep
 }
 
 /** Любая синхронизируемая запись. */
@@ -180,6 +210,17 @@ export const migrations: Migration[] = [
     run: (database) => {
       const specials = database.createObjectStore('specials', { keyPath: 'id' })
       specials.createIndex('updatedAt', 'updatedAt') // нужен слиянию
+    },
+  },
+  {
+    to: 3,
+    note: 'хранилище sleep — распорядок и отметки сна (Р-94)',
+    // Как шаг на версию 2: только новое хранилище, прежние записи
+    // не трогаются, слепки версий 1 и 2 принимаются как есть.
+    additive: true,
+    run: (database) => {
+      const sleep = database.createObjectStore('sleep', { keyPath: 'id' })
+      sleep.createIndex('updatedAt', 'updatedAt') // нужен слиянию
     },
   },
 ]

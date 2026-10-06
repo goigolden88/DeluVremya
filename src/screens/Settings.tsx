@@ -33,6 +33,7 @@ const LABELS: Record<SyncedStore, string> = {
   time: 'Блоки времени',
   reviews: 'Обзоры недели',
   specials: 'Особые дни',
+  sleep: 'Распорядок и сон',
 }
 
 type Row = { store: SyncedStore; live: number; total: number }
