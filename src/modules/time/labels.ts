@@ -3,7 +3,7 @@
  * (правило в CLAUDE.md).
  */
 
-import { formatDateLong, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
+import { formatDateLong, MONTHS_SHORT, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW } from './day.ts'
 import {
@@ -326,6 +326,21 @@ export function dayTitle(day: MonthDay): string {
   if (day.special) return `${date}: особый день «${specialTitle(day.special)}» — в итог месяца не входит`
   if (day.future) return `${date}: ещё не наступил`
   return `${date}: ${lowerFirst(summaryLine(day.value ?? 0, day.count))}`
+}
+
+// ─── Месяц по неделям (Р-93) ───────────────────────────────────────────────
+
+/** Дни недели внутри месяца: «6–12 окт», неделя из одного дня — «1 мар». */
+export function weekSpanText(period: Period): string {
+  const month = MONTHS_SHORT[Number(period.from.slice(5, 7)) - 1] ?? ''
+  const from = Number(period.from.slice(8, 10))
+  const to = Number(period.to.slice(8, 10))
+  return from === to ? `${from} ${month}` : `${from}–${to} ${month}`
+}
+
+/** Подсказка малого столбика недели: «6–12 окт: 3 ч 20 мин». */
+export function weekBarTitle(period: Period, minutes: number): string {
+  return `${weekSpanText(period)}: ${formatMinutes(minutes)}`
 }
 
 /** Категории строкой — «Чтение 1 ч · Ходьба 3 ч»: для особого периода, где таблица была бы лишней. */

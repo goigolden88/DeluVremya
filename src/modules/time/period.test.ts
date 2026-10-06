@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
 import { daySummary } from './day.ts'
 import {
+  categoryWeeks,
   checkNorm,
   compareRows,
+  groupWeeks,
   monthDays,
+  monthWeeks,
   normInput,
   normSince,
   periodNorms,
@@ -185,6 +188,81 @@ describe('месяц по дням — Р-92', () => {
     // Сумма столбцов — итог месяца по обычным дням.
     const total = days.reduce((sum, day) => sum + (day.value ?? 0), 0)
     expect(total).toBe(periodSummary(blocks, [], { from: '2026-09-01', to: '2026-09-30' }, '2026-10-05', [trip]).total)
+  })
+})
+
+describe('месяц по неделям — Р-93', () => {
+  const categories = [
+    cat('a', 'Чтение', 0, { group: 'Развитие' }),
+    cat('c', 'Курс', 1, { group: 'Развитие' }),
+    cat('b', 'Ютуб', 2),
+  ]
+  const spans = (month: string) =>
+    monthWeeks([], [], month, '2030-01-01').map(({ period }) => `${period.from.slice(8)}–${period.to.slice(8)}`)
+
+  it('сумма недель — итог месяца по категории и по группе; фоновое, удалённое и соседний месяц не входят', () => {
+    const blocks = [
+      block('1', 'a', '2026-09-01', 30),
+      block('2', 'a', '2026-09-06', 20),
+      block('3', 'c', '2026-09-07', 45, { bgCategoryId: 'b' }),
+      block('4', 'b', '2026-09-15', 60),
+      block('5', 'a', '2026-09-27', 10),
+      block('6', 'c', '2026-09-30', 25),
+      block('7', 'a', '2026-09-16', 99, { deleted: true }),
+      block('8', 'a', '2026-08-31', 100),
+      block('9', 'a', '2026-10-01', 100),
+    ]
+    const weeks = monthWeeks(blocks, categories, '2026-09', '2026-10-05')
+    const month = periodSummary(blocks, categories, { from: '2026-09-01', to: '2026-09-30' }, '2026-10-05')
+    const sum = (values: number[]) => values.reduce((total, each) => total + each, 0)
+
+    // 1 сентября — вторник: первая неделя со вторника, последняя — до среды.
+    expect(spans('2026-09')).toEqual(['01–06', '07–13', '14–20', '21–27', '28–30'])
+    expect(categoryWeeks(weeks, 'a')).toEqual([50, 0, 0, 10, 0])
+    expect(categoryWeeks(weeks, 'c')).toEqual([0, 45, 0, 0, 25])
+    // Фоном у Ютуба 45 минут — в его столбики не входят.
+    expect(categoryWeeks(weeks, 'b')).toEqual([0, 0, 60, 0, 0])
+    for (const row of month.byCategory) expect(sum(categoryWeeks(weeks, row.categoryId))).toBe(row.minutes)
+    for (const group of month.byGroup) expect(sum(groupWeeks(weeks, group.key))).toBe(group.minutes)
+    expect(groupWeeks(weeks, month.byGroup[0]?.key ?? null)).toEqual([50, 45, 0, 10, 25])
+    expect(sum(weeks.map((week) => week.summary.total))).toBe(month.total)
+    // Категории нет в месяце — нули, а не пропуск.
+    expect(categoryWeeks(weeks, 'нет')).toEqual([0, 0, 0, 0, 0])
+  })
+
+  it('месяц с понедельника — полные недели, с воскресенья — первая из одного дня', () => {
+    // 1 июня 2026 — понедельник.
+    expect(spans('2026-06')).toEqual(['01–07', '08–14', '15–21', '22–28', '29–30'])
+    // 1 марта 2026 — воскресенье: шесть недель.
+    expect(spans('2026-03')).toEqual(['01–01', '02–08', '09–15', '16–22', '23–29', '30–31'])
+    const blocks = [block('1', 'a', '2026-03-01', 40), block('2', 'a', '2026-03-02', 15)]
+    expect(categoryWeeks(monthWeeks(blocks, categories, '2026-03', '2026-04-01'), 'a')).toEqual([40, 15, 0, 0, 0, 0])
+  })
+
+  it('февраль — двадцать восемь дней и високосный; последняя неделя обрезана по месяцу', () => {
+    // 2026: 1-е — воскресенье; 2021: с понедельника — ровно четыре недели; 2028: високосный, со вторника.
+    expect(spans('2026-02')).toEqual(['01–01', '02–08', '09–15', '16–22', '23–28'])
+    expect(spans('2021-02')).toEqual(['01–07', '08–14', '15–21', '22–28'])
+    expect(spans('2028-02')).toEqual(['01–06', '07–13', '14–20', '21–27', '28–29'])
+    const blocks = [block('1', 'a', '2026-02-28', 30), block('2', 'a', '2026-03-01', 50)]
+    expect(categoryWeeks(monthWeeks(blocks, categories, '2026-02', '2026-03-05'), 'a')).toEqual([0, 0, 0, 0, 30])
+  })
+
+  it('особые дни не входят — Р-91; будущие недели — без столбика, сегодняшняя — с ним', () => {
+    const trip: SpecialDays = { id: 't', updatedAt: AT, from: '2026-10-02', to: '2026-10-03', title: 'Поездка' }
+    const blocks = [
+      block('1', 'a', '2026-10-01', 20),
+      block('2', 'a', '2026-10-02', 90),
+      block('3', 'a', '2026-10-06', 30),
+    ]
+    // 6 октября 2026 — вторник второй недели.
+    const weeks = monthWeeks(blocks, categories, '2026-10', '2026-10-06', [trip])
+    expect(weeks.map((week) => week.future)).toEqual([false, false, true, true, true])
+    expect(categoryWeeks(weeks, 'a')).toEqual([20, 30, 0, 0, 0])
+    expect(weeks[0]?.summary.specialDays).toBe(2)
+    const month = periodSummary(blocks, categories, { from: '2026-10-01', to: '2026-10-31' }, '2026-10-06', [trip])
+    expect(categoryWeeks(weeks, 'a').reduce((total, each) => total + each, 0)).toBe(month.total)
+    expect(groupWeeks(weeks, month.byGroup[0]?.key ?? null)).toEqual([20, 30, 0, 0, 0])
   })
 })
 

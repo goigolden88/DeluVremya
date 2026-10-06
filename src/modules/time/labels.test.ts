@@ -28,7 +28,9 @@ import {
   startedLine,
   summaryLine,
   unaccountedLine,
+  weekBarTitle,
   weekCell,
+  weekSpanText,
   windowNote,
   writingFor,
 } from './labels.ts'
@@ -49,6 +51,14 @@ describe('подписи месяца по дням — Р-92', () => {
     expect(dayTitle({ ...base, value: null, special })).toBe(
       '7 сентября 2026: особый день «Поход» — в итог месяца не входит',
     )
+  })
+})
+
+describe('подсказки месяца по неделям — Р-93', () => {
+  it('дни недели внутри месяца и время; неделя из одного дня — одним числом', () => {
+    expect(weekBarTitle({ from: '2026-10-06', to: '2026-10-12' }, 200)).toBe('6–12 окт: 3 ч 20 мин')
+    expect(weekBarTitle({ from: '2026-03-01', to: '2026-03-01' }, 0)).toBe('1 мар: 0 мин')
+    expect(weekSpanText({ from: '2026-02-23', to: '2026-02-28' })).toBe('23–28 фев')
   })
 })
 

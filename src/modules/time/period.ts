@@ -30,7 +30,7 @@ import {
 } from '../../shared/core/dates.ts'
 import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
 import { activeCategories, MINUTES_PER_DAY, type CategoryKind } from './categories.ts'
-import { groupTotals, type GroupTotal } from './groups.ts'
+import { groupMinutes, groupTotals, type GroupTotal } from './groups.ts'
 import { specialPeriod, specialsIn } from './specials.ts'
 
 // ─── Особые дни в промежутке (Р-91) ────────────────────────────────────────
@@ -299,6 +299,54 @@ export function monthDays(
     const value = special || future ? null : own.reduce((sum, block) => sum + block.minutes, 0)
     return { date, value, count: own.length, special, future, muted: value === null || own.length === 0 }
   })
+}
+
+// ─── Месяц по неделям (Р-93) ───────────────────────────────────────────────
+
+export type MonthWeek = {
+  /** Неделя с понедельника по воскресенье, обрезанная по границам месяца. */
+  period: Period
+  /** Ещё не наступила — без столбика. */
+  future: boolean
+  /** Итог её дней внутри месяца — по обычным, фоновое не входит (Р-43, Р-91). */
+  summary: PeriodSummary
+}
+
+/**
+ * Месяц по неделям для малых столбиков категорий: недели с понедельника,
+ * первая и последняя обрезаны по месяцу — сумма недель равна итогу месяца.
+ */
+export function monthWeeks(
+  blocks: readonly TimeBlock[],
+  categories: readonly Category[],
+  month: MonthStr,
+  today: DateStr,
+  specials: readonly SpecialDays[] = [],
+): MonthWeek[] {
+  const whole = monthPeriod(month)
+  const weeks: MonthWeek[] = []
+  for (let from = whole.from; from <= whole.to; from = addDays(weekPeriod(from).to, 1)) {
+    const sunday = weekPeriod(from).to
+    const period = { from, to: sunday < whole.to ? sunday : whole.to }
+    weeks.push({
+      period,
+      future: from > today,
+      summary: periodSummary(blocks, categories, period, today, specials),
+    })
+  }
+  return weeks
+}
+
+/** Минуты категории по неделям, по основной; будущая неделя — ноль. */
+export function categoryWeeks(weeks: readonly MonthWeek[], categoryId: string): number[] {
+  return weeks.map(({ future, summary }) =>
+    future ? 0 : (summary.byCategory.find((row) => row.categoryId === categoryId)?.minutes ?? 0),
+  )
+}
+
+/** Минуты группы по неделям (Р-81); будущая неделя — ноль. */
+export function groupWeeks(weeks: readonly MonthWeek[], key: string | null): number[] {
+  return weeks.map(({ future, summary }) => (future ? 0 : groupMinutes(summary.byGroup, key)))
 }
 
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────
