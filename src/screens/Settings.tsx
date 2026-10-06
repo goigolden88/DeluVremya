@@ -16,6 +16,8 @@ import { InstallNote } from '../shared/ui/Install.tsx'
 import { ReportBug } from '../shared/ui/Report.tsx'
 import { SyncSettings } from '../shared/ui/SyncSettings.tsx'
 import { useSyncStatus } from '../shared/ui/useSync.ts'
+import { useToday } from '../shared/ui/useToday.ts'
+import { RoutineSettings } from '../modules/time/Routine.tsx'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
 import { importPrompt, KIND_ORDER, KINDS, markdownExport, planImport } from '../registry.ts'
@@ -33,6 +35,7 @@ const LABELS: Record<SyncedStore, string> = {
   time: 'Блоки времени',
   reviews: 'Обзоры недели',
   specials: 'Особые дни',
+  sleep: 'Распорядок и сон',
 }
 
 type Row = { store: SyncedStore; live: number; total: number }
@@ -57,6 +60,7 @@ function describe(error: unknown): string {
  */
 export function Settings() {
   const [state, setState] = useState<State>({ status: 'loading' })
+  const day = useToday()
 
   const load = useCallback(async () => {
     try {
@@ -92,6 +96,9 @@ export function Settings() {
       <Reminders />
 
       <ReviewSection />
+
+      {/* Подъём и отбой — окно дня учёта (Р-94). */}
+      <RoutineSettings today={day} />
 
       <ScreenNamesSection />
 
