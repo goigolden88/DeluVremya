@@ -7,6 +7,7 @@ import {
   categoriesLine,
   checkText,
   clearDayConfirm,
+  clockText,
   DAY_LABEL_STEP,
   dayLabel,
   dayTitle,
@@ -20,6 +21,10 @@ import {
   periodLine,
   presetFullLabel,
   presetLabel,
+  ROUTINE_TITLE,
+  routineSavedLine,
+  routineSinceLine,
+  routineSummary,
   runningLine,
   savedLine,
   SPECIAL_WEEK,
@@ -30,7 +35,9 @@ import {
   unaccountedLine,
   weekBarTitle,
   weekCell,
+  windowBound,
   windowNote,
+  windowSpan,
   writingFor,
 } from './labels.ts'
 
@@ -203,5 +210,31 @@ describe('тексты норм недели — Р-45', () => {
   it('пределы в причинах — из констант', () => {
     expect(NORM_PROBLEMS.days).toContain(String(MAX_NORM_DAYS))
     expect(NORM_PROBLEMS.hours).toContain(String(MAX_NORM_MINUTES / 60))
+  })
+})
+
+describe('тексты окна дня и распорядка — Р-94', () => {
+  it('границы окна: целый час — числом, с минутами — «7:30», после полуночи — по часам', () => {
+    expect(windowSpan(DAY_WINDOW)).toBe(`с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}`)
+    expect(windowSpan({ from: 7.5, to: 24.5 })).toBe('с 7:30 до 0:30')
+    expect(windowSpan({ from: 15, to: 31 })).toBe('с 15 до 7')
+    expect(windowBound(7 + 5 / 60)).toBe('7:05')
+  })
+
+  it('пояснение под учётом — окно показанного дня и где его поменять', () => {
+    expect(windowNote({ from: 7, to: 25 })).toContain('Окно дня — с 7 до 1:')
+    expect(windowNote()).toContain(`«Настройки» → «${ROUTINE_TITLE}»`)
+  })
+
+  it('подъём и отбой словами; без распорядка — сказано, что по умолчанию', () => {
+    expect(clockText('07:30')).toBe('7:30')
+    expect(clockText('00:00')).toBe('0:00')
+    expect(clockText('23:05')).toBe('23:05')
+    const routine = { id: 'routine:2026-10-01', updatedAt: '2026-10-01T10:00:00.000Z', since: '2026-10-01', wake: '07:30', bed: '00:30' }
+    expect(routineSummary(routine)).toBe('подъём 7:30, отбой 0:30')
+    expect(routineSummary(null)).toBe('по умолчанию: подъём 8:00, отбой 0:00')
+    expect(routineSinceLine(routine)).toBe('Действует с 1 октября 2026.')
+    expect(routineSinceLine(null)).toBe(`Распорядка ещё нет — окно дня по умолчанию, с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}.`)
+    expect(routineSavedLine({ from: 7, to: 24.5 })).toBe('Сохранено: с сегодняшнего дня окно дня — с 7 до 0:30.')
   })
 })

@@ -5,7 +5,7 @@
 
 import { formatDateLong, MONTHS_SHORT, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
-import { DAY_WINDOW } from './day.ts'
+import { DAY_WINDOW, type DayWindow } from './day.ts'
 import {
   MAX_NORM_DAYS,
   MAX_NORM_MINUTES,
@@ -22,8 +22,9 @@ import {
   type WeekMark,
 } from './period.ts'
 import type { BlockProblem } from './retro.ts'
+import { DEFAULT_TIMES, type RoutineProblem, type SleepTimes } from './sleep.ts'
 import { datesText, specialTitle } from './specials.ts'
-import type { SpecialDays } from '../../app/model.ts'
+import type { Sleep, SpecialDays } from '../../app/model.ts'
 
 /**
  * Признак категории. Нужен только обзору недели (Р-05): на экране дня
@@ -163,10 +164,74 @@ export function clearDayConfirm(count: number, day: DateStr): string {
   return `Убрать ${count} ${blocksWord(count)} за ${formatDateLong(day)}? Блоки других дней, таймер и особые дни не тронутся.`
 }
 
-/** Пояснение к «неучтено» под итогом дня. */
-export function windowNote(): string {
-  return `Окно дня — с ${DAY_WINDOW.from} до ${DAY_WINDOW.to}: неучтённое считается от прошедшей его части, а не от суток.`
+/**
+ * Граница окна дня словами: целый час — числом, «8», «24»; с минутами —
+ * «7:30». После полуночи — по часам: 24,5 — «0:30»; ровно полночь в конце
+ * окна — «24», как писалось до распорядка (Р-21, Р-94).
+ */
+export function windowBound(hours: number): string {
+  const total = Math.round(hours * MINUTES_PER_HOUR)
+  const inDay = total === MINUTES_PER_DAY ? total : total % MINUTES_PER_DAY
+  const minutes = inDay % MINUTES_PER_HOUR
+  const whole = Math.floor(inDay / MINUTES_PER_HOUR)
+  return minutes === 0 ? String(whole) : `${whole}:${String(minutes).padStart(2, '0')}`
 }
+
+/** Окно дня словами: «с 8 до 24», «с 7:30 до 0:30». */
+export function windowSpan(window: DayWindow): string {
+  return `с ${windowBound(window.from)} до ${windowBound(window.to)}`
+}
+
+/** Пояснение к «неучтено» под итогом дня — окно показанного дня (Р-94). */
+export function windowNote(window: DayWindow = DAY_WINDOW): string {
+  return `Окно дня — ${windowSpan(window)}: неучтённое считается от прошедшей его части, а не от суток. Подъём и отбой — «Настройки» → «${ROUTINE_TITLE}».`
+}
+
+// ─── Распорядок (Р-94) ─────────────────────────────────────────────────────
+
+/** Заголовок блока в «Настройках». */
+export const ROUTINE_TITLE = 'Распорядок'
+
+/** «07:30» → «7:30»: подъём и отбой словами. */
+export function clockText(clock: string): string {
+  return clock.replace(/^0(\d)/, '$1')
+}
+
+/** Подъём и отбой строкой: «подъём 7:30, отбой 0:30». */
+export function timesText(times: SleepTimes): string {
+  return `подъём ${clockText(times.wake)}, отбой ${clockText(times.bed)}`
+}
+
+/** Итог у свёрнутого «Распорядка»: действующий сегодня или по умолчанию. */
+export function routineSummary(routine: Sleep | null): string {
+  return routine ? timesText(routine) : `по умолчанию: ${timesText(DEFAULT_TIMES)}`
+}
+
+/** С какого дня действует распорядок; нет его — что окно по умолчанию. */
+export function routineSinceLine(routine: Sleep | null): string {
+  return routine?.since
+    ? `Действует с ${formatDateLong(routine.since)}.`
+    : `Распорядка ещё нет — окно дня по умолчанию, ${windowSpan(DAY_WINDOW)}.`
+}
+
+/** Как работает распорядок — под полями формы. */
+export const ROUTINE_NOTE =
+  'Окно дня — от подъёма до отбоя: от него считаются неучтённое время и реализм плана. Отбой раньше подъёма по часам — это после полуночи. ' +
+  'Новый распорядок действует с сегодняшнего дня; прошлые дни считаются по тому, что действовал тогда. ' +
+  'Распорядок общий для всех устройств — уезжает с синхронизацией.'
+
+export const ROUTINE_PROBLEMS: Record<RoutineProblem, string> = {
+  clock: 'Подъём и отбой — время: часы и минуты',
+  same: 'Подъём и отбой совпадают — выберите разное время',
+}
+
+/** После «Сохранить»: окно с сегодняшнего дня. */
+export function routineSavedLine(window: DayWindow): string {
+  return `Сохранено: с сегодняшнего дня окно дня — ${windowSpan(window)}.`
+}
+
+/** «Сохранить» без изменений. */
+export const ROUTINE_SAME = 'Распорядок тот же — сохранять нечего.'
 
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────
 

@@ -10,13 +10,32 @@ import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import { groupTotals, type GroupTotal } from './groups.ts'
 
 /**
- * Окно дня в часах, с `from` до `to` (Р-21). Неучтённое считается от
- * прошедшей его части, а не от суток: требование закрыть все двадцать
- * четыре часа — самый быстрый способ бросить учёт.
+ * Окно дня в часах от полуночи этого дня, с `from` до `to` (Р-21).
+ * Неучтённое считается от прошедшей его части, а не от суток: требование
+ * закрыть все двадцать четыре часа — самый быстрый способ бросить учёт.
+ * Дробные часы — с минутами: подъём в 7:30 — 7,5; `to` больше 24 — отбой
+ * после полуночи: 0:30 — 24,5 (Р-94).
  */
-export const DAY_WINDOW = { from: 8, to: 24 } as const
+export type DayWindow = { readonly from: number; readonly to: number }
+
+/**
+ * Окно дня без распорядка и отметки (Р-94) — то, каким оно было
+ * константой до распорядка (Р-21). Окно показанного дня выбирает
+ * `dayWindow` в `sleep.ts`.
+ */
+export const DAY_WINDOW: DayWindow = { from: 8, to: 24 }
 
 const MINUTES_PER_HOUR = 60
+
+/** Граница окна в минутах от полуночи дня: часы с минутами дают целое. */
+function minutesOf(hours: number): number {
+  return Math.round(hours * MINUTES_PER_HOUR)
+}
+
+/** Длина окна дня в минутах. */
+function windowLength(window: DayWindow): number {
+  return minutesOf(window.to) - minutesOf(window.from)
+}
 
 /**
  * Какой день показать на «Времени» (Р-25): из адреса — прошлый или
@@ -92,14 +111,16 @@ function totals(
 
 /**
  * Сколько минут окна дня уже прошло. Прошедший день — всё окно, будущий —
- * ноль, сегодня — от начала окна до сейчас, не больше окна.
+ * ноль, сегодня — от начала окна до сейчас, не больше окна. Хвост окна
+ * после полуночи — уже на следующей дате, и день к тому времени прошедший:
+ * граница дня — календарная полночь (Р-19).
  */
-export function windowElapsed(date: DateStr, now: Date, window: { from: number; to: number } = DAY_WINDOW): number {
-  const length = (window.to - window.from) * MINUTES_PER_HOUR
+export function windowElapsed(date: DateStr, now: Date, window: DayWindow = DAY_WINDOW): number {
+  const length = windowLength(window)
   const today = toDateStr(now)
   if (date < today) return length
   if (date > today) return 0
-  const passed = now.getHours() * MINUTES_PER_HOUR + now.getMinutes() - window.from * MINUTES_PER_HOUR
+  const passed = now.getHours() * MINUTES_PER_HOUR + now.getMinutes() - minutesOf(window.from)
   return Math.min(length, Math.max(0, passed))
 }
 
@@ -107,8 +128,8 @@ export function windowElapsed(date: DateStr, now: Date, window: { from: number; 
  * Сколько минут окна дня осталось до его конца: основание реализма плана
  * (Р-35). Прошедший день — ноль, будущий — всё окно.
  */
-export function windowLeft(date: DateStr, now: Date, window: { from: number; to: number } = DAY_WINDOW): number {
-  return (window.to - window.from) * MINUTES_PER_HOUR - windowElapsed(date, now, window)
+export function windowLeft(date: DateStr, now: Date, window: DayWindow = DAY_WINDOW): number {
+  return windowLength(window) - windowElapsed(date, now, window)
 }
 
 export type DaySummary = {
@@ -127,16 +148,20 @@ export type DaySummary = {
   unaccounted: number
 }
 
-/** Итог дня — то, что видно сразу после записи. */
+/**
+ * Итог дня — то, что видно сразу после записи. `window` — окно этого дня
+ * (`dayWindow`, Р-94); не задано — по умолчанию.
+ */
 export function daySummary(
   blocks: readonly TimeBlock[],
   categories: readonly Category[],
   date: DateStr,
   now: Date,
+  window: DayWindow = DAY_WINDOW,
 ): DaySummary {
   const day = blocksOn(blocks, date)
   const total = day.reduce((sum, block) => sum + block.minutes, 0)
-  const elapsed = windowElapsed(date, now)
+  const elapsed = windowElapsed(date, now, window)
   return {
     total,
     count: day.length,
