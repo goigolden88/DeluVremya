@@ -19,6 +19,7 @@ import { useSyncStatus } from '../shared/ui/useSync.ts'
 import { DEFAULT_SCREEN_NAMES, MAX_SCREEN_NAME, quoted, SCREEN_KEYS, type ScreenKey } from '../ui/screenNames.ts'
 import { saveScreenNames, useScreenNames } from '../ui/useScreenNames.ts'
 import { importPrompt, KIND_ORDER, KINDS, markdownExport, planImport } from '../registry.ts'
+import { RoutineSection } from '../modules/time/Routine.tsx'
 import { isEmptyBase } from '../shared/screens/firstRun.ts'
 import { ImportRecords } from '../shared/screens/ImportRecords.tsx'
 import { ChangeList } from '../shared/screens/WhatsNew.tsx'
@@ -91,6 +92,9 @@ export function Settings() {
       <DataTransfer onChanged={load} />
 
       <Reminders />
+
+      {/* Подъём и отбой — окно дня (Р-94): запись, а не настройка устройства. */}
+      <RoutineSection />
 
       <ReviewSection />
 

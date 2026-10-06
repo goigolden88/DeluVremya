@@ -4,8 +4,10 @@ import { useToday } from '../../shared/ui/useToday.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
 import { viewedDay } from './day.ts'
 import { windowNote } from './labels.ts'
+import { dayWindow } from './sleep.ts'
 import { SpecialDay } from './Special.tsx'
 import { TimeDay } from './TimeDay.tsx'
+import { useSleep } from './useSleep.ts'
 import { WeekProgress } from './Week.tsx'
 
 /**
@@ -20,6 +22,7 @@ export function TimeScreen() {
   const today = useToday()
   const names = useScreenNames()
   const [params, setParams] = useSearchParams()
+  const sleep = useSleep()
   const day = viewedDay(params.get('day'), today)
   const isToday = day === today
 
@@ -85,7 +88,8 @@ export function TimeScreen() {
       {/* Нормы — про идущую неделю: на прошлом дне они сбивали бы с толку. */}
       {isToday && <WeekProgress today={today} />}
 
-      <p className="muted">{windowNote()}</p>
+      {/* Окно показанного дня (Р-94): у прошлого — свой распорядок. */}
+      {sleep.status === 'ready' && <p className="muted">{windowNote(dayWindow(sleep.records, day))}</p>}
     </>
   )
 }

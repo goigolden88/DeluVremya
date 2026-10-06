@@ -9,8 +9,10 @@ import { useToday } from '../shared/ui/useToday.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { PlanDay } from '../modules/notes/PlanDay.tsx'
 import { windowLeft } from '../modules/time/day.ts'
+import { dayWindow } from '../modules/time/sleep.ts'
 import { SpecialToday } from '../modules/time/Special.tsx'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
+import { useSleep } from '../modules/time/useSleep.ts'
 import { ReviewCall } from './Review.tsx'
 import { useFirstRun } from '../shared/screens/useFirstRun.ts'
 import { useWhatsNew } from '../shared/screens/useWhatsNew.ts'
@@ -35,6 +37,7 @@ export function Today() {
   const news = useWhatsNew(first, CHANGES)
   const day = useToday()
   const now = useNow(MINUTE)
+  const sleep = useSleep()
   const names = useScreenNames()
   const mark = syncDot(useSyncStatus())
 
@@ -79,7 +82,8 @@ export function Today() {
       {/* В воскресенье и понедельник, пока обзор недели не проведён (Р-41). */}
       <ReviewCall today={day} />
 
-      <PlanDay today={day} left={windowLeft(day, now)} />
+      {/* Остаток окна сегодняшнего дня — по распорядку или отметке (Р-94). */}
+      <PlanDay today={day} left={windowLeft(day, now, dayWindow(sleep.records, day))} />
 
       {/* Учёт времени: кнопки и итог дня. Список блоков — на экране учёта. */}
       <Fold id="today:time" title={names.time}>

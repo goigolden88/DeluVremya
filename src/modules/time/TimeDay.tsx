@@ -8,6 +8,7 @@ import { BlockForm } from './BlockForm.tsx'
 import { categoryEditPath, hiddenPresets, presetLines, shownPresets, type PresetLine } from './categories.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { blockFromPreset, blocksOn, categoryName, clearDayBlocks, daySummary, type DaySummary } from './day.ts'
+import { dayWindow } from './sleep.ts'
 import {
   addedLine,
   blocksWord,
@@ -28,6 +29,7 @@ import {
 import { TimerLine, TimerPanel } from './Timer.tsx'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
+import { useSleep } from './useSleep.ts'
 import { useTimer } from './useTimer.ts'
 
 function describe(error: unknown): string {
@@ -56,6 +58,7 @@ export function TimeDay({
 }) {
   const catalog = useCatalog()
   const time = useBlocks()
+  const sleep = useSleep()
   const timer = useTimer()
   const navigate = useNavigate()
   const longPress = useLongPress()
@@ -76,10 +79,12 @@ export function TimeDay({
 
   if (catalog.status === 'failed') return <p className="error">Категории не прочитались: {catalog.error}</p>
   if (time.status === 'failed') return <p className="error">Блоки времени не прочитались: {time.error}</p>
-  if (catalog.status !== 'ready' || time.status !== 'ready') return null
+  if (sleep.status === 'failed') return <p className="error">Распорядок не прочитался: {sleep.error}</p>
+  if (catalog.status !== 'ready' || time.status !== 'ready' || sleep.status !== 'ready') return null
 
   const lines = presetLines(catalog.categories, catalog.presets)
-  const summary = daySummary(time.blocks, catalog.categories, day, new Date())
+  // Неучтённое — от окна показанного дня: его отметки или распорядка (Р-94).
+  const summary = daySummary(time.blocks, catalog.categories, day, new Date(), dayWindow(sleep.records, day))
   // Блок, снятый из списка, «Отменить» больше не предлагает.
   const undoable = last !== null && time.blocks.some((each) => each.id === last.block.id)
   const categoryTotal =
