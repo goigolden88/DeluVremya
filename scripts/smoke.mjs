@@ -1216,7 +1216,7 @@ async function scenario() {
   }
   check(
     'в файле копии — схема и обе записи, токена нет',
-    snapshot?.schemaVersion === 2 &&
+    snapshot?.schemaVersion === 3 &&
       snapshot?.data?.notes?.length === 2 &&
       !JSON.stringify(snapshot).includes('syncToken'),
     saved ?? `файла нет: ${readdirSync(profile).filter((name) => name.endsWith('.json')).join(', ')}`,
@@ -1224,7 +1224,8 @@ async function scenario() {
 
   // Запись с другого устройства, без даты: её загрузка — тем же путём, что
   // у человека, «Восстановить из копии». Схема 1 — нарочно: копия, снятая
-  // до особых дней, принимается (шаг на версию 2 только добавляет, Р-91).
+  // до особых дней и распорядка, принимается (шаги на версии 2 и 3 только
+  // добавляют, Р-91, Р-94).
   const restore = join(profile, 'restore.json')
   writeFileSync(
     restore,
@@ -1320,6 +1321,8 @@ async function scenario() {
   await polishScenario()
 
   await specialsScenario()
+
+  await routineScenario()
 
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
@@ -1495,7 +1498,7 @@ async function stageSixScenario() {
       has(report, ' · #/inbox · ') &&
       // Текст в адресе закодирован: ищется не он, а сам параметр.
       !has(report, 'shared') &&
-      has(report, 'Схема данных: 2') &&
+      has(report, 'Схема данных: 3') &&
       has(cleared, 'Ошибок приложение не записало'),
     line(report, 'проверка журнала') || report.slice(0, 120),
   )
@@ -2456,7 +2459,7 @@ async function syncScenario() {
     `коммитов ${commitCount()}; ${line(first, 'отправлено файлов')}`,
   )
   const expected = ['meta.json', 'categories.json', 'presets.json', 'templates.json', 'reviews.json',
-    'specials.json', 'time/2026-02.json', `time/${month}.json`, `notes/${month}.json`, 'notes/undated.json']
+    'specials.json', 'sleep.json', 'time/2026-02.json', `time/${month}.json`, `notes/${month}.json`, 'notes/undated.json']
   check(
     'раскладка по месяцам, годовых файлов нет — Р-28',
     expected.every((path) => paths.includes(path)) && !paths.some((path) => /^(time|notes)\/\d{4}\.json$/.test(path)),
@@ -2977,6 +2980,102 @@ async function specialsScenario() {
       removedPlate === '' &&
       todayAfter === '',
     `поля ${editing}; после — «${removedPlate}», «${todayAfter}»`,
+  )
+}
+
+/**
+ * Распорядок (Р-94): блок «Распорядок» в «Настройках» — по умолчанию 8:00
+ * и 0:00; подъём, совпавший с отбоем, и тот же распорядок не пишутся;
+ * «Сохранить» меняет окно сегодня, отбой после полуночи, вчерашний день —
+ * при прежнем окне; правка в тот же день — та же запись; справка называет
+ * сегодняшнее окно. Идёт последним из сценариев с окном дня: после него
+ * окно сегодня уже не 8–24.
+ */
+async function routineScenario() {
+  const field = (name) => `document.querySelector('input[name=${name}]')`
+  const fields = () => run(`[${field('routine-wake')}?.value ?? '-', ${field('routine-bed')}?.value ?? '-'].join(' ')`)
+  const block = () => run(`${field('routine-wake')}?.closest('section')?.innerText.replace(/\\s+/g, ' ') ?? ''`)
+  const windowNote = () =>
+    run(`[...document.querySelectorAll('p.muted')].map((el) => el.innerText).find((text) => text.startsWith('Окно дня')) ?? ''`)
+  // Записи хранилища sleep — прямо из базы: «одна запись» видно только там.
+  const records = () =>
+    run(`new Promise((done, fail) => {
+      const request = indexedDB.open('deluvremya')
+      request.onerror = () => fail(request.error)
+      request.onsuccess = () => {
+        const all = request.result.transaction('sleep', 'readonly').objectStore('sleep').getAll()
+        all.onsuccess = () => {
+          request.result.close()
+          done(all.result.map((record) => [record.id, record.wake, record.bed].join(' ')).join('; '))
+        }
+        all.onerror = () => fail(all.error)
+      }
+    })`)
+  const save = async (wake, bed) => {
+    await act(`set(${field('routine-wake')}, ${JSON.stringify(wake)})`)
+    await sleep(100)
+    await act(`set(${field('routine-bed')}, ${JSON.stringify(bed)})`)
+    await sleep(100)
+    await act(`${field('routine-wake')}?.closest('form')?.querySelector('button[type=submit]')?.click()`)
+    await sleep(700)
+    return block()
+  }
+  const today = localDay(0)
+
+  await go('/settings')
+  const folded = await screen()
+  await unfold('Распорядок')
+  const defaults = await fields()
+  const empty = await block()
+  check(
+    'блок «Распорядок» в «Настройках»: у свёрнутого — по умолчанию, в полях 8:00 и 0:00 — Р-94',
+    has(folded, 'Распорядок') &&
+      has(folded, 'по умолчанию: подъём 8:00, отбой 0:00') &&
+      defaults === '08:00 00:00' &&
+      has(empty, 'Распорядка ещё нет — окно дня по умолчанию, с 8 до 24'),
+    `поля ${defaults}; ${empty.slice(0, 120)}`,
+  )
+
+  const same = await save('07:00', '07:00')
+  const unchanged = await save('08:00', '00:00')
+  const none = await records()
+  check(
+    'подъём, совпавший с отбоем, не сохраняется; тот же распорядок не пишется — Р-94',
+    has(same, 'Подъём и отбой совпадают') && has(unchanged, 'Распорядок тот же') && none === '',
+    `«${line(same, 'совпадают')}»; «${line(unchanged, 'тот же')}»; записи: «${none}»`,
+  )
+
+  const saved = await save('07:00', '00:30')
+  const first = await records()
+  check(
+    '«Сохранить» — распорядок с сегодняшнего дня, отбой после полуночи; итог у заголовка — новый — Р-94',
+    has(saved, 'Сохранено: с сегодняшнего дня окно дня — с 7 до 0:30') &&
+      has(saved, 'подъём 7:00, отбой 0:30') &&
+      first === `routine:${today} 07:00 00:30`,
+    `${line(saved, 'Сохранено')}; записи: «${first}»`,
+  )
+
+  await save('07:00', '01:00')
+  const edited = await records()
+  check('правка в тот же день — та же запись — Р-94', edited === `routine:${today} 07:00 01:00`, `записи: «${edited}»`)
+
+  await go('/time')
+  const todayNote = await windowNote()
+  await go(`/time?day=${localDay(-1)}`)
+  const yesterdayNote = await windowNote()
+  check(
+    'окно на «Учёте»: сегодня — по распорядку, вчера — прежнее, 8–24 — Р-94',
+    todayNote.startsWith('Окно дня — с 7 до 1:') && yesterdayNote.startsWith('Окно дня — с 8 до 24:'),
+    `«${todayNote.slice(0, 30)}» | «${yesterdayNote.slice(0, 30)}»`,
+  )
+
+  await go('/help')
+  await unfold('Учёт времени')
+  const help = await screen()
+  check(
+    'справка называет сегодняшнее окно и окно без распорядка — Р-94',
+    has(help, 'сегодня с 7 до 1,') && has(help, 'Без распорядка — с 8 до 24'),
+    line(help, 'Без распорядка'),
   )
 }
 
