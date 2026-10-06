@@ -2108,6 +2108,25 @@ async function monthScenario() {
     dayBars,
   )
 
+  // ─ Категории по неделям: у строки «Стык» — столбики недель 1–4 и 26–31 августа, у июля столбиков нет (Р-93).
+  const weekBars = await run(`JSON.stringify((() => {
+    const row = [...document.querySelectorAll('table.stats tr')].find((tr) => tr.cells[0]?.textContent.trim() === 'Стык')
+    return {
+      cells: row ? row.querySelectorAll('svg.minibars').length : -1,
+      titles: row ? [...row.querySelectorAll('svg.minibars .chart__bar title')].map((el) => el.textContent) : [],
+      numbers: row ? [...row.querySelectorAll('td.num')].map((td) => td.textContent.trim()) : [],
+    }
+  })())`)
+  const weekly = JSON.parse(weekBars ?? '{}')
+  check(
+    'итоги месяца: у категории — малые столбики по неделям, крайние обрезаны по месяцу, числа рядом — Р-93',
+    weekly.cells === 1 &&
+      JSON.stringify(weekly.titles) === JSON.stringify(['1–4 авг: 1 ч 10 мин', '26–31 авг: 15 мин']) &&
+      JSON.stringify(weekly.numbers) === JSON.stringify(['1 ч 25 мин', '50 мин']) &&
+      has(august, 'Малые столбики — недели месяца'),
+    weekBars,
+  )
+
   // ─ Тап по столбцу дня — этот день в учёте.
   await act(`
     document.querySelector('svg.chart__svg a[href="#/time?day=2024-08-01"]')
@@ -2127,6 +2146,12 @@ async function monthScenario() {
   const plainWeek = await screen()
   await go('/review?week=2024-07-29')
   const closing = await screen()
+  const reviewBars = await run(`document.querySelectorAll('svg.minibars').length`)
+  check(
+    'обзор недели — без малых столбиков: они только у месяца — Р-93',
+    has(closing, 'Стык') && reviewBars === 0,
+    `${line(closing, 'Стык')}; столбиков ${reviewBars}`,
+  )
   await act(`byText('a', 'Итоги месяца')?.click()`)
   await sleep(700)
   const july = await screen()
