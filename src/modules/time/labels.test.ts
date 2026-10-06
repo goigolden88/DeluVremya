@@ -28,6 +28,7 @@ import {
   startedLine,
   summaryLine,
   unaccountedLine,
+  weekBarTitle,
   weekCell,
   windowNote,
   writingFor,
@@ -49,6 +50,13 @@ describe('подписи месяца по дням — Р-92', () => {
     expect(dayTitle({ ...base, value: null, special })).toBe(
       '7 сентября 2026: особый день «Поход» — в итог месяца не входит',
     )
+  })
+})
+
+describe('подсказка столбика недели месяца — Р-93', () => {
+  it('дни недели и время; неделя из одного дня — одним числом', () => {
+    expect(weekBarTitle({ from: '2026-10-05', to: '2026-10-11' }, 200)).toBe('5–11 окт: 3 ч 20 мин')
+    expect(weekBarTitle({ from: '2026-02-01', to: '2026-02-01' }, 45)).toBe('1 фев: 45 мин')
   })
 })
 
