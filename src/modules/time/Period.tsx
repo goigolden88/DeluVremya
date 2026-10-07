@@ -1,6 +1,5 @@
 import { Fragment, type ReactNode } from 'react'
-import { formatPeriod, type DateStr, type MonthStr, type Period } from '../../shared/core/dates.ts'
-import { MiniBars } from '../../shared/ui/BarChart.tsx'
+import { formatPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { quoted } from '../../ui/screenNames.ts'
 import { useScreenNames } from '../../ui/useScreenNames.ts'
@@ -18,20 +17,11 @@ import {
   periodLine,
   specialMarksText,
   UNKNOWN_CATEGORY,
-  weekBarTitle,
   YEAR_NORMS_BASIS,
 } from './labels.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
-import {
-  categoryWeeks,
-  compareRows,
-  groupWeeks,
-  monthWeeks,
-  periodNorms,
-  periodSummary,
-  specialTime,
-  type SpecialTime,
-} from './period.ts'
+import { compareRows, periodNorms, periodSummary, specialTime, type SpecialTime } from './period.ts'
+import { PeriodShares } from './Shares.tsx'
 import { datesText, specialTitle } from './specials.ts'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
@@ -107,23 +97,26 @@ export type Compare = { period: Period; label: string; own: string }
  * Итог и сравнение — по обычным дням с обеих сторон; особые — ниже, своим
  * блоком (Р-91).
  *
- * `chart` — график над таблицей: у месяца — дни (Р-92).
+ * `scope` — начало ключей свёрнутых блоков: что свёрнуто, устройство
+ * помнит по экрану.
  *
- * `weeks` — месяц, по чьим неделям у категорий и групп малые столбики
- * (Р-93); только у итогов месяца, обзор недели их не передаёт.
+ * `chart` — график дней месяца (Р-92); с ним — раскладка итогов месяца
+ * (Р-95): под итогом, который не сворачивается, блоки «По дням», «Доли»
+ * и свёрнутая «Таблица». Без него — как у обзора недели: таблица, под ней
+ * «Доли».
  */
 export function PeriodTime({
   period,
   today,
+  scope,
   compare,
   chart,
-  weeks,
 }: {
   period: Period
   today: DateStr
+  scope: string
   compare?: Compare
   chart?: ReactNode
-  weeks?: MonthStr
 }) {
   const catalog = useCatalog()
   const time = useBlocks()
@@ -142,32 +135,50 @@ export function PeriodTime({
   // По группам (Р-81): строка группы с суммой в каждом столбце, под ней её категории.
   const groups = hasGroups(catalog.categories) ? byGroup(rows, catalog.categories, (row) => row.categoryId) : null
   const dash = (minutes: number) => (minutes > 0 ? formatMinutes(minutes) : '—')
-  const weekly = weeks
-    ? monthWeeks(time.blocks, catalog.categories, weeks, today, specials.specials)
-    : null
-  const bars = (values: number[]) =>
-    weekly && (
-      <td className="minibars-cell">
-        <MiniBars
-          values={values}
-          titles={values.map((minutes, index) => {
-            const week = weekly[index]
-            return week ? weekBarTitle(week.period, minutes) : ''
-          })}
-        />
-      </td>
-    )
   const line = (row: (typeof rows)[number], sub: boolean) => (
     <tr key={row.categoryId}>
       <td className={sub ? 'stats__sub' : undefined}>
         {row.name ?? UNKNOWN_CATEGORY}
         {row.background > 0 && <span className="muted"> · {backgroundText(row.background)}</span>}
       </td>
-      {weekly && bars(categoryWeeks(weekly, row.categoryId))}
       <td className="num">{dash(row.minutes)}</td>
       {compare && <td className="num muted">{dash(row.before)}</td>}
     </tr>
   )
+
+  const table = rows.length > 0 && (
+    <>
+      <table className="stats">
+        {compare && (
+          <thead>
+            <tr>
+              <th />
+              <th className="num">{compare.own}</th>
+              <th className="num">{compare.label}</th>
+            </tr>
+          </thead>
+        )}
+        <tbody>
+          {groups
+            ? groups.map((group) => (
+                <Fragment key={group.key ?? ''}>
+                  <tr className="stats__group">
+                    <td>{group.name ?? NO_GROUP}</td>
+                    <td className="num">{dash(groupMinutes(summary.byGroup, group.key))}</td>
+                    {compare && (
+                      <td className="num muted">{dash(before ? groupMinutes(before.byGroup, group.key) : 0)}</td>
+                    )}
+                  </tr>
+                  {group.items.map((row) => line(row, true))}
+                </Fragment>
+              ))
+            : rows.map((row) => line(row, false))}
+        </tbody>
+      </table>
+      {withBackground && <p className="muted">Фоновое в сумму не входит: час ютуба под покер — один час.</p>}
+    </>
+  )
+  const shares = <PeriodShares id={`${scope}:shares`} summary={summary} categories={catalog.categories} />
 
   return (
     <div className="day-sum">
@@ -177,45 +188,24 @@ export function PeriodTime({
           {compare.label}: {lowerFirst(periodLine(before))}
         </p>
       )}
-      {chart}
-      {rows.length > 0 && (
-        <table className="stats">
-          {compare && (
-            <thead>
-              <tr>
-                <th />
-                {weekly && <th />}
-                <th className="num">{compare.own}</th>
-                <th className="num">{compare.label}</th>
-              </tr>
-            </thead>
+      {chart ? (
+        <>
+          <Fold id={`${scope}:days`} title="По дням" summary={formatMinutes(summary.total)} sub>
+            {chart}
+          </Fold>
+          {shares}
+          {table && (
+            <Fold id={`${scope}:table`} title="Таблица" summary={rows.length} folded sub>
+              {table}
+            </Fold>
           )}
-          <tbody>
-            {groups
-              ? groups.map((group) => (
-                  <Fragment key={group.key ?? ''}>
-                    <tr className="stats__group">
-                      <td>{group.name ?? NO_GROUP}</td>
-                      {weekly && bars(groupWeeks(weekly, group.key))}
-                      <td className="num">{dash(groupMinutes(summary.byGroup, group.key))}</td>
-                      {compare && (
-                        <td className="num muted">{dash(before ? groupMinutes(before.byGroup, group.key) : 0)}</td>
-                      )}
-                    </tr>
-                    {group.items.map((row) => line(row, true))}
-                  </Fragment>
-                ))
-              : rows.map((row) => line(row, false))}
-          </tbody>
-        </table>
+        </>
+      ) : (
+        <>
+          {table}
+          {shares}
+        </>
       )}
-      {weekly && rows.length > 0 && (
-        <p className="muted">
-          Малые столбики — недели этого месяца с понедельника, у каждой строки своя шкала. Первая и последняя
-          недели обрезаны по месяцу и бывают короче.
-        </p>
-      )}
-      {withBackground && <p className="muted">Фоновое в сумму не входит: час ютуба под покер — один час.</p>}
       {summary.byKind.length > 0 && <p className="muted">По признаку: {kindLine(summary.byKind)}</p>}
       <SpecialTimeList rows={special} />
     </div>

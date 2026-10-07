@@ -2111,27 +2111,39 @@ async function monthScenario() {
     dayBars,
   )
 
-  // ─ Столбики категорий по неделям: у каждой строки таблицы, у «Стыка» — первая и последняя
-  // неделя, обрезанные по августу, с подсказкой «дни: время» (Р-93).
-  const weekBars = await run(`(() => {
-    const table = [...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === 'Время месяца')
-      ?.closest('section')?.querySelector('table.stats')
-    const rows = [...(table?.querySelectorAll('tbody tr') ?? [])]
-    const own = rows.find((row) => row.querySelector('td')?.textContent.trim() === 'Стык')
+  // ─ Под итогом — три блока (Р-95, вместо столбиков по неделям Р-93): «По дням» и «Доли»
+  //   открыты, «Таблица» свёрнута; в таблице — категория с прошлым месяцем, без столбиков.
+  const monthFolds = await run(`JSON.stringify([...([...document.querySelectorAll('h2')]
+    .find((el) => el.textContent.trim() === 'Время месяца')?.closest('section')?.querySelectorAll('.fold__btn') ?? [])]
+    .map((el) => [el.textContent.trim(), el.getAttribute('aria-expanded')]))`)
+  await unfold('Таблица')
+  const tableProbe = await run(`(() => {
+    const block = [...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Таблица')?.closest('section')
+    const rows = [...(block?.querySelectorAll('table.stats tbody tr') ?? [])]
     return JSON.stringify({
-      rows: rows.length,
-      withBars: rows.filter((row) => row.querySelector('svg.minibars')).length,
-      titles: [...(own?.querySelectorAll('svg.minibars .chart__bar title') ?? [])].map((el) => el.textContent),
+      columns: block?.querySelectorAll('table.stats thead th').length ?? 0,
+      own: rows.find((row) => row.querySelector('td')?.textContent.trim() === 'Стык')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
+      bars: document.querySelectorAll('svg.minibars').length,
     })
   })()`)
-  const weekly = JSON.parse(weekBars ?? '{}')
+  const table = JSON.parse(tableProbe ?? '{}')
   check(
-    'итоги месяца: у строк таблицы — столбики по неделям, крайние недели обрезаны по месяцу — Р-93',
-    weekly.rows > 0 &&
-      weekly.withBars === weekly.rows &&
-      JSON.stringify(weekly.titles) === JSON.stringify(['1–4 авг: 1 ч 10 мин', '26–31 авг: 15 мин']),
-    weekBars,
+    'итоги месяца: блоки «По дням» и «Доли» открыты, «Таблица» свёрнута; в таблице — прошлый месяц, без столбиков по неделям — Р-95',
+    monthFolds === JSON.stringify([['По дням', 'true'], ['Доли', 'true'], ['Таблица', 'false']]) &&
+      table.columns === 3 &&
+      has(table.own, '1 ч 25 мин') &&
+      has(table.own, '50 мин') &&
+      table.bars === 0,
+    `${monthFolds}; ${tableProbe}`,
   )
+
+  // ─ Что свёрнуто, помнит устройство: раскрытая «Таблица» остаётся раскрытой и после перезагрузки.
+  await sleep(500)
+  const tableButton = `[...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Таблица')`
+  await reload(tableButton)
+  await sleep(700)
+  const kept = await run(`${tableButton}?.getAttribute('aria-expanded') ?? 'нет'`)
+  check('итоги месяца: раскрытая «Таблица» остаётся раскрытой и после перезагрузки — Р-95', kept === 'true', `Таблица раскрыта: ${kept}`)
 
   // ─ Тап по столбцу дня — этот день в учёте.
   await act(`
@@ -2150,8 +2162,6 @@ async function monthScenario() {
   // ─ Неделя, закрывшая июль: карточка в обзоре ведёт к итогам июля; другая неделя — без неё (Р-54).
   await go('/review?week=2024-08-05')
   const plainWeek = await screen()
-  const reviewBars = await run(`document.querySelectorAll('svg.minibars').length`)
-  check('обзор недели — без столбиков по неделям: они только у месяца — Р-93', reviewBars === 0, `столбиков ${reviewBars}`)
   await go('/review?week=2024-07-29')
   const closing = await screen()
   await act(`byText('a', 'Итоги месяца')?.click()`)
@@ -2188,6 +2198,25 @@ async function monthScenario() {
     `${line(year, 'Учтено')}; ${bars}`,
   )
 
+  // ─ Год: категории с малыми столбиками по месяцам (Р-57) — в свёрнутом «По месяцам», над ним «Доли» (Р-95).
+  const yearFolds = await run(`JSON.stringify([...([...document.querySelectorAll('h2')]
+    .find((el) => el.textContent.trim() === 'Время года')?.closest('section')?.querySelectorAll('.fold__btn') ?? [])]
+    .map((el) => [el.textContent.trim(), el.getAttribute('aria-expanded')]))`)
+  const foldedBars = await run(`document.querySelectorAll('svg.minibars').length`)
+  await unfold('По месяцам')
+  const openBars = await run(`(() => {
+    const block = [...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'По месяцам')?.closest('section')
+    const own = [...(block?.querySelectorAll('table.stats tbody tr') ?? [])].find((row) => row.querySelector('td')?.textContent.trim() === 'Стык')
+    return own?.querySelectorAll('svg.minibars').length ?? 0
+  })()`)
+  check(
+    'итоги года: «Доли» открыты, категории со столбиками по месяцам — в свёрнутом «По месяцам» — Р-95, Р-57',
+    yearFolds === JSON.stringify([['Месяцы таблицей', 'false'], ['Доли', 'true'], ['По месяцам', 'false']]) &&
+      foldedBars === 0 &&
+      openBars === 1,
+    `${yearFolds}; столбиков свёрнутым ${foldedBars}, у «Стыка» раскрытым ${openBars}`,
+  )
+
   // ─ Тап по столбцу — итоги этого месяца.
   await act(`
     document.querySelector('svg.chart__svg a[href="#/month?m=2024-08"]')
@@ -2196,6 +2225,73 @@ async function monthScenario() {
   await sleep(900)
   const tapped = await screen()
   check('тап по столбцу года открывает итоги месяца — Р-57', has(tapped, 'Август 2024') && has(tapped, 'Учтено 1 ч 25 мин'), line(tapped, 'Учтено'))
+
+  // ─ Окно шириной с телефон (Р-95): у месяца (с раскрытой «Таблицей»), года (с раскрытым
+  //   «По месяцам») и обзора недели страница не шире окна; «Доли» открыты под временем
+  //   периода, тап по группе раскрывает её категории — доля от всего учтённого.
+  await phone(true)
+  for (const [route, owner] of [
+    ['/month?m=2024-08', 'Время месяца'],
+    ['/year?y=2024', 'Время года'],
+    ['/review?week=2024-07-29', 'Время недели'],
+  ]) {
+    const seen = await sharesOnPhone(route)
+    check(
+      `${route} в окне ${PHONE_WIDTH} px: не шире окна; «Доли» открыты, тап по группе — её категории — Р-95`,
+      seen.view > 0 &&
+        seen.view <= PHONE_WIDTH &&
+        seen.wide <= seen.view &&
+        seen.owner === owner &&
+        seen.open === 'true' &&
+        JSON.stringify(seen.groups) === JSON.stringify(['Без группы 100 %']) &&
+        seen.expanded === 'true' &&
+        has(seen.sub, 'Стык 100 %'),
+      JSON.stringify(seen),
+    )
+  }
+  await phone(false)
+}
+
+/** Ширина окна телефона, на которой итоги не должны прокручиваться вбок (Р-95). */
+const PHONE_WIDTH = 360
+
+/** Окно шириной с телефон и без полос прокрутки — или обратно обычное. */
+async function phone(on) {
+  if (on) {
+    await send('Emulation.setDeviceMetricsOverride', { width: PHONE_WIDTH, height: 800, deviceScaleFactor: 1, mobile: false })
+    await send('Emulation.setScrollbarsHidden', { hidden: true })
+  } else {
+    await send('Emulation.setScrollbarsHidden', { hidden: false })
+    await send('Emulation.clearDeviceMetricsOverride')
+  }
+  await sleep(400)
+}
+
+/**
+ * Блок «Доли» экрана: открыт ли, в каком блоке экрана, строки групп; затем
+ * тап по первой группе — раскрылась ли и что под ней; и ширина страницы
+ * против ширины окна.
+ */
+async function sharesOnPhone(route) {
+  await go(route)
+  const before = await run(`JSON.stringify((() => {
+    const fold = [...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Доли')
+    const block = fold?.closest('section')
+    return {
+      open: fold?.getAttribute('aria-expanded') ?? 'нет',
+      owner: block?.parentElement?.closest('section')?.querySelector('h2')?.textContent.trim() ?? '',
+      groups: [...(block?.querySelectorAll('button.share--group') ?? [])].map((el) => el.innerText.replace(/\\s+/g, ' ').trim()),
+    }
+  })())`)
+  await act(`document.querySelector('button.share--group')?.click()`)
+  await sleep(400)
+  const after = await run(`JSON.stringify({
+    expanded: document.querySelector('button.share--group')?.getAttribute('aria-expanded') ?? 'нет',
+    sub: document.querySelector('.shares--sub')?.innerText.replace(/\\s+/g, ' ').trim() ?? '',
+    wide: document.documentElement.scrollWidth,
+    view: document.documentElement.clientWidth,
+  })`)
+  return { ...JSON.parse(before ?? '{}'), ...JSON.parse(after ?? '{}') }
 }
 
 /** Месяц словом, как его ищут: «сентябрь». По часам этого компьютера — как `today()`. */

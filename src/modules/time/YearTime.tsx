@@ -14,6 +14,7 @@ import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { backgroundText, formatMinutes, kindLine, lowerFirst, NO_GROUP, periodLine, UNKNOWN_CATEGORY } from './labels.ts'
 import { specialTime, yearTime } from './period.ts'
 import { ready, SpecialTimeList, Unready } from './Period.tsx'
+import { PeriodShares } from './Shares.tsx'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
 import { useSpecials } from './useSpecials.ts'
@@ -27,8 +28,9 @@ function capitalized(text: string): string {
 
 /**
  * Время года (Р-57): итог с основанием, столбцы месяцев — тап открывает
- * месяц, — те же числа таблицей в свёрнутом блоке, категории строками
- * с малыми столбиками по месяцам. Признак не красит (Р-05); фоновое —
+ * месяц, — те же числа таблицей в свёрнутом блоке, «Доли» открытым блоком
+ * (Р-95), категории строками с малыми столбиками по месяцам — в свёрнутом
+ * «По месяцам». Признак не красит (Р-05); фоновое —
  * отдельно и в сумму не входит (Р-43). Итог, столбцы и категории — по
  * обычным дням; особые — ниже, своим блоком (Р-91).
  *
@@ -123,9 +125,10 @@ export function YearTime({
         </Fold>
       )}
 
+      <PeriodShares id="year:shares" summary={data.total} categories={catalog.categories} />
+
       {data.categories.length > 0 && (
-        <>
-          <h3 className="unit__name">По категориям</h3>
+        <Fold id="year:by-months" title="По месяцам" summary={data.categories.length} folded sub>
           <table className="stats">
             <tbody>
               {groups
@@ -150,7 +153,7 @@ export function YearTime({
             Малые столбики — месяцы по порядку, у каждой категории своя шкала: видно, когда она росла. Сколько —
             числом справа.
           </p>
-        </>
+        </Fold>
       )}
       {data.total.byKind.length > 0 && <p className="muted">По признаку: {kindLine(data.total.byKind)}</p>}
       <SpecialTimeList rows={special} />

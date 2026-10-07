@@ -14,8 +14,8 @@ const dayHref = (day: string) => `#/time?day=${day}`
 /**
  * Итоги месяца — экран `#/month?m=` (Р-54). Читает оба модуля и потому живёт
  * в `screens/` (Р-10). Записи о проведении нет: месяц читают, а решения
- * принимает обзор недели. Время против прошлого месяца с графиком по дням
- * (Р-92) и столбиками категорий по неделям (Р-93), нормы по неделям месяца, план против факта (Р-55).
+ * принимает обзор недели. Время против прошлого месяца блоками «По дням»
+ * (Р-92), «Доли» и «Таблица» (Р-95), нормы по неделям месяца, план против факта (Р-55).
  */
 export function Month() {
   const today = useToday()
@@ -75,9 +75,9 @@ export function Month() {
         <PeriodTime
           period={period}
           today={today}
+          scope="month"
           compare={{ period: monthPeriod(previous), label: monthLabel(previous), own: monthLabel(month) }}
           chart={<MonthDays month={month} today={today} dayHref={dayHref} />}
-          weeks={month}
         />
       </section>
 

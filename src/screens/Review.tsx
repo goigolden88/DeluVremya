@@ -131,7 +131,7 @@ export function Review() {
 
       <section className="block">
         <h2>Время недели</h2>
-        <PeriodTime period={weekPeriod(week)} today={today} />
+        <PeriodTime period={weekPeriod(week)} today={today} scope="review" />
       </section>
 
       <section className="block">
