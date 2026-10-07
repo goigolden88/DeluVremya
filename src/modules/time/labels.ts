@@ -3,7 +3,7 @@
  * (правило в CLAUDE.md).
  */
 
-import { formatDateLong, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
+import { formatDateLong, monthName, plural, type DateStr, type MonthStr, type Period } from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW, type DayWindow } from './day.ts'
 import {
@@ -394,11 +394,32 @@ export function lowerFirst(text: string): string {
  * «учёт был в 5 днях из 5 обычных; особых — 2».
  */
 export function periodLine(summary: PeriodSummary): string {
-  const special = `особых — ${summary.specialDays}`
-  if (summary.count === 0) return summary.specialDays === 0 ? 'Ничего не учтено' : `Ничего не учтено в обычные дни · ${special}`
-  let days = `учёт был в ${summary.days} ${plural(summary.days, ['дне', 'днях', 'днях'])} из ${summary.elapsedDays}`
-  if (summary.specialDays > 0) days += ` ${plural(summary.elapsedDays, ['обычного', 'обычных', 'обычных'])}; ${special}`
-  return `Учтено ${formatMinutes(summary.total)} · ${summary.count} ${blocksWord(summary.count)} · ${days}`
+  if (summary.count === 0) {
+    return summary.specialDays === 0
+      ? 'Ничего не учтено'
+      : `Ничего не учтено в обычные дни · особых — ${summary.specialDays}`
+  }
+  return `Учтено ${formatMinutes(summary.total)} · ${summary.count} ${blocksWord(summary.count)} · ${daysText(summary)}`
+}
+
+/** «учёт был в 5 днях из 5», с особыми — «… из 5 обычных; особых — 2». */
+function daysText(summary: PeriodSummary): string {
+  const days = `учёт был в ${summary.days} ${plural(summary.days, ['дне', 'днях', 'днях'])} из ${summary.elapsedDays}`
+  if (summary.specialDays === 0) return days
+  return `${days} ${plural(summary.elapsedDays, ['обычного', 'обычных', 'обычных'])}; особых — ${summary.specialDays}`
+}
+
+/** Пометка идущего месяца в подсказке столбца года. */
+export const MONTH_RUNNING = 'идёт'
+
+/**
+ * Идущий месяц под графиком года — с основанием, тем же, что в «Месяцах
+ * таблицей»: «Октябрь идёт: учёт был в 5 днях из 7». Высота его столбца —
+ * не итог месяца.
+ */
+export function runningMonthLine(month: MonthStr, summary: PeriodSummary): string {
+  const name = monthName(Number(month.slice(5, 7)))
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${MONTH_RUNNING}: ${daysText(summary)}`
 }
 
 // ─── Месяц по дням (Р-92) ──────────────────────────────────────────────────
