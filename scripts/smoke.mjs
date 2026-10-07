@@ -1324,6 +1324,8 @@ async function scenario() {
 
   await routineScenario()
 
+  await markScenario()
+
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
     navigator.serviceWorker.ready.then((r) => r.active?.state ?? 'нет'),
@@ -3132,6 +3134,82 @@ async function routineScenario() {
       has(yesterdayNote, 'с 8 до 24') &&
       /^Распорядок и сон\s+1\s*$/.test(line(about, 'Распорядок и сон')),
     `сегодня «${todayNote}»; вчера «${yesterdayNote}»; ${line(about, 'Распорядок и сон')}`,
+  )
+}
+
+/**
+ * Отметка дня (Р-96): строка «Подъём · отбой» под итогом дня. Вчера — без
+ * распорядка, окно по умолчанию; отметка меняет «неучтено», «Как обычно»
+ * возвращает. Сегодня — распорядок из `routineScenario`: то же время
+ * отметку не пишет. Идёт после него.
+ */
+async function markScenario() {
+  const sleepLine = () => run(`document.querySelector('.day-sleep')?.innerText.trim() ?? ''`)
+  const usual = () => run(`document.querySelector('.day-sleep--usual') !== null`)
+  const fields = () =>
+    run(`['mark-wake', 'mark-bed'].map((name) => document.querySelector('input[name=' + name + ']')?.value ?? '-').join(' ')`)
+  const unaccounted = async () => line(await screen(), 'Неучтено')
+  const tap = `document.querySelector('.day-sleep button')?.click()`
+  const submit = `document.querySelector('[name=mark-wake]')?.closest('form')?.querySelector('button[type=submit]')?.click()`
+
+  await go(`/time?day=${localDay(-1)}`)
+  const before = await sleepLine()
+  const beforeUsual = await usual()
+  const beforeLeft = await unaccounted()
+  await act(tap)
+  await sleep(400)
+  const opened = await fields()
+  await act(`
+    set(document.querySelector('input[name=mark-wake]'), '10:00');
+    set(document.querySelector('input[name=mark-bed]'), '00:00');
+  `)
+  await sleep(200)
+  await act(submit)
+  await sleep(700)
+  const marked = await sleepLine()
+  const markedUsual = await usual()
+  const markedLeft = await unaccounted()
+  check(
+    'отметка вчерашнего дня: строка под итогом, серым по умолчанию; «Сохранить» — обычным цветом, «неучтено» от нового окна — Р-96',
+    before === 'Подъём 8:00 · отбой 0:00 · окно по умолчанию' &&
+      beforeUsual === true &&
+      has(beforeLeft, 'из прошедших 16 ч') &&
+      opened === '08:00 00:00' &&
+      marked === 'Подъём 10:00 · отбой 0:00' &&
+      markedUsual === false &&
+      has(markedLeft, 'из прошедших 14 ч'),
+    `«${before}» → «${marked}»; поля ${opened}; «${beforeLeft}» → «${markedLeft}»`,
+  )
+
+  await act(tap)
+  await sleep(400)
+  await act(`byText('button', 'Как обычно')?.click()`)
+  await sleep(700)
+  const back = await sleepLine()
+  const backLeft = await unaccounted()
+  check(
+    '«Как обычно» снимает отметку: день снова по умолчанию, «неучтено» — как было — Р-96',
+    back === before && backLeft === beforeLeft,
+    `«${back}»; «${backLeft}»`,
+  )
+
+  // Сегодня: время распорядка — отметка не пишется, строка остаётся «по распорядку».
+  await go('/')
+  const today = await sleepLine()
+  await act(tap)
+  await sleep(400)
+  const todayFields = await fields()
+  await act(submit)
+  await sleep(700)
+  const todayAfter = await sleepLine()
+  const todayUsual = await usual()
+  check(
+    'на «Сегодня» — строка распорядка; сохранить его же время — отметки нет — Р-96',
+    today === 'Подъём 7:30 · отбой 23:45 · по распорядку' &&
+      todayFields === '07:30 23:45' &&
+      todayAfter === today &&
+      todayUsual === true,
+    `«${today}» → «${todayAfter}»; поля ${todayFields}`,
   )
 }
 

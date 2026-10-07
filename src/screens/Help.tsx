@@ -2,7 +2,7 @@ import { days, plural, timeSpan } from '../shared/core/dates.ts'
 import { QUIET_MS, RETRY_MS } from '../shared/core/sync.ts'
 import { RECALL_WEEKS, STALE_BATCH } from '../modules/notes/review.ts'
 import { DAY_WINDOW } from '../modules/time/day.ts'
-import { SPECIAL_WEEK, windowText } from '../modules/time/labels.ts'
+import { MARK_USUAL, SPECIAL_WEEK, windowText } from '../modules/time/labels.ts'
 import { dayWindow } from '../modules/time/sleep.ts'
 import { useSleep } from '../modules/time/useSleep.ts'
 import { NORM_HISTORY_WEEKS, NORM_MIN_WEEKS } from '../modules/time/period.ts'
@@ -132,6 +132,11 @@ export function Help() {
           Окно дня — с подъёма до отбоя: «Настройки» → «Распорядок». Отбой раньше подъёма по часам — после
           полуночи. Новый распорядок действует с того дня, когда сохранён; прошлые дни остаются со своим. Без
           распорядка окно — {windowText(DAY_WINDOW)}; сегодня — {todayWindow}.
+        </p>
+        <p>
+          Встали или легли не по распорядку — тап по строке «Подъём · отбой» под итогом дня на экране{' '}
+          {quoted(names.today)} или {quoted(names.time)}, в том числе у прошлого дня: время только этого дня. Серым — день идёт по распорядку, обычным цветом — отмечен
+          отдельно. «{MARK_USUAL}» снимает отметку. Будущий день не отмечается.
         </p>
         <p>
           Категорию можно переименовать, убрать в архив, удалить: пустую — сразу, с блоками — переносом их

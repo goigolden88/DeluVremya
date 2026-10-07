@@ -6,7 +6,7 @@
 import { formatDateLong, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW, type DayWindow } from './day.ts'
-import { clockMinutes, type SleepProblem } from './sleep.ts'
+import { clockMinutes, type DaySleep, type MarkProblem, type SleepProblem, type SleepSource } from './sleep.ts'
 import {
   MAX_NORM_DAYS,
   MAX_NORM_MINUTES,
@@ -210,6 +210,38 @@ export function routineLine(entry: Pick<Sleep, 'wake' | 'bed'>): string {
 export function routineSavedLine(since: DateStr): string {
   return `Сохранено: распорядок с ${formatDateLong(since)}. Прошлые дни остаются со своим.`
 }
+
+/** Распорядка нет — так и сказано: у свёрнутого «Распорядка» и в строке дня. */
+export const DEFAULT_WINDOW_NOTE = 'окно по умолчанию'
+
+/** Итог свёрнутого «Распорядка», когда его нет. */
+export const NO_ROUTINE = `не задан — ${DEFAULT_WINDOW_NOTE}`
+
+// ─── Отметка дня (Р-96) ────────────────────────────────────────────────────
+
+const SLEEP_SOURCE_NOTES: Record<SleepSource, string | null> = {
+  mark: null,
+  routine: 'по распорядку',
+  default: DEFAULT_WINDOW_NOTE,
+}
+
+/**
+ * Строка дня над итогом: «Подъём 7:40 · отбой 0:30»; без отметки — с
+ * припиской, откуда время: «· по распорядку» или «· окно по умолчанию».
+ */
+export function daySleepLine(entry: DaySleep): string {
+  const line = `Подъём ${clockText(entry.wake)} · отбой ${clockText(entry.bed)}`
+  const note = SLEEP_SOURCE_NOTES[entry.source]
+  return note === null ? line : `${line} · ${note}`
+}
+
+export const MARK_PROBLEMS: Record<MarkProblem, string> = {
+  ...SLEEP_PROBLEMS,
+  future: 'День ещё не наступил — отмечается сегодня или прошлый день',
+}
+
+/** Кнопка: снять отметку дня, день снова по распорядку. */
+export const MARK_USUAL = 'Как обычно'
 
 // ─── Нормы недели (Р-45) ───────────────────────────────────────────────────
 
