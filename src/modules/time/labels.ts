@@ -424,7 +424,7 @@ export function backgroundText(minutes: number): string {
   return `ещё ${formatMinutes(minutes)} фоном`
 }
 
-// ─── Доли от всего (Р-97) ──────────────────────────────────────────────────
+// ─── Доли от всего (Р-98) ──────────────────────────────────────────────────
 
 /** Подписи переключателя «Долей». */
 export const SHARE_MODES = { accounted: 'от учтённого', whole: 'от всего' } as const

@@ -104,7 +104,7 @@ describe('доли учтённого — Р-95', () => {
   })
 })
 
-describe('доли от всего — Р-97', () => {
+describe('доли от всего — Р-98', () => {
   const DAY = 24 * 60
   const categories = [cat('a', 'Чтение', 0, { group: 'Развитие' }), cat('c', 'Ютуб', 1, { group: 'Отдых' })]
   const routine = (since: string, wake: string, bed: string, extra: Partial<Sleep> = {}): Sleep => ({
