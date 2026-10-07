@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { DateStr, Period } from '../../shared/core/dates.ts'
 import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
@@ -17,7 +16,14 @@ import {
   wholeTitle,
 } from './labels.ts'
 import type { PeriodSummary } from './period.ts'
-import { periodShares, wholeShares, type Share, type Shares } from './shares.ts'
+import {
+  groupFoldId,
+  periodShares,
+  wholeShares,
+  type GroupShare,
+  type Share,
+  type Shares,
+} from './shares.ts'
 import { useSleep } from './useSleep.ts'
 
 /** Строка доли: название, процент и тонкая полоса под ними. Цвет один, признак не красит (Р-05). */
@@ -35,39 +41,39 @@ function ShareLine({ name, share }: { name: string; share: Share }) {
   )
 }
 
-/** Строки групп — тап раскрывает категории; групп нет — сразу категории. */
-function ShareRows({ shares }: { shares: Shares }) {
-  const [open, setOpen] = useState<ReadonlySet<string | null>>(new Set())
-  const toggle = (key: string | null) =>
-    setOpen((before) => {
-      const next = new Set(before)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+/**
+ * Группа: тап раскрывает её категории. Что раскрыто, помнит устройство —
+ * тем же механизмом, что свёрнутость; «свёрнут» по умолчанию, как и было.
+ */
+function GroupRow({ blockId, group }: { blockId: string; group: GroupShare }) {
+  const fold = useFold(groupFoldId(blockId, group.key), true)
+  return (
+    <li>
+      <button
+        type="button"
+        className="share share--group"
+        aria-expanded={!fold.folded}
+        onClick={fold.toggle}
+      >
+        <ShareLine name={group.name ?? NO_GROUP} share={group} />
+      </button>
+      {!fold.folded && (
+        <ul className="shares shares--sub">
+          {group.categories.map((row) => (
+            <li key={row.categoryId} className="share">
+              <ShareLine name={row.name ?? UNKNOWN_CATEGORY} share={row} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  )
+}
 
+/** Строки групп — тап раскрывает категории; групп нет — сразу категории. */
+function ShareRows({ blockId, shares }: { blockId: string; shares: Shares }) {
   return shares.groups
-    ? shares.groups.map((group) => (
-        <li key={group.key ?? ''}>
-          <button
-            type="button"
-            className="share share--group"
-            aria-expanded={open.has(group.key)}
-            onClick={() => toggle(group.key)}
-          >
-            <ShareLine name={group.name ?? NO_GROUP} share={group} />
-          </button>
-          {open.has(group.key) && (
-            <ul className="shares shares--sub">
-              {group.categories.map((row) => (
-                <li key={row.categoryId} className="share">
-                  <ShareLine name={row.name ?? UNKNOWN_CATEGORY} share={row} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </li>
-      ))
+    ? shares.groups.map((group) => <GroupRow key={group.key ?? ''} blockId={blockId} group={group} />)
     : shares.categories.map((row) => (
         <li key={row.categoryId} className="share">
           <ShareLine name={row.name ?? UNKNOWN_CATEGORY} share={row} />
@@ -84,7 +90,8 @@ function ShareRows({ shares }: { shares: Shares }) {
  * сутки прошедших дней периода: группы, «Неучтено» и «Сон». Выбор помнит
  * устройство, как и что свёрнуто.
  *
- * `id` — ключ блока: что свёрнуто и какой режим, устройство помнит по нему.
+ * `id` — ключ блока: что свёрнуто, какой режим и какие группы раскрыты,
+ * устройство помнит по нему. Раскрытая группа одна на оба режима.
  */
 export function PeriodShares({
   id,
@@ -139,7 +146,7 @@ export function PeriodShares({
       {!mode.folded ? (
         <>
           <ul className="shares">
-            <ShareRows shares={shares} />
+            <ShareRows blockId={id} shares={shares} />
           </ul>
           <p className="muted">
             Доля — от всего учтённого за период по основной категории; фоновое и особые дни не входят.
@@ -160,7 +167,7 @@ export function PeriodShares({
           {whole.status === 'ready' && (
             <>
               <ul className="shares">
-                <ShareRows shares={whole.shares} />
+                <ShareRows blockId={id} shares={whole.shares} />
                 <li className="share share--rest">
                   <ShareLine name={UNACCOUNTED_ROW} share={whole.unaccounted} />
                 </li>
