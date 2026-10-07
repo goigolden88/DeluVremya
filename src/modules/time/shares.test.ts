@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, Sleep, SpecialDays, TimeBlock } from '../../app/model.ts'
 import { periodSummary } from './period.ts'
-import { periodShares, shareText, wholeShares, type WholeShares } from './shares.ts'
+import { groupFoldId, periodShares, shareText, wholeShares, type WholeShares } from './shares.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
 const WEEK = { from: '2026-09-07', to: '2026-09-13' }
@@ -14,6 +14,23 @@ function cat(id: string, name: string, order: number, extra: Partial<Category> =
 function block(id: string, categoryId: string, date: string, minutes: number, extra: Partial<TimeBlock> = {}): TimeBlock {
   return { id, updatedAt: AT, date, categoryId, minutes, ...extra }
 }
+
+describe('раскрытая группа — ключ устройства', () => {
+  it('у группы ключ внутри своего блока, у «Без группы» — свой', () => {
+    expect(groupFoldId('week:shares', 'Отдых')).toBe('week:shares:group:Отдых')
+    expect(groupFoldId('week:shares', null)).toBe('week:shares:no-group')
+  })
+
+  it('разные блоки и группа с именем «no-group» не пересекаются', () => {
+    const ids = [
+      groupFoldId('week:shares', 'Отдых'),
+      groupFoldId('month:shares', 'Отдых'),
+      groupFoldId('week:shares', null),
+      groupFoldId('week:shares', 'no-group'),
+    ]
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+})
 
 describe('доли учтённого — Р-95', () => {
   const grouped = [
