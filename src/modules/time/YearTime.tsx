@@ -125,7 +125,15 @@ export function YearTime({
         </Fold>
       )}
 
-      <PeriodShares id="year:shares" summary={data.total} categories={catalog.categories} />
+      <PeriodShares
+        id="year:shares"
+        summary={data.total}
+        categories={catalog.categories}
+        blocks={time.blocks}
+        specials={specials.specials}
+        period={yearPeriod(year)}
+        today={today}
+      />
 
       {data.categories.length > 0 && (
         <Fold id="year:by-months" title="По месяцам" summary={data.categories.length} folded sub>

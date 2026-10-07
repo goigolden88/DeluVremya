@@ -29,6 +29,8 @@ import {
   summaryLine,
   unaccountedLine,
   weekCell,
+  wholeBasisText,
+  wholeTitle,
   windowNote,
   writingFor,
 } from './labels.ts'
@@ -49,6 +51,23 @@ describe('подписи месяца по дням — Р-92', () => {
     expect(dayTitle({ ...base, value: null, special })).toBe(
       '7 сентября 2026: особый день «Поход» — в итог месяца не входит',
     )
+  })
+})
+
+describe('основание долей от всего — Р-98', () => {
+  const basis = { days: 6, marked: 2, routine: 4, today: true, beforeRoutine: 3, special: 0 }
+
+  it('суток и часов, сон отмечен и по распорядку, что не в счёте', () => {
+    expect(wholeBasisText(basis)).toBe(
+      '6 суток — 144 ч; сон: отмечено 2, по распорядку 4; не в счёт: сегодня, до распорядка — 3 дня',
+    )
+    expect(wholeBasisText({ ...basis, days: 1, marked: 0, routine: 1, today: false, beforeRoutine: 0, special: 2 })).toBe(
+      '1 сутки — 24 ч; сон: отмечено 0, по распорядку 1; не в счёт: особые — 2 дня',
+    )
+    expect(wholeBasisText({ ...basis, days: 0, marked: 0, routine: 0, today: false, beforeRoutine: 5 })).toBe(
+      'Суток в счёте нет; не в счёт: до распорядка — 5 дней',
+    )
+    expect(wholeTitle(6)).toBe('от 6 суток')
   })
 })
 

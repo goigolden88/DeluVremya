@@ -43,7 +43,7 @@ function inside(special: SpecialDays, period: Period): Period | null {
 }
 
 /** Особые дни промежутка — дни живых периодов внутри него. */
-function specialDaysIn(specials: readonly SpecialDays[], period: Period): Set<DateStr> {
+export function specialDaysIn(specials: readonly SpecialDays[], period: Period): Set<DateStr> {
   const found = new Set<DateStr>()
   for (const special of specialsIn(specials, period)) {
     const part = inside(special, period)

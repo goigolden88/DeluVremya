@@ -2,7 +2,14 @@ import { days, plural, timeSpan } from '../shared/core/dates.ts'
 import { QUIET_MS, RETRY_MS } from '../shared/core/sync.ts'
 import { RECALL_WEEKS, STALE_BATCH } from '../modules/notes/review.ts'
 import { DAY_WINDOW } from '../modules/time/day.ts'
-import { MARK_USUAL, SPECIAL_WEEK, windowText } from '../modules/time/labels.ts'
+import {
+  MARK_USUAL,
+  SHARE_MODES,
+  SLEEP_ROW,
+  SPECIAL_WEEK,
+  UNACCOUNTED_ROW,
+  windowText,
+} from '../modules/time/labels.ts'
 import { dayWindow } from '../modules/time/sleep.ts'
 import { useSleep } from '../modules/time/useSleep.ts'
 import { NORM_HISTORY_WEEKS, NORM_MIN_WEEKS } from '../modules/time/period.ts'
@@ -225,6 +232,14 @@ export function Help() {
           «Доли» — в обзоре недели, итогах месяца и года: какая часть всего учтённого у каждой группы, тап
           по группе — её категории, их доли тоже от всего. Фоновое и особые дни не входят; из-за округления
           сумма бывает чуть больше или меньше целого.
+        </p>
+        <p>
+          Переключатель вверху «Долей» — «{SHARE_MODES.accounted}» или «{SHARE_MODES.whole}». Во втором целое —
+          сутки прошедших дней: к группам добавлены «{UNACCOUNTED_ROW}» — окно дня минус учтённое в нём — и
+          «{SLEEP_ROW}» — сутки минус окно дня по отметке или распорядку; учтённое сверх окна отнимается от сна.
+          Сегодня, особые дни и дни до первого распорядка без отметки не в счёте — это сказано под
+          переключателем. Без распорядка в «Настройках» сон неизвестен, и этот режим не считается. Выбор
+          помнит устройство.
         </p>
       </Fold>
 
