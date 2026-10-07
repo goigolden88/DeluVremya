@@ -1326,6 +1326,8 @@ async function scenario() {
 
   await markScenario()
 
+  await routineSinceScenario()
+
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
     navigator.serviceWorker.ready.then((r) => r.active?.state ?? 'нет'),
@@ -2256,9 +2258,10 @@ async function monthScenario() {
 }
 
 /**
- * Распорядок и отметка прошедших дней для долей «от всего» (Р-98): из
- * «Настроек» распорядок ставится только с сегодня, поэтому прошлые записи
- * кладутся прямо в базу страницы, как прогон кладёт и настройки.
+ * Распорядок и отметка прошедших дней для долей «от всего» (Р-98): кладутся
+ * прямо в базу страницы, как прогон кладёт и настройки, — сценарий идёт
+ * раньше распорядка из «Настроек» и убирает их за собой. Задним числом
+ * из «Настроек» — `routineSinceScenario` (Р-99).
  * Распорядок — с 10 августа 2024, 8–24; отметка 1 августа — 7–24.
  */
 const WHOLE_SLEEP = [
@@ -3231,10 +3234,13 @@ async function routineScenario() {
     run(`['routine-wake', 'routine-bed'].map((name) => document.querySelector('input[name=' + name + ']')?.value ?? '-').join(' ')`)
   const note = () => run(`[...document.querySelectorAll('p.muted')].map((el) => el.innerText).find((text) => text.startsWith('Окно дня')) ?? ''`)
 
+  const since = () => run(`document.querySelector('input[name=routine-since]')?.value ?? '-'`)
+
   await go('/settings')
   const folded = await screen()
   await unfold('Распорядок')
   const defaults = await fields()
+  const defaultSince = await since()
   await act(`
     set(document.querySelector('input[name=routine-wake]'), '07:30');
     set(document.querySelector('input[name=routine-bed]'), '00:30');
@@ -3242,18 +3248,32 @@ async function routineScenario() {
   await sleep(200)
   // «Сохранить» в «Настройках» не один — жмётся кнопка своей формы.
   const submit = `document.querySelector('[name=routine-wake]')?.closest('form')?.querySelector('button[type=submit]')?.click()`
+
+  // Будущий день — отказ, ничего не пишется (Р-99); обратно — сегодня.
+  await act(`set(document.querySelector('input[name=routine-since]'), ${JSON.stringify(localDay(1))})`)
+  await sleep(200)
+  await act(submit)
+  await sleep(700)
+  const refused = await screen()
+  await act(`set(document.querySelector('input[name=routine-since]'), ${JSON.stringify(localDay())})`)
+  await sleep(200)
+
   await act(submit)
   await sleep(700)
   const saved = await screen()
   check(
-    'распорядок: блок в «Настройках», по умолчанию 8:00 и 0:00; сохранение — с сегодня, отбой после полуночи — Р-94',
+    'распорядок: блок в «Настройках», по умолчанию 8:00 и 0:00 с сегодня; будущий день — отказ; сохранение — с сегодня, отбой после полуночи — Р-94, Р-99',
     has(folded, 'Распорядок') &&
       has(folded, 'не задан — окно по умолчанию') &&
       defaults === '08:00 00:00' &&
-      has(saved, 'Сохранено: распорядок с') &&
+      defaultSince === localDay() &&
+      has(refused, 'День ещё не наступил') &&
+      !has(refused, 'Сохранено') &&
+      has(saved, 'Сохранено: с ') &&
+      has(saved, 'окно дня — с 7:30 до 0:30 следующих суток. Дни раньше остаются со своим') &&
       has(saved, 'подъём 7:30, отбой 0:30') &&
       has(saved, 'Сегодня окно с 7:30 до 0:30 следующих суток'),
-    `поля ${defaults}; ${line(saved, 'Сохранено')}`,
+    `поля ${defaults}, с ${defaultSince}; отказ «${line(refused, 'не наступил')}»; ${line(saved, 'Сохранено')}`,
   )
 
   // Правка в тот же день — та же запись: в «О приложении» одна строка.
@@ -3351,6 +3371,52 @@ async function markScenario() {
       todayUsual === true,
     `«${today}» → «${todayAfter}»; поля ${todayFields}`,
   )
+}
+
+/**
+ * Распорядок задним числом (Р-99): «С какого дня» — 1 июля 2024; неделя
+ * 29 июля — 4 августа, где «от всего» было «Суток в счёте нет», считается
+ * по нему — 7 суток. Сегодняшний распорядок из `routineScenario` позже —
+ * строка после сохранения говорит, что новый действует до него. Идёт после
+ * `markScenario`: прошлая дата сдвигает окно вчерашнего дня, на которое
+ * опирается проверка отметок.
+ */
+async function routineSinceScenario() {
+  const week = '/review?week=2024-07-29'
+
+  await go(week)
+  await sharesMode('от всего')
+  const before = await sharesProbe()
+
+  await go('/settings')
+  await unfold('Распорядок')
+  await act(`
+    set(document.querySelector('input[name=routine-wake]'), '09:00');
+    set(document.querySelector('input[name=routine-bed]'), '23:00');
+    set(document.querySelector('input[name=routine-since]'), '2024-07-01');
+  `)
+  await sleep(200)
+  await act(`document.querySelector('[name=routine-wake]')?.closest('form')?.querySelector('button[type=submit]')?.click()`)
+  await sleep(700)
+  const saved = await screen()
+
+  await go(week)
+  const after = await sharesProbe()
+  check(
+    'распорядок с прошлой даты: «Сохранено» с днём и до следующего распорядка; в «Долях» «от всего» неделя — 7 суток в счёте — Р-99',
+    has(before.basis, 'Суток в счёте нет') &&
+      has(before.basis, 'до распорядка — 7 дней') &&
+      has(saved, 'Сохранено: с 1 июля 2024 окно дня — с 9 до 23. Действует с 1 июля 2024 до ') &&
+      has(saved, '; дальше — распорядок с ') &&
+      after.mode === 'от всего' &&
+      after.head === '· от 7 суток' &&
+      after.basis === '7 суток — 168 ч; сон: отмечено 0, по распорядку 7' &&
+      after.rows.length === 3 &&
+      has(after.rows[1] ?? '', 'Неучтено') &&
+      has(after.rows[2] ?? '', 'Сон'),
+    `до «${before.basis}»; ${line(saved, 'Сохранено')}; после ${JSON.stringify(after)}`,
+  )
+  await sharesMode('от учтённого')
 }
 
 async function unfoldAll() {

@@ -6,13 +6,16 @@ import {
   daySleepLine,
   MARK_PROBLEMS,
   NO_ROUTINE,
+  ROUTINE_PROBLEMS,
   routineLine,
+  routineSavedLine,
   SLEEP_PROBLEMS,
   windowNote,
   windowText,
 } from './labels.ts'
 import {
   checkMark,
+  checkRoutine,
   checkSleep,
   clockMinutes,
   clockOf,
@@ -20,6 +23,7 @@ import {
   dayWindow,
   markChange,
   markOn,
+  nextRoutine,
   nightsSleep,
   routineDraft,
   routineFrom,
@@ -149,6 +153,73 @@ describe('распорядок из «Настроек»', () => {
 
   it('у отметки дня и распорядка разные id, даже на одну дату', () => {
     expect(routineId(TODAY)).not.toBe(sleepId(TODAY))
+  })
+
+  it('с прошлого дня (Р-99): прошлые дни с этой даты — по нему, раньше — как были', () => {
+    const records = [routineFrom({ wake: '07:00', bed: '23:00' }, '2026-09-01')]
+    expect(records[0]).toMatchObject({ id: 'routine:2026-09-01', since: '2026-09-01' })
+    expect(dayWindow(records, '2026-09-01')).toEqual({ from: 7, to: 23 })
+    expect(dayWindow(records, '2026-09-20')).toEqual({ from: 7, to: 23 })
+    expect(dayWindow(records, '2026-08-31')).toEqual(DAY_WINDOW)
+    expect(nightsSleep(records, [], { from: '2026-09-14', to: '2026-09-20' }, TODAY)).toMatchObject({
+      routine: true,
+      byRoutine: 7,
+      beforeRoutine: 0,
+    })
+  })
+
+  it('тот же прошлый день — та же запись', () => {
+    const first = routineFrom({ wake: '07:00', bed: '23:00' }, '2026-09-01')
+    const again = routineFrom({ wake: '06:30', bed: '22:30' }, '2026-09-01')
+    expect(again.id).toBe(first.id)
+    expect(again.since).toBe(first.since)
+  })
+
+  it('более поздний распорядок важнее раннего: задним числом — только до него', () => {
+    const later = routine(TODAY, '07:30', '00:30')
+    const earlier = routineFrom({ wake: '09:00', bed: '23:00' }, '2026-09-01')
+    const records = [later, earlier]
+    expect(dayWindow(records, '2026-10-05')).toEqual({ from: 9, to: 23 })
+    expect(dayWindow(records, TODAY)).toEqual({ from: 7.5, to: 24.5 })
+    expect(nextRoutine(records, '2026-09-01')?.since).toBe(TODAY)
+    expect(nextRoutine(records, TODAY)).toBeNull()
+  })
+
+  it('следующий распорядок — ближайший позже дня; удалённые и отметки не в счёт', () => {
+    const records = [
+      routine('2026-09-20', '07:00', '23:00'),
+      routine('2026-09-10', '07:00', '23:00', { deleted: true }),
+      routine('2026-09-15', '07:00', '23:00'),
+      mark('2026-09-05', '07:00', '23:00'),
+    ]
+    expect(nextRoutine(records, '2026-09-01')?.since).toBe('2026-09-15')
+    expect(nextRoutine(records, '2026-09-15')?.since).toBe('2026-09-20')
+  })
+
+  it('отметка дня важнее распорядка, заданного задним числом', () => {
+    const records = [routineFrom({ wake: '07:00', bed: '23:00' }, '2026-09-01'), mark('2026-09-10', '10:00', '02:00')]
+    expect(dayWindow(records, '2026-09-10')).toEqual({ from: 10, to: 26 })
+    expect(dayWindow(records, '2026-09-11')).toEqual({ from: 7, to: 23 })
+  })
+
+  it('будущий день — отказ; сегодня и прошлый — можно; день не выбран — отказ', () => {
+    const draft = { wake: '07:30', bed: '00:30' }
+    expect(checkRoutine(draft, TODAY, TODAY)).toBeNull()
+    expect(checkRoutine(draft, '2026-09-01', TODAY)).toBeNull()
+    expect(checkRoutine(draft, '2026-10-07', TODAY)).toBe('future')
+    expect(checkRoutine(draft, '', TODAY)).toBe('date')
+    expect(checkRoutine({ wake: '08:00', bed: '08:00' }, '2026-09-01', TODAY)).toBe('same')
+    expect(ROUTINE_PROBLEMS.future).toContain('не наступил')
+    expect(ROUTINE_PROBLEMS.same).toBe(SLEEP_PROBLEMS.same)
+  })
+
+  it('строка после сохранения называет день и окно; есть распорядок позже — до него', () => {
+    expect(routineSavedLine('2026-09-01', { from: 7.5, to: 24.5 })).toBe(
+      'Сохранено: с 1 сентября 2026 окно дня — с 7:30 до 0:30 следующих суток. Дни раньше остаются со своим.',
+    )
+    expect(routineSavedLine('2026-09-01', { from: 9, to: 23 }, '2026-10-07')).toBe(
+      'Сохранено: с 1 сентября 2026 окно дня — с 9 до 23. Действует с 1 сентября 2026 до 7 октября 2026; дальше — распорядок с 7 октября 2026.',
+    )
   })
 
   it('форма — распорядок на сегодня, нет — окно по умолчанию', () => {

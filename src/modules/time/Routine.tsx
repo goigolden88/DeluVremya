@@ -3,8 +3,8 @@ import { db } from '../../app/core.ts'
 import type { Sleep } from '../../app/model.ts'
 import type { DateStr } from '../../shared/core/dates.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
-import { NO_ROUTINE, routineLine, routineSavedLine, SLEEP_PROBLEMS, windowText } from './labels.ts'
-import { checkSleep, dayWindow, routineDraft, routineFrom, routineOn } from './sleep.ts'
+import { NO_ROUTINE, ROUTINE_PROBLEMS, routineLine, routineSavedLine, windowText } from './labels.ts'
+import { checkRoutine, dayWindow, nextRoutine, routineDraft, routineFrom, routineOn } from './sleep.ts'
 import { useSleep } from './useSleep.ts'
 
 function describe(error: unknown): string {
@@ -13,7 +13,8 @@ function describe(error: unknown): string {
 
 /**
  * «Распорядок» в «Настройках» (Р-94): подъём и отбой — окно дня учёта.
- * Сохранение — распорядок с сегодня; правка в тот же день — та же запись.
+ * Сохранение — распорядок с выбранного дня, сегодня или прошлого (Р-99);
+ * тот же день — та же запись.
  * У свёрнутого — распорядок на сегодня или что действует окно по умолчанию.
  */
 export function RoutineSettings({ today }: { today: DateStr }) {
@@ -33,22 +34,25 @@ export function RoutineSettings({ today }: { today: DateStr }) {
 
 function RoutineForm({ today, records }: { today: DateStr; records: Sleep[] }) {
   const [draft, setDraft] = useState(() => routineDraft(records, today))
+  // Смена дня не подставляет в форму время того дня: форма держит введённое (Р-99).
+  const [since, setSince] = useState(today)
   const [note, setNote] = useState('')
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function save() {
-    const found = checkSleep(draft)
+    const found = checkRoutine(draft, since, today)
     if (found) {
-      setProblem(SLEEP_PROBLEMS[found])
+      setProblem(ROUTINE_PROBLEMS[found])
       return
     }
+    const next = nextRoutine(records, since)?.since ?? null
     setBusy(true)
     setProblem('')
     setNote('')
     try {
-      const saved = await db.put('sleep', routineFrom(draft, today))
-      setNote(routineSavedLine(saved.since ?? today))
+      const saved = await db.put('sleep', routineFrom(draft, since))
+      setNote(routineSavedLine(since, dayWindow([saved], since), next))
     } catch (failure) {
       setProblem(`Не записалось: ${describe(failure)}`)
     } finally {
@@ -85,14 +89,25 @@ function RoutineForm({ today, records }: { today: DateStr; records: Sleep[] }) {
             onChange={(event) => setDraft({ ...draft, bed: event.target.value })}
           />
         </label>
+        <label className="field">
+          <span>С какого дня</span>
+          <input
+            name="routine-since"
+            type="date"
+            max={today}
+            value={since}
+            onChange={(event) => setSince(event.target.value)}
+          />
+        </label>
       </div>
       <p className="muted">
         Окно дня — с подъёма до отбоя: от него считаются неучтённое и остаток дня в плане. Отбой раньше
         подъёма по часам — после полуночи. Сегодня окно {windowText(dayWindow(records, today))}.
       </p>
       <p className="muted">
-        Распорядок действует с сегодняшнего дня; у прошлых дней остаётся свой. Он общий для всех устройств —
-        уезжает с синхронизацией.
+        Распорядок действует с выбранного дня до следующего распорядка, если тот есть; дни раньше остаются со
+        своим, отметки дней важнее. С прошлого дня пересчитаются «неучтено» прошлых дней, доли «от всего» и
+        сон за ночь. Распорядок общий для всех устройств — уезжает с синхронизацией.
       </p>
       {problem && <p className="error">{problem}</p>}
       {note && <p className="muted">{note}</p>}

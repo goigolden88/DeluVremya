@@ -6,7 +6,14 @@
 import { formatDateLong, plural, type DateStr, type Period } from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW, type DayWindow } from './day.ts'
-import { clockMinutes, type DaySleep, type MarkProblem, type SleepProblem, type SleepSource } from './sleep.ts'
+import {
+  clockMinutes,
+  type DaySleep,
+  type MarkProblem,
+  type RoutineProblem,
+  type SleepProblem,
+  type SleepSource,
+} from './sleep.ts'
 import {
   MAX_NORM_DAYS,
   MAX_NORM_MINUTES,
@@ -207,9 +214,21 @@ export function routineLine(entry: Pick<Sleep, 'wake' | 'bed'>): string {
   return `подъём ${clockText(entry.wake)}, отбой ${clockText(entry.bed)}`
 }
 
-/** Что записано: с какого дня действует распорядок. */
-export function routineSavedLine(since: DateStr): string {
-  return `Сохранено: распорядок с ${formatDateLong(since)}. Прошлые дни остаются со своим.`
+export const ROUTINE_PROBLEMS: Record<RoutineProblem, string> = {
+  ...SLEEP_PROBLEMS,
+  date: 'Не выбран день, с которого действует распорядок',
+  future: 'День ещё не наступил — распорядок задаётся с сегодня или с прошлого дня',
+}
+
+/**
+ * Что записано (Р-99): с какого дня и какое окно. Есть распорядок позже —
+ * сказано, что новый действует до него: «с 1 сентября до 7 октября;
+ * дальше — распорядок с 7 октября».
+ */
+export function routineSavedLine(since: DateStr, window: DayWindow, next: DateStr | null = null): string {
+  const line = `Сохранено: с ${formatDateLong(since)} окно дня — ${windowText(window)}.`
+  if (next === null) return `${line} Дни раньше остаются со своим.`
+  return `${line} Действует с ${formatDateLong(since)} до ${formatDateLong(next)}; дальше — распорядок с ${formatDateLong(next)}.`
 }
 
 /** Распорядка нет — так и сказано: у свёрнутого «Распорядка» и в строке дня. */
