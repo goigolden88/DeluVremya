@@ -192,11 +192,36 @@ export function nightsSleep(
 }
 
 /**
- * Распорядок из «Настроек»: действует с сегодня. Правка в тот же день —
- * та же запись, по id из даты; прошлые дни не меняются — у них свой.
+ * Распорядок из «Настроек»: действует с дня `since` — сегодня или прошлого
+ * (Р-99). Тот же день — та же запись, по id из даты; дни раньше `since`
+ * не меняются — у них свой.
  */
-export function routineFrom(draft: Pick<Sleep, 'wake' | 'bed'>, today: DateStr): Sleep {
-  return { id: routineId(today), updatedAt: nowIso(), since: today, wake: draft.wake, bed: draft.bed }
+export function routineFrom(draft: Pick<Sleep, 'wake' | 'bed'>, since: DateStr): Sleep {
+  return { id: routineId(since), updatedAt: nowIso(), since, wake: draft.wake, bed: draft.bed }
+}
+
+/** Почему распорядок не сохранить: время не годится, день не выбран или ещё не наступил. */
+export type RoutineProblem = SleepProblem | 'date' | 'future'
+
+/** Можно ли сохранить распорядок с дня `since`: сегодня или прошлый, время годится. Null — можно. */
+export function checkRoutine(draft: Pick<Sleep, 'wake' | 'bed'>, since: DateStr, today: DateStr): RoutineProblem | null {
+  if (!isDateStr(since)) return 'date'
+  if (since > today) return 'future'
+  return checkSleep(draft)
+}
+
+/**
+ * Следующий распорядок после дня `since`: с самым ранним `since` позже него.
+ * Распорядок с `since` действует до него (Р-94). Нет — null.
+ */
+export function nextRoutine(records: readonly Sleep[], since: DateStr): Sleep | null {
+  let found: Sleep | null = null
+  for (const record of usable(records)) {
+    if (record.day !== undefined || record.since === undefined || !isDateStr(record.since)) continue
+    if (record.since <= since) continue
+    if (found === null || record.since < (found.since ?? '')) found = record
+  }
+  return found
 }
 
 // ─── Отметка дня (Р-96) ────────────────────────────────────────────────────
