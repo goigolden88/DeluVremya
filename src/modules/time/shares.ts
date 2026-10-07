@@ -58,6 +58,14 @@ export type Shares = {
   categories: CategoryShare[]
 }
 
+/**
+ * Ключ, по которому устройство помнит, раскрыта ли группа в блоке `blockId`.
+ * У «Без группы» свой ключ, не пересекающийся с ключами групп.
+ */
+export function groupFoldId(blockId: string, key: string | null): string {
+  return key === null ? `${blockId}:no-group` : `${blockId}:group:${key}`
+}
+
 /** Доля в процентах: целыми; больше нуля, но меньше `SHARE_FLOOR` — «<1 %». */
 export function shareText(minutes: number, total: number): string {
   const percent = total > 0 ? (minutes / total) * WHOLE : 0
