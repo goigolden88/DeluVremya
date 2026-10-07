@@ -64,6 +64,7 @@
   margin: 2px 0;
 }
 
+/* Малые столбики категорий года по месяцам (Р-57). */
 .stats .minibars-cell {
   width: 96px;
   padding-left: 12px;
@@ -813,6 +814,85 @@ span.plan-item__text {
 
 .stats td.stats__sub {
   padding-left: 16px;
+}
+
+/* Доли учтённого (Р-95): строка — название и процент, под ними тонкая
+   полоса. Строкой, а не столбцом таблицы: экран не шире. Цвет один —
+   столбцов графика; признак не красит (Р-05). */
+.shares {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.shares--sub {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.share {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.share {
+  min-height: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.share--group .share__name {
+  font-weight: 600;
+}
+
+.share--group .share__name::after {
+  content: ' ▸';
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.share--group[aria-expanded='true'] .share__name::after {
+  content: ' ▾';
+}
+
+.share__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.share__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.share__text {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.share__bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.share__fill {
+  display: block;
+  height: 100%;
+  background: var(--chart);
 }
 
 .cat-group__head {
