@@ -5,6 +5,7 @@ import type { Category, Preset, TimeBlock } from '../../app/model.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { useLongPress } from '../../ui/useLongPress.ts'
 import { BlockForm } from './BlockForm.tsx'
+import { DaySleep } from './DaySleep.tsx'
 import { categoryEditPath, hiddenPresets, presetLines, shownPresets, type PresetLine } from './categories.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
 import { blockFromPreset, blocksOn, categoryName, clearDayBlocks, daySummary, type DaySummary } from './day.ts'
@@ -210,6 +211,9 @@ export function TimeDay({
         {error && <p className="error">Не записалось: {error}</p>}
 
         <Summary summary={summary} categories={catalog.categories} />
+        {/* Подъём и отбой дня — рядом с «неучтено», которое от них считается (Р-96). */}
+        {sleep.status === 'failed' && <p className="error">Распорядок не прочитался: {sleep.error}</p>}
+        {sleep.status === 'ready' && <DaySleep records={sleep.records} day={day} today={today} />}
       </section>
 
       {!compact && (
