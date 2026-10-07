@@ -72,9 +72,12 @@ export function clockOf(hours: number): string {
   return `${pad(Math.floor(minutes / MINUTES_PER_HOUR))}:${pad(minutes % MINUTES_PER_HOUR)}`
 }
 
-/** Что стоит в форме «Распорядка»: распорядок на сегодня, нет — окно по умолчанию. */
-export function routineDraft(records: readonly Sleep[], today: DateStr): Pick<Sleep, 'wake' | 'bed'> {
-  const routine = routineOn(records, today)
+/**
+ * Обычные подъём и отбой дня: распорядок на него, нет — окно по умолчанию.
+ * Это и форма «Распорядка» на сегодня, и «как обычно» у отметки дня.
+ */
+export function routineDraft(records: readonly Sleep[], day: DateStr): Pick<Sleep, 'wake' | 'bed'> {
+  const routine = routineOn(records, day)
   return routine
     ? { wake: routine.wake, bed: routine.bed }
     : { wake: clockOf(DAY_WINDOW.from), bed: clockOf(DAY_WINDOW.to) }
@@ -116,4 +119,52 @@ export function dayWindow(records: readonly Sleep[], day: DateStr): DayWindow {
  */
 export function routineFrom(draft: Pick<Sleep, 'wake' | 'bed'>, today: DateStr): Sleep {
   return { id: routineId(today), updatedAt: nowIso(), since: today, wake: draft.wake, bed: draft.bed }
+}
+
+// ─── Отметка дня (Р-96) ────────────────────────────────────────────────────
+
+/** Откуда подъём и отбой дня: отметка, распорядок или окно по умолчанию. */
+export type SleepSource = 'mark' | 'routine' | 'default'
+
+/** Подъём и отбой показанного дня — для строки над итогом и формы отметки. */
+export type DaySleep = Pick<Sleep, 'wake' | 'bed'> & { source: SleepSource }
+
+/** Подъём и отбой дня: отметка, иначе распорядок на него, иначе по умолчанию. */
+export function daySleep(records: readonly Sleep[], day: DateStr): DaySleep {
+  const mark = markOn(records, day)
+  if (mark) return { wake: mark.wake, bed: mark.bed, source: 'mark' }
+  return { ...routineDraft(records, day), source: routineOn(records, day) ? 'routine' : 'default' }
+}
+
+/** Почему отметку не сохранить: время не годится или день ещё не наступил. */
+export type MarkProblem = SleepProblem | 'future'
+
+/** Можно ли отметить день: сегодня или прошлый, время годится. Null — можно. */
+export function checkMark(draft: Pick<Sleep, 'wake' | 'bed'>, day: DateStr, today: DateStr): MarkProblem | null {
+  if (day > today) return 'future'
+  return checkSleep(draft)
+}
+
+/** Что сделать с базой: записать отметку, снять её или ничего. */
+export type MarkChange = { kind: 'put'; record: Sleep } | { kind: 'remove'; id: string } | { kind: 'none' }
+
+function sameClock(a: Pick<Sleep, 'wake' | 'bed'>, b: Pick<Sleep, 'wake' | 'bed'>): boolean {
+  return clockMinutes(a.wake) === clockMinutes(b.wake) && clockMinutes(a.bed) === clockMinutes(b.bed)
+}
+
+/**
+ * «Сохранить» отметку дня. Время, как у распорядка этого дня (нет его —
+ * как окно по умолчанию), — отметка не нужна: была — снимается, не было —
+ * ничего. Иначе — отметка `sleep:<день>`: правка того же дня — та же запись.
+ * Годность времени и дня проверяет `checkMark` до этого.
+ */
+export function markChange(records: readonly Sleep[], draft: Pick<Sleep, 'wake' | 'bed'>, day: DateStr): MarkChange {
+  if (sameClock(draft, routineDraft(records, day))) return usualChange(records, day)
+  return { kind: 'put', record: { id: sleepId(day), updatedAt: nowIso(), day, wake: draft.wake, bed: draft.bed } }
+}
+
+/** «Как обычно»: отметка дня снимается — день снова по распорядку. Нет её — ничего. */
+export function usualChange(records: readonly Sleep[], day: DateStr): MarkChange {
+  const live = records.some((record) => record.id === sleepId(day) && !record.deleted)
+  return live ? { kind: 'remove', id: sleepId(day) } : { kind: 'none' }
 }

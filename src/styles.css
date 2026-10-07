@@ -438,6 +438,19 @@
   margin-bottom: 8px;
 }
 
+/* Подъём и отбой дня (Р-96): строка-кнопка под «неучтено». Без отметки — серым. */
+.day-sleep {
+  margin: 0 0 8px;
+}
+
+.day-sleep .plain-btn {
+  font-weight: 400;
+}
+
+.day-sleep--usual .plain-btn {
+  color: var(--muted);
+}
+
 .tblock {
   display: flex;
   align-items: center;

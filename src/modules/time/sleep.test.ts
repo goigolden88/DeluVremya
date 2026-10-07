@@ -1,18 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import type { Sleep } from '../../app/model.ts'
 import { daySummary, DAY_WINDOW, windowElapsed, windowLeft, windowLength } from './day.ts'
-import { routineLine, SLEEP_PROBLEMS, windowNote, windowText } from './labels.ts'
 import {
+  DEFAULT_WINDOW_NOTE,
+  daySleepLine,
+  MARK_PROBLEMS,
+  NO_ROUTINE,
+  routineLine,
+  SLEEP_PROBLEMS,
+  windowNote,
+  windowText,
+} from './labels.ts'
+import {
+  checkMark,
   checkSleep,
   clockMinutes,
   clockOf,
+  daySleep,
   dayWindow,
+  markChange,
   markOn,
   routineDraft,
   routineFrom,
   routineId,
   routineOn,
   sleepId,
+  usualChange,
   windowOf,
 } from './sleep.ts'
 
@@ -193,5 +206,89 @@ describe('окно словами', () => {
 
   it('итог «Распорядка» — без ведущего нуля', () => {
     expect(routineLine({ wake: '07:30', bed: '00:30' })).toBe('подъём 7:30, отбой 0:30')
+  })
+})
+
+describe('отметка дня (Р-96): строка над итогом', () => {
+  const DAY = '2026-10-15'
+
+  it('с отметкой — время отметки, без приписки', () => {
+    const records = [routine('2026-10-01', '07:00', '23:00'), mark(DAY, '07:40', '00:30')]
+    const entry = daySleep(records, DAY)
+    expect(entry).toEqual({ wake: '07:40', bed: '00:30', source: 'mark' })
+    expect(daySleepLine(entry)).toBe('Подъём 7:40 · отбой 0:30')
+  })
+
+  it('без отметки — распорядок дня, с припиской «по распорядку»', () => {
+    const entry = daySleep([routine('2026-10-01', '07:00', '23:00')], DAY)
+    expect(entry.source).toBe('routine')
+    expect(daySleepLine(entry)).toBe('Подъём 7:00 · отбой 23:00 · по распорядку')
+  })
+
+  it('без распорядка — окно по умолчанию, тем же текстом, что у «Распорядка» в «Настройках»', () => {
+    const entry = daySleep([], DAY)
+    expect(entry).toEqual({ wake: clockOf(DAY_WINDOW.from), bed: clockOf(DAY_WINDOW.to), source: 'default' })
+    expect(daySleepLine(entry)).toBe(`Подъём 8:00 · отбой 0:00 · ${DEFAULT_WINDOW_NOTE}`)
+    expect(NO_ROUTINE).toContain(DEFAULT_WINDOW_NOTE)
+  })
+
+  it('удалённая отметка — день снова по распорядку', () => {
+    const records = [routine('2026-10-01', '07:00', '23:00'), mark(DAY, '07:40', '00:30', { deleted: true })]
+    expect(daySleep(records, DAY).source).toBe('routine')
+  })
+})
+
+describe('отметка дня (Р-96): «Сохранить» и «Как обычно»', () => {
+  const DAY = '2026-10-15'
+  const usual = routine('2026-10-01', '07:00', '23:00')
+
+  it('время не как у распорядка — отметка sleep:<день>; правка того же дня — та же запись', () => {
+    const change = markChange([usual], { wake: '07:40', bed: '00:30' }, DAY)
+    expect(change).toMatchObject({ kind: 'put', record: { id: 'sleep:2026-10-15', day: DAY, wake: '07:40', bed: '00:30' } })
+    const again = markChange([usual, mark(DAY, '07:40', '00:30')], { wake: '09:00', bed: '01:00' }, DAY)
+    expect(again.kind === 'put' && again.record.id).toBe('sleep:2026-10-15')
+    expect(again.kind === 'put' && again.record.since).toBeUndefined()
+  })
+
+  it('отбой после полуночи — окно дня до следующих суток', () => {
+    const change = markChange([usual], { wake: '08:00', bed: '01:30' }, DAY)
+    expect(change.kind).toBe('put')
+    if (change.kind !== 'put') return
+    expect(dayWindow([usual, change.record], DAY)).toEqual({ from: 8, to: 25.5 })
+  })
+
+  it('время распорядка этого дня — отметка не пишется, а была — снимается', () => {
+    expect(markChange([usual], { wake: '07:00', bed: '23:00' }, DAY)).toEqual({ kind: 'none' })
+    expect(markChange([usual, mark(DAY, '07:40', '00:30')], { wake: '07:00', bed: '23:00' }, DAY)).toEqual({
+      kind: 'remove',
+      id: 'sleep:2026-10-15',
+    })
+  })
+
+  it('без распорядка «обычное» — окно по умолчанию', () => {
+    expect(markChange([], { wake: '08:00', bed: '00:00' }, DAY)).toEqual({ kind: 'none' })
+    expect(markChange([], { wake: '08:00', bed: '00:30' }, DAY).kind).toBe('put')
+  })
+
+  it('«Как обычно» снимает отметку; нет её — ничего', () => {
+    expect(usualChange([usual, mark(DAY, '07:40', '00:30')], DAY)).toEqual({ kind: 'remove', id: 'sleep:2026-10-15' })
+    expect(usualChange([usual], DAY)).toEqual({ kind: 'none' })
+    expect(usualChange([usual, mark(DAY, '07:40', '00:30', { deleted: true })], DAY)).toEqual({ kind: 'none' })
+    // Отметка другого дня не трогается.
+    expect(usualChange([mark('2026-10-14', '07:40', '00:30')], DAY)).toEqual({ kind: 'none' })
+  })
+
+  it('сегодня и прошлый день отмечаются, будущий — нет', () => {
+    const draft = { wake: '07:40', bed: '00:30' }
+    expect(checkMark(draft, DAY, DAY)).toBeNull()
+    expect(checkMark(draft, '2026-10-14', DAY)).toBeNull()
+    expect(checkMark(draft, '2026-10-16', DAY)).toBe('future')
+    expect(MARK_PROBLEMS.future).toContain('не наступил')
+  })
+
+  it('подъём и отбой совпадают — тот же отказ, что у распорядка', () => {
+    expect(checkMark({ wake: '08:00', bed: '08:00' }, DAY, DAY)).toBe('same')
+    expect(MARK_PROBLEMS.same).toBe(SLEEP_PROBLEMS.same)
+    expect(checkMark({ wake: '', bed: '00:30' }, DAY, DAY)).toBe('clock')
   })
 })
