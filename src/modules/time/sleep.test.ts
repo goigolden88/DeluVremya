@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Sleep } from '../../app/model.ts'
+import type { Sleep, SpecialDays } from '../../app/model.ts'
 import { daySummary, DAY_WINDOW, windowElapsed, windowLeft, windowLength } from './day.ts'
 import { routineLine, SLEEP_PROBLEMS, windowNote, windowText } from './labels.ts'
 import {
@@ -8,6 +8,7 @@ import {
   clockOf,
   dayWindow,
   markOn,
+  nightsSleep,
   routineDraft,
   routineFrom,
   routineId,
@@ -176,6 +177,81 @@ describe('окно после полуночи в «неучтено» и реа
     const now = new Date(2026, 9, 6, 9, 0)
     expect(daySummary([], [], DAY, now).elapsed).toBe(60)
     expect(daySummary([], [], DAY, now, { from: 7.5, to: 23 }).elapsed).toBe(90)
+  })
+})
+
+describe('сон за ночь — Р-97', () => {
+  /** 14–20 сентября 2026: понедельник — воскресенье. */
+  const WEEK = { from: '2026-09-14', to: '2026-09-20' }
+  const AFTER = '2026-09-21'
+  const BASE = routine('2026-09-01', '07:00', '23:00')
+  const trip: SpecialDays = { id: 's1', updatedAt: AT, from: '2026-09-18', to: '2026-09-19' }
+
+  it('отметка и распорядок вперемешку; один отмеченный конец — ночь по распорядку', () => {
+    const records = [BASE, mark('2026-09-15', '08:00', '00:30'), mark('2026-09-16', '06:30', '23:30')]
+    expect(nightsSleep(records, [], WEEK, AFTER)).toEqual({
+      routine: true,
+      nights: 7,
+      // Отмечена с обоих концов одна: отбой 15-го в 0:30 — подъём 16-го в 6:30, 6 ч.
+      marked: 1,
+      byRoutine: 6,
+      beforeRoutine: 0,
+      special: 0,
+      // 23:00 → 7:00 по 8 ч — четыре ночи; 23:00 → 8:00 — 9 ч; 23:30 → 7:00 — 7 ч 30 мин.
+      minutes: 4 * 480 + 360 + 540 + 450,
+    })
+  })
+
+  it('ночи до первого распорядка — не в счёте; отмеченная с обоих концов — в счёте и без него', () => {
+    const late = routine('2026-09-17', '07:00', '23:00')
+    expect(nightsSleep([late], [], WEEK, AFTER)).toMatchObject({ nights: 7, beforeRoutine: 4, byRoutine: 3, marked: 0 })
+    const records = [late, mark('2026-09-15', '08:00', '00:00'), mark('2026-09-16', '08:00', '00:00')]
+    // Перед 16-м — оба конца отмечены; перед 17-м — отбой отмечен, подъём по распорядку.
+    expect(nightsSleep(records, [], WEEK, AFTER)).toMatchObject({ beforeRoutine: 2, marked: 1, byRoutine: 4 })
+  })
+
+  it('смена распорядка внутри недели: отбой — по распорядку вечера, подъём — по распорядку утра', () => {
+    const records = [BASE, routine('2026-09-17', '09:00', '01:00')]
+    // До 16-го — 8 ч; 23:00 → 9:00 — 10 ч; дальше 1:00 → 9:00 — 8 ч.
+    expect(nightsSleep(records, [], WEEK, AFTER)).toMatchObject({ byRoutine: 7, minutes: 6 * 480 + 600 })
+  })
+
+  it('отбой после полуночи — от него, а не от прошлой полуночи', () => {
+    const records = [routine('2026-09-01', '15:00', '07:00')]
+    // Лечь в 7 утра и встать в 15 — 8 ч сна (Р-94, «Цена»).
+    expect(nightsSleep(records, [], { from: '2026-09-14', to: '2026-09-14' }, AFTER).minutes).toBe(480)
+  })
+
+  it('ночь, задевшая особый день, — в счёте только отмеченной с обоих концов', () => {
+    const records = [BASE, mark('2026-09-18', '10:00', '02:00'), mark('2026-09-19', '09:00', '01:00')]
+    expect(nightsSleep(records, [trip], WEEK, AFTER)).toMatchObject({
+      nights: 7,
+      // Перед 19-м: отбой 18-го в 2:00 — подъём в 9:00, 7 ч.
+      marked: 1,
+      // Перед 18-м и 20-м — один конец по распорядку.
+      special: 2,
+      byRoutine: 4,
+      minutes: 4 * 480 + 420,
+    })
+  })
+
+  it('нет распорядка — так и сказано, отметки его не заменяют', () => {
+    const records = [mark('2026-09-15', '08:00', '00:00'), mark('2026-09-16', '08:00', '00:00')]
+    expect(nightsSleep(records, [], WEEK, AFTER)).toMatchObject({ routine: false, marked: 1, beforeRoutine: 6 })
+    expect(nightsSleep([], [], WEEK, AFTER)).toMatchObject({ routine: false, nights: 7, beforeRoutine: 7 })
+  })
+
+  it('идущая неделя — только ночи перед прошедшими днями, сегодняшняя тоже', () => {
+    expect(nightsSleep([BASE], [], WEEK, '2026-09-16')).toMatchObject({ nights: 3, byRoutine: 3, minutes: 3 * 480 })
+    expect(nightsSleep([BASE], [], WEEK, '2026-09-13')).toMatchObject({ nights: 0, minutes: 0 })
+  })
+
+  it('удалённая отметка не в счёт; кривая пара концов — не меньше нуля', () => {
+    const removed = [BASE, mark('2026-09-14', '05:00', '21:00', { deleted: true })]
+    expect(nightsSleep(removed, [], { from: '2026-09-14', to: '2026-09-14' }, AFTER)).toMatchObject({ byRoutine: 1, minutes: 480 })
+    // Отбой 14-го в 2:00 следующих суток, подъём 15-го в 1:00 — раньше отбоя.
+    const odd = [BASE, mark('2026-09-14', '08:00', '02:00'), mark('2026-09-15', '01:00', '23:00')]
+    expect(nightsSleep(odd, [], { from: '2026-09-15', to: '2026-09-15' }, AFTER)).toMatchObject({ marked: 1, minutes: 0 })
   })
 })
 

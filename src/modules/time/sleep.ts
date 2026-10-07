@@ -12,9 +12,10 @@
  * Чистые функции, без React и без базы.
  */
 
-import { isDateStr, nowIso, type DateStr } from '../../shared/core/dates.ts'
-import type { Sleep } from '../../app/model.ts'
+import { addDays, isDateStr, nowIso, periodDays, type DateStr, type Period } from '../../shared/core/dates.ts'
+import type { Sleep, SpecialDays } from '../../app/model.ts'
 import { DAY_WINDOW, type DayWindow } from './day.ts'
+import { specialOn } from './specials.ts'
 
 const HOURS_PER_DAY = 24
 const MINUTES_PER_HOUR = 60
@@ -108,6 +109,83 @@ export function routineOn(records: readonly Sleep[], day: DateStr): Sleep | null
 export function dayWindow(records: readonly Sleep[], day: DateStr): DayWindow {
   const entry = markOn(records, day) ?? routineOn(records, day)
   return (entry && windowOf(entry)) ?? DAY_WINDOW
+}
+
+/** Сон за ночи отрезка (Р-97): счёты ночей — основание среднего. */
+export type NightsSleep = {
+  /** Есть ли распорядок, действующий на день расчёта. Нет — сна не считаем: окно по умолчанию — не сон человека. */
+  routine: boolean
+  /** Ночей перед прошедшими днями отрезка — все, и в счёте, и нет. */
+  nights: number
+  /** В счёте: оба конца отмечены. */
+  marked: number
+  /** В счёте: хоть один конец — по распорядку. */
+  byRoutine: number
+  /** Не в счёте: у конца ни отметки, ни распорядка. */
+  beforeRoutine: number
+  /** Не в счёте: ночь задела особый день, а отмечена не с обоих концов (Р-91). */
+  special: number
+  /** Сумма минут сна ночей в счёте. */
+  minutes: number
+}
+
+/** Подъём — минуты от полуночи дня, отбой — тоже, за полночью — больше суток (Р-94). */
+function wakeAt(entry: Sleep): number {
+  return clockMinutes(entry.wake) ?? 0
+}
+
+function bedAt(entry: Sleep): number {
+  const window = windowOf(entry)
+  return window === null ? 0 : Math.round(window.to * MINUTES_PER_HOUR)
+}
+
+/**
+ * Сон за ночи перед прошедшими днями отрезка, по день расчёта включительно
+ * (Р-97). Ночь перед днём D — от отбоя D−1 до подъёма D, каждый конец по
+ * своему правилу: отметка, иначе распорядок. Отмеченная — только с обоих
+ * концов. Конец без отметки и распорядка — ночь не в счёте («до
+ * распорядка»); ночь, задевшая особый день, — в счёте только отмеченной
+ * с обоих концов. Кривая пара концов — сон не меньше нуля.
+ */
+export function nightsSleep(
+  records: readonly Sleep[],
+  specials: readonly SpecialDays[],
+  period: Period,
+  day: DateStr,
+): NightsSleep {
+  const result: NightsSleep = {
+    routine: routineOn(records, day) !== null,
+    nights: 0,
+    marked: 0,
+    byRoutine: 0,
+    beforeRoutine: 0,
+    special: 0,
+    minutes: 0,
+  }
+  const last = period.to < day ? period.to : day
+  if (last < period.from) return result
+
+  for (const morning of periodDays({ from: period.from, to: last })) {
+    const evening = addDays(morning, -1)
+    result.nights += 1
+    const bedMark = markOn(records, evening)
+    const wakeMark = markOn(records, morning)
+    const bed = bedMark ?? routineOn(records, evening)
+    const wake = wakeMark ?? routineOn(records, morning)
+    if (bed === null || wake === null) {
+      result.beforeRoutine += 1
+      continue
+    }
+    const marked = bedMark !== null && wakeMark !== null
+    if (!marked && (specialOn(specials, evening) !== null || specialOn(specials, morning) !== null)) {
+      result.special += 1
+      continue
+    }
+    if (marked) result.marked += 1
+    else result.byRoutine += 1
+    result.minutes += Math.max(0, HOURS_PER_DAY * MINUTES_PER_HOUR + wakeAt(wake) - bedAt(bed))
+  }
+  return result
 }
 
 /**
