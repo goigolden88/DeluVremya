@@ -178,7 +178,17 @@ export function PeriodTime({
       {withBackground && <p className="muted">Фоновое в сумму не входит: час ютуба под покер — один час.</p>}
     </>
   )
-  const shares = <PeriodShares id={`${scope}:shares`} summary={summary} categories={catalog.categories} />
+  const shares = (
+    <PeriodShares
+      id={`${scope}:shares`}
+      summary={summary}
+      categories={catalog.categories}
+      blocks={time.blocks}
+      specials={specials.specials}
+      period={period}
+      today={today}
+    />
+  )
 
   return (
     <div className="day-sum">

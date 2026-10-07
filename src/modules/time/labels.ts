@@ -23,6 +23,7 @@ import {
   type WeekMark,
 } from './period.ts'
 import type { BlockProblem } from './retro.ts'
+import type { WholeBasis } from './shares.ts'
 import { datesText, specialTitle } from './specials.ts'
 import type { Sleep, SpecialDays } from '../../app/model.ts'
 
@@ -422,6 +423,55 @@ export function kindLine(byKind: readonly KindTotal[]): string {
 export function backgroundText(minutes: number): string {
   return `ещё ${formatMinutes(minutes)} фоном`
 }
+
+// ─── Доли от всего (Р-97) ──────────────────────────────────────────────────
+
+/** Подписи переключателя «Долей». */
+export const SHARE_MODES = { accounted: 'от учтённого', whole: 'от всего' } as const
+
+/** Строки «от всего» под группами. */
+export const UNACCOUNTED_ROW = 'Неучтено'
+export const SLEEP_ROW = 'Сон'
+
+/** Распорядка нет — режим «от всего» не считается. */
+export const WHOLE_NO_ROUTINE = 'Задайте распорядок в „Настройках“ — без него сон неизвестен.'
+
+/** Ни одного прошедшего обычного дня в периоде. */
+export const WHOLE_NO_DAYS = 'Нет прошедших дней.'
+
+function daysWord(count: number): string {
+  return plural(count, ['день', 'дня', 'дней'])
+}
+
+/** Заголовок блока «от всего»: «от 6 суток». */
+export function wholeTitle(days: number): string {
+  return `от ${days} суток`
+}
+
+/**
+ * Основание «от всего»: «6 суток — 144 ч; сон: отмечено 2, по распорядку 4;
+ * не в счёт: сегодня, до распорядка — 3 дня».
+ */
+export function wholeBasisText(basis: WholeBasis): string {
+  const parts =
+    basis.days === 0
+      ? ['Суток в счёте нет']
+      : [
+          `${basis.days} ${plural(basis.days, ['сутки', 'суток', 'суток'])} — ${formatMinutes(basis.days * MINUTES_PER_DAY)}`,
+          `сон: отмечено ${basis.marked}, по распорядку ${basis.routine}`,
+        ]
+  const out = [
+    ...(basis.today ? ['сегодня'] : []),
+    ...(basis.beforeRoutine > 0 ? [`до распорядка — ${basis.beforeRoutine} ${daysWord(basis.beforeRoutine)}`] : []),
+    ...(basis.special > 0 ? [`особые — ${basis.special} ${daysWord(basis.special)}`] : []),
+  ]
+  if (out.length > 0) parts.push(`не в счёт: ${out.join(', ')}`)
+  return parts.join('; ')
+}
+
+/** Пояснение под долями «от всего». */
+export const WHOLE_NOTE =
+  'Доля — от суток прошедших дней. Сон — сутки минус окно дня (отметка дня, иначе распорядок); неучтено — окно минус учтённое в нём; учтённое сверх окна отнимается от сна. Фоновое не входит.'
 
 /** Пояснение к блоку «Неделя» на экране учёта. */
 export function progressLead(from: DateStr): string {
