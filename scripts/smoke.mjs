@@ -2251,7 +2251,147 @@ async function monthScenario() {
       JSON.stringify(seen),
     )
   }
+  await wholeShares()
   await phone(false)
+}
+
+/**
+ * Распорядок и отметка прошедших дней для долей «от всего» (Р-97): из
+ * «Настроек» распорядок ставится только с сегодня, поэтому прошлые записи
+ * кладутся прямо в базу страницы, как прогон кладёт и настройки.
+ * Распорядок — с 10 августа 2024, 8–24; отметка 1 августа — 7–24.
+ */
+const WHOLE_SLEEP = [
+  { id: 'routine:2024-08-10', updatedAt: '2024-08-10T08:00:00.000Z', since: '2024-08-10', wake: '08:00', bed: '00:00' },
+  { id: 'sleep:2024-08-01', updatedAt: '2024-08-01T08:00:00.000Z', day: '2024-08-01', wake: '07:00', bed: '00:00' },
+]
+
+/** Пишет в хранилище `sleep` базы страницы или удаляет оттуда: `put` — записи, иначе — id. */
+function sleepStore(put, list) {
+  return run(`new Promise((done, fail) => {
+    const request = indexedDB.open('deluvremya')
+    request.onerror = () => fail(request.error)
+    request.onsuccess = () => {
+      const tx = request.result.transaction('sleep', 'readwrite')
+      for (const each of ${JSON.stringify(list)}) ${put ? `tx.objectStore('sleep').put(each)` : `tx.objectStore('sleep').delete(each)`}
+      tx.oncomplete = () => { request.result.close(); done(true) }
+      tx.onerror = () => fail(tx.error)
+    }
+  })`)
+}
+
+/** Блок «Доли»: итог у заголовка, нажатый режим, основание, строки — и ширина страницы. */
+async function sharesProbe() {
+  return JSON.parse(
+    (await run(`JSON.stringify((() => {
+      const fold = [...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Доли')
+      const block = fold?.closest('section')
+      const text = (el) => el.innerText.replace(/\\s+/g, ' ').trim()
+      return {
+        head: block?.querySelector('.fold__summary')?.textContent.trim() ?? '',
+        mode: [...(block?.querySelectorAll('.chip[aria-pressed=true]') ?? [])].map((el) => el.textContent.trim()).join(),
+        basis: block?.querySelector('.share-basis')?.textContent.trim() ?? '',
+        rows: [...(block?.querySelectorAll('.share--group, .share--rest') ?? [])].map(text),
+        note: [...(block?.querySelectorAll('p.muted') ?? [])].map(text).join(' | '),
+        wide: document.documentElement.scrollWidth,
+        view: document.documentElement.clientWidth,
+      }
+    })())`)) ?? '{}',
+  )
+}
+
+/** Тап по режиму «Долей». */
+async function sharesMode(label) {
+  await act(`
+    const block = [...document.querySelectorAll('.fold__btn')].find((el) => el.textContent.trim() === 'Доли')?.closest('section')
+    ;[...(block?.querySelectorAll('.chip') ?? [])].find((el) => el.textContent.trim() === ${JSON.stringify(label)})?.click()
+  `)
+  await sleep(400)
+}
+
+/**
+ * Доли «от всего» (Р-97) в окне шириной с телефон: без распорядка режим не
+ * считается; с распорядком и отметкой — группы, «Неучтено» и «Сон» в обзоре
+ * недели, итогах месяца и года, основание под переключателем, страница не
+ * шире окна; выбор помнит устройство. В конце режимы — обратно «от
+ * учтённого», подложенные записи — убраны: дальше сценарий ждёт пустой `sleep`.
+ */
+async function wholeShares() {
+  const fits = (seen) => seen.view > 0 && seen.view <= PHONE_WIDTH && seen.wide <= seen.view
+
+  // ─ Без распорядка: вместо долей — просьба задать его.
+  await go('/review?week=2024-07-29')
+  await sharesMode('от всего')
+  const none = await sharesProbe()
+  check(
+    'доли «от всего» без распорядка — не считаются: «Задайте распорядок» — Р-97',
+    none.mode === 'от всего' && has(none.note, 'Задайте распорядок') && none.rows.length === 0 && fits(none),
+    JSON.stringify(none),
+  )
+
+  await sleepStore(true, WHOLE_SLEEP)
+
+  // ─ Неделя 29 июля — 4 августа: в счёте только 1 августа (отметка 7–24, учтено 1 ч 10 мин из Стыка).
+  //   Неучтено 17 ч − 70 мин = 950 мин — 66 %; сон 7 ч — 29 %; Стык 70 мин — 5 %.
+  await go('/month?m=2024-08')
+  await go('/review?week=2024-07-29')
+  const week = await sharesProbe()
+  check(
+    `обзор недели в окне ${PHONE_WIDTH} px: доли «от всего» — группа, «Неучтено», «Сон»; основание; не шире окна — Р-97`,
+    week.mode === 'от всего' &&
+      week.head === '· от 1 суток' &&
+      week.basis === '1 сутки — 24 ч; сон: отмечено 1, по распорядку 0; не в счёт: до распорядка — 6 дней' &&
+      JSON.stringify(week.rows) === JSON.stringify(['Без группы 5 %', 'Неучтено 66 %', 'Сон 29 %']) &&
+      fits(week),
+    JSON.stringify(week),
+  )
+
+  // ─ Август: 1-е по отметке, 10–31 по распорядку — 23 суток; 2–9 — до распорядка.
+  //   Неучтено 22 055 мин — 67 %, сон 10 980 мин — 33 %, Стык 85 мин — <1 %.
+  await go('/month?m=2024-08')
+  const accounted = await sharesProbe()
+  await sharesMode('от всего')
+  const month = await sharesProbe()
+  check(
+    `итоги месяца в окне ${PHONE_WIDTH} px: «от учтённого» — как было, «от всего» — 23 суток, «Неучтено» и «Сон» — Р-97`,
+    accounted.mode === 'от учтённого' &&
+      JSON.stringify(accounted.rows) === JSON.stringify(['Без группы 100 %']) &&
+      month.mode === 'от всего' &&
+      month.head === '· от 23 суток' &&
+      month.basis === '23 суток — 552 ч; сон: отмечено 1, по распорядку 22; не в счёт: до распорядка — 8 дней' &&
+      JSON.stringify(month.rows) === JSON.stringify(['Без группы <1 %', 'Неучтено 67 %', 'Сон 33 %']) &&
+      fits(month),
+    `${JSON.stringify(accounted)}; ${JSON.stringify(month)}`,
+  )
+
+  // ─ Выбор помнит устройство: после перезагрузки месяц — снова «от всего».
+  await sleep(500)
+  await reload(`document.querySelector('.share--rest') !== null`)
+  await sleep(500)
+  const kept = await sharesProbe()
+  check('доли: выбранный режим «от всего» остаётся и после перезагрузки — Р-97', kept.mode === 'от всего', JSON.stringify(kept))
+
+  // ─ Год 2024: 1 августа и 10 августа — 31 декабря — 145 суток; сегодня не в году.
+  await go('/year?y=2024')
+  await sharesMode('от всего')
+  const year = await sharesProbe()
+  check(
+    `итоги года в окне ${PHONE_WIDTH} px: доли «от всего» — 145 суток, «Неучтено» и «Сон» — Р-97`,
+    year.head === '· от 145 суток' &&
+      has(year.basis, 'сон: отмечено 1, по распорядку 144') &&
+      year.rows.length === 3 &&
+      has(year.rows[1] ?? '', 'Неучтено') &&
+      year.rows[2] === 'Сон 33 %' &&
+      fits(year),
+    JSON.stringify(year),
+  )
+
+  // ─ Обратно: режимы — «от учтённого», подложенное — убрано.
+  for (const route of ['/year?y=2024', '/month?m=2024-08', '/review?week=2024-07-29']) {
+    await go(route)
+    await sharesMode('от учтённого')
+  }
+  await sleepStore(false, WHOLE_SLEEP.map((each) => each.id))
 }
 
 /** Ширина окна телефона, на которой итоги не должны прокручиваться вбок (Р-95). */
