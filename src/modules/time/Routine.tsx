@@ -3,7 +3,7 @@ import { db } from '../../app/core.ts'
 import type { Sleep } from '../../app/model.ts'
 import type { DateStr } from '../../shared/core/dates.ts'
 import { Fold } from '../../shared/ui/Fold.tsx'
-import { routineLine, routineSavedLine, SLEEP_PROBLEMS, windowText } from './labels.ts'
+import { NO_ROUTINE, routineLine, routineSavedLine, SLEEP_PROBLEMS, windowText } from './labels.ts'
 import { checkSleep, dayWindow, routineDraft, routineFrom, routineOn } from './sleep.ts'
 import { useSleep } from './useSleep.ts'
 
@@ -20,7 +20,7 @@ export function RoutineSettings({ today }: { today: DateStr }) {
   const data = useSleep()
   const routine = data.status === 'ready' ? routineOn(data.records, today) : null
   const summary =
-    data.status !== 'ready' ? undefined : routine ? routineLine(routine) : 'не задан — окно по умолчанию'
+    data.status !== 'ready' ? undefined : routine ? routineLine(routine) : NO_ROUTINE
 
   return (
     <Fold id="settings:routine" title="Распорядок" summary={summary} folded>
