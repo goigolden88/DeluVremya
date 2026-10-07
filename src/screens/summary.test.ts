@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildSummary, checkSummary, type Metric, type PeriodSummary } from '../shared/core/summary.ts'
-import type { Category, Note, Review, SpecialDays, TimeBlock } from '../app/model.ts'
+import type { Category, Note, Review, Sleep, SpecialDays, TimeBlock } from '../app/model.ts'
 import { importTime } from '../modules/time/import.ts'
 import { summary, type SummaryData } from './summary.ts'
 
@@ -143,10 +143,12 @@ describe('время — по группам, фон отдельно (Р-43, Р
     expect(keys.filter((key) => key.startsWith('time.'))).toEqual(['time.total'])
   })
 
-  it('разбивки по признаку и средних на день нет (Р-05, Р-55)', () => {
-    const text = JSON.stringify(sliced(data(), MONDAY))
+  it('разбивки по признаку и средних на день нет (Р-05, Р-55); сон за ночь — не среднее на день (Р-97)', () => {
+    const result = sliced(data(), MONDAY)
+    const text = JSON.stringify(result)
     expect(text).not.toMatch(/useful|idle|neutral|kind/)
-    expect(text).not.toMatch(/в среднем|в день/)
+    const others = result.periods.map((period) => metrics(period).filter((metric) => metric.key !== 'sleep.night'))
+    expect(JSON.stringify(others)).not.toMatch(/в среднем|в день/)
   })
 })
 
@@ -261,6 +263,63 @@ describe('особые дни — Р-91', () => {
     const plain = data({ time: withTrip().time })
     expect(keys(withTrip())).toEqual(keys(plain))
     expect(JSON.stringify(sliced(withTrip(), MONDAY))).not.toContain('Казань')
+  })
+})
+
+describe('сон за ночь в среднем — Р-97', () => {
+  const ROUTINE: Sleep = { id: 'routine:2026-08-01', updatedAt: AT, since: '2026-08-01', wake: '07:00', bed: '23:00' }
+  const mark = (day: string, wake: string, bed: string): Sleep => ({ id: `sleep:${day}`, updatedAt: AT, day, wake, bed })
+
+  it('неделя и месяц: среднее минутами, основание — сколько отмечено, сколько по распорядку', () => {
+    // Отбой 15-го в 0:30 — подъём 16-го в 6:30: 6 ч; перед 15-м — 9 ч, перед 17-м — 7 ч 30 мин.
+    const input = data({ sleep: [ROUTINE, mark('2026-09-15', '08:00', '00:30'), mark('2026-09-16', '06:30', '23:30')] })
+    const result = sliced(input, MONDAY)
+    const week = byKey(result.periods[0])
+    expect(week['sleep.night']).toEqual({
+      key: 'sleep.night',
+      label: 'Сон за ночь в среднем',
+      value: { n: Math.round((4 * 480 + 360 + 540 + 450) / 7), unit: 'minutes' },
+      basis: 'ночей 7: отмечено 1, по распорядку 6',
+    })
+    // Идущая неделя — только ночь перед сегодня; идущий месяц — 21 ночь.
+    expect(byKey(result.periods[1])['sleep.night']).toMatchObject({ value: { n: 480 }, basis: 'ночей 1: отмечено 0, по распорядку 1' })
+    expect(byKey(result.periods[3])['sleep.night']?.basis).toBe('ночей 21: отмечено 1, по распорядку 20')
+  })
+
+  it('ночи до распорядка и особые без отметки — названы в основании, не в счёте', () => {
+    const trip: SpecialDays = { id: 's1', updatedAt: AT, from: '2026-09-19', to: '2026-09-19' }
+    const late: Sleep = { ...ROUTINE, id: 'routine:2026-09-16', since: '2026-09-16' }
+    const week = byKey(sliced(data({ sleep: [late], specials: [trip] }), MONDAY).periods[0])
+    expect(week['sleep.night']).toMatchObject({
+      value: { n: 480, unit: 'minutes' },
+      basis: 'ночей 7: отмечено 0, по распорядку 2; до распорядка — 3, не в счёте; особых без отметки — 2, не в счёте',
+    })
+  })
+
+  it('распорядка нет — «не известно»: окно по умолчанию — не сон', () => {
+    for (const period of sliced(data({ sleep: [mark('2026-09-15', '08:00', '00:00')] }), MONDAY).periods) {
+      expect(byKey(period)['sleep.night']).toMatchObject({
+        value: { unknown: 'no-data' },
+        basis: 'распорядок не задан',
+      })
+    }
+  })
+
+  it('ни одной ночи в счёте — тоже «не известно», с основанием', () => {
+    const late: Sleep = { ...ROUTINE, id: 'routine:2026-09-21', since: '2026-09-21' }
+    const august = byKey(sliced(data({ sleep: [late] }), MONDAY).periods[2])
+    expect(august['sleep.night']).toMatchObject({
+      value: { unknown: 'no-data', text: 'Ни одной ночи в счёте' },
+      basis: 'ночей 31: отмечено 0, по распорядку 0; до распорядка — 31, не в счёте',
+    })
+  })
+
+  it('прочие строки среза — побайтно прежние', () => {
+    const without = (input: SummaryData) =>
+      JSON.stringify(
+        sliced(input, MONDAY).periods.map((period) => metrics(period).filter((metric) => metric.key !== 'sleep.night')),
+      )
+    expect(without(data({ sleep: [ROUTINE] }))).toBe(without(data()))
   })
 })
 

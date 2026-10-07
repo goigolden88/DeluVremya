@@ -5,11 +5,13 @@
  * Итоги считает хозяин данных своими функциями (Я-11 «FamilyCore»): здесь
  * они только переложены в форму договора — показатель с ключом, подписью,
  * значением и основанием. Состав — таблица «Состав» договора (Я-19
- * «FamilyCore»): минуты по группам и фон отдельно, счёты плана и факта,
+ * «FamilyCore»): минуты по группам и фон отдельно, сон за ночь в среднем
+ * (Р-97), счёты плана и факта,
  * нормы недели вердиктом, «требует внимания» — непроведённый обзор.
  *
  * Чего здесь нет намеренно: текстов заметок и пунктов плана, повторов
- * (Я-14 «FamilyCore»); средних на день (Р-55), разбивки по признаку (Р-05),
+ * (Я-14 «FamilyCore»); средних на день (Р-55: сон за ночь в среднем — не
+ * среднее на день, Р-97), разбивки по признаку (Р-05),
  * серий (Р-45) — метаприложение показывает, а не досчитывает (Я-15
  * «FamilyCore»). Настроек устройства — порогов обзора, идущего таймера —
  * тоже: срез считается только из синхронизируемых записей (Я-16 «FamilyCore»).
@@ -33,6 +35,7 @@ import { activeCategories } from '../modules/time/categories.ts'
 import { byGroup, hasGroups, type GroupTotal } from '../modules/time/groups.ts'
 import { blocksWord, checkText, formatMinutes, NO_GROUP, normText } from '../modules/time/labels.ts'
 import { periodSummary, weekNorms, type PeriodSummary as TimeSummary, type WeekNorm } from '../modules/time/period.ts'
+import { nightsSleep, type NightsSleep } from '../modules/time/sleep.ts'
 import { PLAN_FACT_BASIS, planFact, type PlanFact } from '../modules/notes/period.ts'
 import { reviewCall } from './review.ts'
 
@@ -72,6 +75,7 @@ export const KEYS = {
   main: 'plan.main',
   estimate: 'plan.estimate',
   norm: (categoryId: string) => `norm.${categoryId}`,
+  sleep: 'sleep.night',
   review: 'review',
 } as const
 
@@ -155,6 +159,46 @@ function timeMetrics(data: SummaryData, time: TimeSummary, length: number): Metr
     }
   }
   return metrics
+}
+
+// ─── Сон (Р-97) ────────────────────────────────────────────────────────────
+
+const SLEEP_LABEL = 'Сон за ночь в среднем'
+
+/** «ночей 7: отмечено 2, по распорядку 5; до распорядка — 3, не в счёте». */
+function nightsText(nights: NightsSleep): string {
+  let text = `ночей ${nights.nights}: отмечено ${nights.marked}, по распорядку ${nights.byRoutine}`
+  if (nights.beforeRoutine > 0) text += `; до распорядка — ${nights.beforeRoutine}, не в счёте`
+  if (nights.special > 0) text += `; особых без отметки — ${nights.special}, не в счёте`
+  return text
+}
+
+function sleepMetric(data: SummaryData, period: SummaryPeriod, day: DateStr): Metric {
+  const nights = nightsSleep(data.sleep, data.specials, period, day)
+  if (!nights.routine) {
+    // Окно по умолчанию — не сон человека: из него среднее соврало бы.
+    return {
+      key: KEYS.sleep,
+      label: SLEEP_LABEL,
+      value: { unknown: UNKNOWN.noData, text: 'Распорядок не задан: окно дня по умолчанию — не сон человека' },
+      basis: 'распорядок не задан',
+    }
+  }
+  const counted = nights.marked + nights.byRoutine
+  if (counted === 0) {
+    return {
+      key: KEYS.sleep,
+      label: SLEEP_LABEL,
+      value: { unknown: UNKNOWN.noData, text: 'Ни одной ночи в счёте' },
+      basis: nightsText(nights),
+    }
+  }
+  return {
+    key: KEYS.sleep,
+    label: SLEEP_LABEL,
+    value: { n: Math.round(nights.minutes / counted), unit: 'minutes' },
+    basis: nightsText(nights),
+  }
 }
 
 // ─── План и факт ───────────────────────────────────────────────────────────
@@ -294,7 +338,11 @@ function periodOf(data: SummaryData, period: SummaryPeriod, day: DateStr): Perio
   // Время — по всем дням, особые тоже: состав среза — договор ядра (Р-91, Я-19 «FamilyCore»).
   const time = periodSummary(data.time, data.categories, period, day)
   const length = periodDays(period).length
-  const metrics = [...timeMetrics(data, time, length), ...planMetrics(planFact(data.notes, period, day))]
+  const metrics = [
+    ...timeMetrics(data, time, length),
+    sleepMetric(data, period, day),
+    ...planMetrics(planFact(data.notes, period, day)),
+  ]
   if (period.grain === 'week') {
     const runningText = running ? `неделя идёт: прошло ${days(time.elapsedDays)} из ${length}` : null
     for (const row of weekNorms(data.time, data.categories, period.from, day, data.specials)) {
