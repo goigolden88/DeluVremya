@@ -11,7 +11,17 @@ import {
 import { BarChart, MiniBars } from '../../shared/ui/BarChart.tsx'
 import { Fold } from '../../shared/ui/Fold.tsx'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
-import { backgroundText, formatMinutes, kindLine, lowerFirst, NO_GROUP, periodLine, UNKNOWN_CATEGORY } from './labels.ts'
+import {
+  backgroundText,
+  formatMinutes,
+  kindLine,
+  lowerFirst,
+  MONTH_RUNNING,
+  NO_GROUP,
+  periodLine,
+  runningMonthLine,
+  UNKNOWN_CATEGORY,
+} from './labels.ts'
 import { specialTime, yearTime } from './period.ts'
 import { ready, SpecialTimeList, Unready } from './Period.tsx'
 import { PeriodShares } from './Shares.tsx'
@@ -53,13 +63,18 @@ export function YearTime({
   const data = yearTime(time.blocks, catalog.categories, year, today, specials.specials)
   const special = specialTime(time.blocks, catalog.categories, specials.specials, yearPeriod(year), today)
   const past = data.months.filter(({ month }) => monthPeriod(month).from <= today)
+  // Идущий месяц — бледным, как пустые: его столбец — не итог месяца.
+  // Основание — строкой под графиком; в прошлых годах его нет.
+  const running = data.months.find(({ month }) => month === today.slice(0, 7)) ?? null
   const items = data.months.map(({ month, summary }, index) => {
     const future = monthPeriod(month).from > today
+    const now = month === running?.month
+    const state = future ? 'ещё не наступил' : `${now ? `${MONTH_RUNNING} · ` : ''}${lowerFirst(periodLine(summary))}`
     return {
       value: future ? null : summary.total,
       label: MONTHS_SHORT[index] ?? month,
-      title: `${capitalized(formatMonth(month))}: ${future ? 'ещё не наступил' : lowerFirst(periodLine(summary))}`,
-      muted: future || summary.count === 0,
+      title: `${capitalized(formatMonth(month))}: ${state}`,
+      muted: future || now || summary.count === 0,
       ...(future ? {} : { href: monthHref(month) }),
     }
   })
@@ -97,6 +112,7 @@ export function YearTime({
         peakText={formatMinutes}
         unit={HOUR}
       />
+      {running && <p>{runningMonthLine(running.month, running.summary)}</p>}
       <p className="muted">Столбец — учтено за месяц по основной категории; тап — итоги месяца.</p>
 
       {past.length > 0 && (

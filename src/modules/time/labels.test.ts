@@ -14,6 +14,7 @@ import {
   historyWaitText,
   keptText,
   marksLine,
+  MONTH_RUNNING,
   morePresetsLabel,
   NORM_PROBLEMS,
   normText,
@@ -21,6 +22,7 @@ import {
   presetFullLabel,
   presetLabel,
   runningLine,
+  runningMonthLine,
   savedLine,
   SPECIAL_WEEK,
   specialMarksText,
@@ -199,6 +201,17 @@ describe('тексты норм недели — Р-45', () => {
       'Ничего не учтено в обычные дни · особых — 7',
     )
     expect(periodLine({ ...base, total: 0, count: 0, days: 0, specialDays: 0 })).toBe('Ничего не учтено')
+  })
+
+  it('идущий месяц года — словами, с тем же основанием, что в таблице месяцев', () => {
+    const base = { total: 300, count: 5, days: 5, elapsedDays: 7, specialDays: 0, byCategory: [], byGroup: [], byKind: [] }
+    expect(runningMonthLine('2026-10', base)).toBe(`Октябрь ${MONTH_RUNNING}: учёт был в 5 днях из 7`)
+    expect(runningMonthLine('2026-10', { ...base, days: 1, elapsedDays: 1 })).toBe(
+      `Октябрь ${MONTH_RUNNING}: учёт был в 1 дне из 1`,
+    )
+    expect(runningMonthLine('2026-03', { ...base, total: 0, count: 0, days: 0, elapsedDays: 4, specialDays: 2 })).toBe(
+      `Март ${MONTH_RUNNING}: учёт был в 0 днях из 4 обычных; особых — 2`,
+    )
   })
 
   it('категории особого периода — строкой, без нулей', () => {
