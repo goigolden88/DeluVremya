@@ -179,11 +179,12 @@ export function Inbox() {
     }
   }
 
-  // Дело уходит из неразобранного в план дня (Р-37) — отклик с «Отменить».
-  async function plan(note: Note, day: DateStr) {
+  // Дело уходит из неразобранного в план дня или на период (Р-37, Р-101) —
+  // отклик с «Отменить»; «Отменить» снимает и период.
+  async function plan(next: Note) {
     setError('')
     try {
-      setPlanned(await db.put('notes', withPlan(note, day)))
+      setPlanned(await db.put('notes', next))
       setFinished(null)
       setOpenId(null)
     } catch (failure) {
@@ -237,7 +238,7 @@ export function Inbox() {
       open={openId === note.id}
       onToggle={() => setOpenId(openId === note.id ? null : note.id)}
       onDone={(done) => void finish(done)}
-      onPlan={(each, day) => void plan(each, day)}
+      onPlan={(next) => void plan(next)}
       onError={setError}
     />
   )
