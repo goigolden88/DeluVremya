@@ -71,6 +71,13 @@ describe('замыслы без движения — Р-47', () => {
     expect(stuckGoals([old, deleted], TODAY, 28)).toEqual([{ goal: old, since: '2026-06-01' }])
   })
 
+  it('новая мысль о замысле — тоже движение; удалённая — нет — Р-102', () => {
+    const old = goal('G1', '2026-06-01')
+    const thought = note('M1', { kind: 'thought', capturedOn: '2026-09-10', refs: [noteRef('G1')] })
+    expect(stuckGoals([old, thought], TODAY, 28)).toEqual([])
+    expect(stuckGoals([old, { ...thought, deleted: true }], TODAY, 28)).toEqual([{ goal: old, since: '2026-06-01' }])
+  })
+
   it('без единой даты — без движения; достигнутый — не здесь', () => {
     expect(stuckGoals([goal('G1', null)], TODAY, 28)).toEqual([{ goal: goal('G1', null), since: null }])
     expect(stuckGoals([{ ...goal('G2', '2026-01-01'), status: 'done' }], TODAY, 28)).toEqual([])

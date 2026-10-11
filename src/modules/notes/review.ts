@@ -7,14 +7,14 @@
 
 import { addDays, daysBetween, inPeriod, isDateStr, weekPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
 import type { Note } from '../../app/model.ts'
-import { ageDays, compareNotes, goalsOf, isUnsorted, tasksOfGoal } from './inbox.ts'
+import { ageDays, compareNotes, goalsOf, isUnsorted, tasksOfGoal, thoughtsOfGoal } from './inbox.ts'
 import { withoutMain, withSpan } from './plan.ts'
 
 // ─── Пороги (Р-48) ─────────────────────────────────────────────────────────
 
 /** Висяк — дело неразобранного не моложе стольких дней: «что висит месяц» (Р-46). */
 export const STALE_DAYS = 30
-/** Замысел без движения — ни одного дела за столько дней (Р-47). */
+/** Замысел без движения — ни одного дела и ни одной мысли за столько дней (Р-47, Р-102). */
 export const GOAL_STILL_DAYS = 28
 /** Пределы порога в настройках: от дня до года. */
 export const MIN_THRESHOLD = 1
@@ -55,12 +55,19 @@ export function somedayOf(notes: readonly Note[]): Note[] {
 
 export type StuckGoal = {
   goal: Note
-  /** Последнее движение: запись замысла, запись или выполнение его дела. Null — дат нет. */
+  /**
+   * Последнее движение: запись замысла, запись или выполнение его дела,
+   * запись мысли о нём (Р-102). Null — дат нет.
+   */
   since: DateStr | null
 }
 
 function lastMove(goal: Note, notes: readonly Note[]): DateStr | null {
-  const dates = [goal.capturedOn, ...tasksOfGoal(goal.id, notes).flatMap((task) => [task.capturedOn, task.doneOn ?? null])]
+  const dates = [
+    goal.capturedOn,
+    ...tasksOfGoal(goal.id, notes).flatMap((task) => [task.capturedOn, task.doneOn ?? null]),
+    ...thoughtsOfGoal(goal.id, notes).map((thought) => thought.capturedOn),
+  ]
   return dates.reduce<DateStr | null>((last, date) => {
     if (date === null || !isDateStr(date)) return last
     return last === null || date > last ? date : last

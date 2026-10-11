@@ -14,7 +14,7 @@ type Props = {
   note: Note
   /** Все живые заметки: замысел дела и дела замысла берутся отсюда. */
   notes: readonly Note[]
-  /** Замыслы в работе — выбор в карточке дела (Р-31). */
+  /** Замыслы в работе — выбор в карточке дела и мысли (Р-31, Р-102). */
   goals: readonly Note[]
   today: DateStr
   open: boolean
@@ -35,8 +35,13 @@ export function noteAnchor(id: string): string {
  * Строка записи: текст, вид и возраст серым. Тап раскрывает карточку
  * на месте (Р-30), а не уводит на другой экран.
  */
+/** К замыслу относятся дело и мысль (Р-31, Р-102); замысел к замыслу — нет. */
+function goalOfItem(note: Note, notes: readonly Note[]): Note | null {
+  return note.kind === 'goal' ? null : goalOf(note, notes)
+}
+
 export function NoteItem({ note, notes, goals, today, open, onToggle, onDone, onPlan, onError }: Props) {
-  const goal = note.kind === 'task' ? goalOf(note, notes) : null
+  const goal = goalOfItem(note, notes)
   const meta = [KIND_NAMES[note.kind].toLowerCase(), ageText(note, today)]
   if (goal) meta.push(goalLine(goal))
   if (note.kind === 'goal') meta.push(progressText(goalProgress(note.id, notes)))
@@ -63,7 +68,7 @@ export function NoteItem({ note, notes, goals, today, open, onToggle, onDone, on
 }
 
 /**
- * Карточка записи (Р-30): ссылки, вид, текст, замысел у дела, дела у замысла,
+ * Карточка записи (Р-30): ссылки, вид, текст, замысел у дела и мысли, дела у замысла,
  * «В план» у дела, «Сделано» и «Удалить». Вид и замысел пишутся тапом сразу,
  * текст — кнопкой.
  */
@@ -78,7 +83,7 @@ function NoteCard({
 }: Pick<Props, 'note' | 'notes' | 'goals' | 'today' | 'onDone' | 'onPlan' | 'onError'>) {
   const [text, setText] = useState(note.text)
   const edited = withText(note, text)
-  const goal = note.kind === 'task' ? goalOf(note, notes) : null
+  const goal = goalOfItem(note, notes)
   // Достигнутый замысел в выборе не стоит, но у своего дела остаётся виден.
   const choices = goal && !goals.some((each) => each.id === goal.id) ? [goal, ...goals] : goals
   const links = linksOf(note.text)
@@ -142,7 +147,7 @@ function NoteCard({
         </div>
       )}
 
-      {note.kind === 'task' && choices.length > 0 && (
+      {note.kind !== 'goal' && choices.length > 0 && (
         <label className="field">
           <span>Замысел</span>
           <select
@@ -150,7 +155,7 @@ function NoteCard({
             value={goal?.id ?? ''}
             onChange={(event) => void save(withGoal(note, event.target.value || null))}
           >
-            <option value="">— ни к какому —</option>
+            <option value="">— без замысла —</option>
             {choices.map((each) => (
               <option key={each.id} value={each.id}>
                 {firstLine(each.text)}
