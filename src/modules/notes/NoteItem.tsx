@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { DateStr } from '../../shared/core/dates.ts'
+import { addDays, isDateStr, type DateStr } from '../../shared/core/dates.ts'
 import { db } from '../../app/core.ts'
 import type { Note } from '../../app/model.ts'
 import { goalOf, goalProgress, linksOf, NOTE_KINDS, tasksOfGoal, withGoal, withKind, withText } from './inbox.ts'
 import { ageText, deleteConfirm, DONE_LABELS, firstLine, goalLine, KIND_NAMES, progressText } from './labels.ts'
 import { goalLink } from './goal.ts'
+import { withPlanSpan } from './plan.ts'
 import { PlanButtons } from './PlanItem.tsx'
+
+/** Последний день периода не позже первого — дело в план не уходит (Р-101). */
+const SPAN_ERROR = '«По какой день» — позже дня начала'
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
@@ -23,8 +27,8 @@ type Props = {
   onToggle: () => void
   /** «Сделано» или «Достигнут»: отклик с «Отменить» — у экрана. */
   onDone: (note: Note) => void
-  /** Дело — в план на день (Р-37): отклик с «Отменить» — у экрана. */
-  onPlan: (note: Note, day: DateStr) => void
+  /** Дело — в план на день или период (Р-37, Р-101): `planned` уже поставлено; отклик с «Отменить» — у экрана. */
+  onPlan: (planned: Note) => void
   onError: (message: string) => void
 }
 
@@ -90,6 +94,18 @@ function NoteCard({
   const choices = goal && !goals.some((each) => each.id === goal.id) ? [goal, ...goals] : goals
   const links = linksOf(note.text)
   const done = DONE_LABELS[note.kind]
+  const [to, setTo] = useState<DateStr | null>(null)
+  const [spanError, setSpanError] = useState('')
+
+  function plan(day: DateStr) {
+    const next = withPlanSpan(note, day, to)
+    if (next === null) {
+      setSpanError(SPAN_ERROR)
+      return
+    }
+    setSpanError('')
+    onPlan(next)
+  }
 
   async function save(next: Note) {
     if (next === note) return
@@ -181,7 +197,26 @@ function NoteCard({
 
       {/* В план — только дело: мысль и замысел на день не ставятся. */}
       {note.kind === 'task' && note.status === 'open' && (
-        <PlanButtons note={note} today={today} onMove={(day) => onPlan(note, day)} />
+        <>
+          {/* Сразу на период (Р-101): необязательно, без него — на один день. */}
+          <label className="field">
+            <span>По какой день</span>
+            <input
+              type="date"
+              name="plan-to"
+              min={addDays(today, 1)}
+              value={to ?? ''}
+              onChange={(event) => {
+                const day = event.target.value
+                setSpanError('')
+                if (day === '') setTo(null)
+                else if (isDateStr(day) && day > today) setTo(day)
+              }}
+            />
+          </label>
+          {spanError && <p className="error">{spanError}</p>}
+          <PlanButtons note={note} today={today} onMove={plan} />
+        </>
       )}
 
       <div className="row row--wrap">

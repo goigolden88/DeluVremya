@@ -19,6 +19,7 @@ import {
   withEstimate,
   withoutMain,
   withPlan,
+  withPlanSpan,
   withSpan,
 } from './plan.ts'
 
@@ -302,6 +303,19 @@ describe('дело на период — Р-101', () => {
     expect(set.plannedTo).toBe(TO)
     expect(set).not.toHaveProperty('main')
     expect(withSpan(set, null)).not.toHaveProperty('plannedTo')
+  })
+
+  it('из входящих сразу на период: с дня начала по выбранный', () => {
+    const inbox = note('01', { plannedFor: null })
+    const set = withPlanSpan(inbox, FROM, TO)
+    expect(set?.plannedFor).toBe(FROM)
+    expect(set?.plannedTo).toBe(TO)
+    expect(ids(dayPlan(set ? [set] : [], '2026-10-13').open)).toEqual(['01'])
+    const single = withPlanSpan(inbox, FROM, null)
+    expect(single?.plannedFor).toBe(FROM)
+    expect(single).not.toHaveProperty('plannedTo')
+    expect(withPlanSpan(inbox, FROM, FROM)).toBeNull()
+    expect(withPlanSpan(inbox, '2026-10-16', TO)).toBeNull()
   })
 
   it('кривое поле — дело на один день, как без него', () => {

@@ -149,6 +149,16 @@ export function withPlan(note: Note, day: DateStr | null): Note {
 }
 
 /**
+ * В план из входящих сразу на период (Р-101): с `day` по `to`. Без `to` —
+ * на один день, как `withPlan`. Последний день не позже первого — `null`:
+ * в план дело не уходит, экран говорит почему.
+ */
+export function withPlanSpan(note: Note, day: DateStr, to: DateStr | null): Note | null {
+  if (to !== null && to <= day) return null
+  return withSpan(withPlan(note, day), to)
+}
+
+/**
  * Сдвиг пункта выше или ниже среди `list` — открытых пунктов дня в порядке
  * экрана (Р-75). Нумерует список подряд с нуля, возвращает изменённые.
  * Сдвигать некуда — пусто.
