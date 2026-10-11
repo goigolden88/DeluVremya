@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { addMonths, monthOf, monthPeriod } from '../shared/core/dates.ts'
+import { GoalsPeriod } from '../modules/notes/GoalsPeriod.tsx'
 import { PlanPeriod } from '../modules/notes/PlanPeriod.tsx'
 import { MonthDays } from '../modules/time/MonthDays.tsx'
 import { PeriodNorms, PeriodTime } from '../modules/time/Period.tsx'
@@ -15,7 +16,8 @@ const dayHref = (day: string) => `#/time?day=${day}`
  * Итоги месяца — экран `#/month?m=` (Р-54). Читает оба модуля и потому живёт
  * в `screens/` (Р-10). Записи о проведении нет: месяц читают, а решения
  * принимает обзор недели. Время против прошлого месяца блоками «По дням»
- * (Р-92), «Доли» и «Таблица» (Р-95), нормы по неделям месяца, план против факта (Р-55).
+ * (Р-92), «Доли» и «Таблица» (Р-95), нормы по неделям месяца, план против факта (Р-55),
+ * движение замыслов (Р-104).
  */
 export function Month() {
   const today = useToday()
@@ -90,6 +92,8 @@ export function Month() {
         <h2>План против факта</h2>
         <PlanPeriod period={period} today={today} />
       </section>
+
+      <GoalsPeriod period={period} span="месяц" />
 
       <p className="muted">
         <Link to={`/year?y=${month.slice(0, 4)}`}>Итоги года →</Link>

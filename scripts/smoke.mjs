@@ -2645,6 +2645,28 @@ async function goalScenario() {
     line(added, 'дела,'),
   )
 
+  // ─ Блок «Замыслы» за неделю и за месяц (Р-104): записанное сегодня — движение, тап — экран замысла.
+  const goalsBlock = () =>
+    run(`[...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === 'Замыслы')?.closest('section')?.innerText ?? ''`)
+  const goalsLink = () =>
+    run(`[...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === 'Замыслы')
+      ?.closest('section')?.querySelector('a[href=${JSON.stringify(goalHash)}]') != null`)
+  await go(`/review?week=${localDay()}`)
+  const weekGoals = await goalsBlock()
+  const weekLink = await goalsLink()
+  await go(`/month?m=${localDay().slice(0, 7)}`)
+  const monthGoals = await goalsBlock()
+  const monthLink = await goalsLink()
+  check(
+    'блок «Замыслы» в обзоре недели и итогах месяца: записано дел и мыслей, тап — экран замысла — Р-104',
+    /Выучить испанский — .*записано дел \d+ · мыслей 1/.test(weekGoals) &&
+      /Выучить испанский — .*записано дел \d+ · мыслей 1/.test(monthGoals) &&
+      has(weekGoals, 'по дню записи') &&
+      weekLink === true &&
+      monthLink === true,
+    `${line(weekGoals, 'Выучить')}; ${line(monthGoals, 'Выучить')}`,
+  )
+
   await go('/goal/нет-такого')
   const missing = await screen()
   check('незнакомый замысел — «Замысел не найден» и ссылка на «Заметки»', has(missing, 'Замысел не найден'), missing.slice(0, 80))
