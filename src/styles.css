@@ -247,6 +247,34 @@
   flex: none;
 }
 
+/* Строка ленты замысла: переход и «Открепить» рядом, черта — под обоими. */
+.goal-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.goal-entry .feed__row {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+
+.goal-entry .link-btn {
+  flex: none;
+}
+
+/* Строка выбора «Прикрепить» — кнопка целиком, вид как у строки ленты. */
+.feed__pick {
+  width: 100%;
+  border-width: 0 0 1px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 /* ─── Мелочи, вернувшиеся с учётом времени ───────────────────────────────── */
 
 .back {
