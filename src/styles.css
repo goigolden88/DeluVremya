@@ -175,6 +175,17 @@
   overflow-wrap: anywhere;
 }
 
+/* Экран замысла (Р-103): название и видение — текст человека, переносится как записан. */
+.goal__title,
+.goal__vision {
+  overflow-wrap: anywhere;
+}
+
+.screen-head .goal__vision {
+  margin-top: 8px;
+  white-space: pre-wrap;
+}
+
 .month-group + .month-group {
   margin-top: 16px;
 }

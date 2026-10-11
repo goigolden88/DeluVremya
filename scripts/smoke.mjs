@@ -2581,7 +2581,104 @@ async function notesScenario() {
     line(removed, 'Выучить'),
   )
 
+  await goalScenario()
   await notesImportScenario()
+}
+
+/**
+ * Экран замысла (Р-103): вход из карточки, название и видение, лента,
+ * «Добавить мысль» и «Добавить дело», переход к неразобранному, «не найден».
+ * На входе — замысел «Выучить испанский» с делом «Купить фильтр для воды»;
+ * добавленное в конце удаляется, текст замысла — возвращается.
+ */
+async function goalScenario() {
+  await go('/inbox')
+  await act(`startsWith('.note__main', 'Выучить испанский')?.click()`)
+  await sleep(400)
+  await act(`byText('a', 'Открыть замысел')?.click()`)
+  await sleep(700)
+  const goalHash = await run('location.hash')
+  const opened = await screen()
+  check(
+    '«Открыть замысел» в карточке ведёт на экран замысла: название, счёт, его дело — Р-103',
+    String(goalHash).startsWith('#/goal/') &&
+      has(opened, '1 дело, сделано 0') &&
+      has(opened, 'Купить фильтр для воды') &&
+      has(opened, 'дело · открыто'),
+    `${goalHash}; ${line(opened, 'дело,')}`,
+  )
+
+  // ─ Видение — остальной текст после первой строки; правка — та же, что в карточке.
+  const editText = (text) => act(`
+    set(document.querySelector('textarea[name=goal-text]'), ${JSON.stringify(text)});
+    byText('button', 'Сохранить текст')?.click();
+  `)
+  await unfold('Править замысел')
+  await editText('Выучить испанский\nЧитать книги без словаря')
+  await sleep(700)
+  const title = await run(`document.querySelector('.goal__title')?.textContent ?? ''`)
+  const vision = await run(`document.querySelector('.goal__vision')?.textContent ?? ''`)
+  check(
+    'первая строка — название крупно, остальное — видение',
+    title === 'Выучить испанский' && vision === 'Читать книги без словаря',
+    `«${title}» / «${vision}»`,
+  )
+  await editText('Выучить испанский')
+  await sleep(700)
+
+  // ─ «Добавить мысль» и «Добавить дело» — сразу к замыслу, в ленте сразу.
+  const add = async (button, text) => {
+    await act(`byText('button', ${JSON.stringify(button)})?.click()`)
+    await sleep(300)
+    await act(`
+      set(document.querySelector('textarea[name=goal-entry]'), ${JSON.stringify(text)});
+      byText('button', 'Записать')?.click();
+    `)
+    await sleep(700)
+  }
+  await add('Добавить мысль', 'Сериалы с субтитрами')
+  await add('Добавить дело', 'Купить учебник')
+  const added = await screen()
+  check(
+    'добавленные дело и мысль — в ленте замысла и в его счёте',
+    has(added, 'Сериалы с субтитрами') && has(added, 'Купить учебник') && has(added, '2 дела, сделано 0 · мыслей 1'),
+    line(added, 'дела,'),
+  )
+
+  await go('/goal/нет-такого')
+  const missing = await screen()
+  check('незнакомый замысел — «Замысел не найден» и ссылка на «Заметки»', has(missing, 'Замысел не найден'), missing.slice(0, 80))
+
+  // ─ Неразобранное в ленте ведёт к своей карточке на «Заметках» (Р-59).
+  await run(`location.hash = ${JSON.stringify(goalHash)}`)
+  await sleep(700)
+  // С «const», а не со скобки: строка «[…» склеилась бы с концом помощников.
+  await act(`
+    const row = [...document.querySelectorAll('a.feed__row')].find((el) => el.textContent.includes('Сериалы с субтитрами'));
+    row?.click();
+  `)
+  await sleep(1000)
+  const notesHash = await run('location.hash')
+  const card = await run(`document.querySelector('.note__card textarea[name=note-text]')?.value ?? ''`)
+  const onNotes = await screen()
+  check(
+    'мысль из ленты замысла открывает свою карточку на «Заметках»; дело лежит в неразобранном',
+    String(notesHash).startsWith('#/inbox') && card === 'Сериалы с субтитрами' && has(onNotes, 'Купить учебник'),
+    `${notesHash}; карточка «${card}»`,
+  )
+
+  await act(`window.confirm = () => true; byText('button', 'Удалить')?.click()`)
+  await sleep(700)
+  await act(`startsWith('.note__main', 'Купить учебник')?.click()`)
+  await sleep(400)
+  await act(`window.confirm = () => true; byText('button', 'Удалить')?.click()`)
+  await sleep(700)
+  const cleaned = await screen()
+  check(
+    'добавленное с экрана замысла удаляется, как любая запись',
+    !has(cleaned, 'Сериалы с субтитрами') && !has(cleaned, 'Купить учебник'),
+    line(cleaned, 'записи'),
+  )
 }
 
 /**
