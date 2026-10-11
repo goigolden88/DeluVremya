@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { addDays, formatPeriod, weekPeriod, weekStart, type DateStr } from '../shared/core/dates.ts'
 import { db } from '../app/core.ts'
 import { captureNote, noteRef } from '../modules/notes/inbox.ts'
+import { GoalsPeriod } from '../modules/notes/GoalsPeriod.tsx'
 import { durationText } from '../modules/notes/labels.ts'
 import { PlanPeriod } from '../modules/notes/PlanPeriod.tsx'
 import { RecallWeeks } from '../modules/notes/Recall.tsx'
@@ -143,6 +144,8 @@ export function Review() {
         <h2>Нормы</h2>
         <WeekNorms week={week} today={today} />
       </section>
+
+      <GoalsPeriod period={weekPeriod(week)} span="неделю" />
 
       <section className="block">
         <h2>Висяки и замыслы</h2>

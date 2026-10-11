@@ -17,6 +17,7 @@ import {
 } from '../../shared/core/dates.ts'
 import type { Note, NoteKind } from '../../app/model.ts'
 import { quoted } from '../../ui/screenNames.ts'
+import type { GoalMove } from './goalPeriod.ts'
 import { ageDays, type GoalProgress } from './inbox.ts'
 import type { PlanFact, Repeat } from './period.ts'
 import { spanEnd, type Realism } from './plan.ts'
@@ -337,3 +338,35 @@ export function recallTitle(weeksAgo: number, period: Period): string {
 }
 
 export const RECALL_EMPTY = 'Мыслей в ту неделю не записано'
+
+// ─── Замыслы за промежуток (Р-104) ─────────────────────────────────────────
+
+/** Заголовок блока в обзоре недели и итогах месяца. */
+export const GOALS_PERIOD_TITLE = 'Замыслы'
+
+/** Как считается движение замыслов: число не врёт молча. */
+export const GOALS_PERIOD_BASIS =
+  'Сделано — по дню выполнения дела, записано — по дню записи; без даты, удалённые и отброшенные не считаются. Время по замыслам не считается.'
+
+/**
+ * Движение замысла: «сделано дел 2 · записано дел 1 · мыслей 3 · достигнут».
+ * Нулевые части не пишутся; дел не записано — «записано мыслей 3».
+ */
+export function goalMoveText(move: GoalMove): string {
+  const parts: string[] = []
+  if (move.done > 0) parts.push(`сделано дел ${move.done}`)
+  if (move.tasks > 0) parts.push(`записано дел ${move.tasks}`)
+  if (move.thoughts > 0) parts.push(move.tasks > 0 ? `мыслей ${move.thoughts}` : `записано мыслей ${move.thoughts}`)
+  if (move.reached) parts.push('достигнут')
+  return parts.join(' · ')
+}
+
+/** Ни у одного замысла движения не было. `span` — «неделю», «месяц». */
+export function goalsStillText(span: string): string {
+  return `За ${span} по замыслам движения нет`
+}
+
+/** Записи замыслов без даты — числом, а не молча. */
+export function goalsUndatedText(count: number): string {
+  return `Без даты — ${recordsText(count)} замыслов: в счёт не идут`
+}
