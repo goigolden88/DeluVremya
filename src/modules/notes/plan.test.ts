@@ -15,9 +15,11 @@ import {
   plannedCount,
   readEstimate,
   realism,
+  spanEnd,
   withEstimate,
   withoutMain,
   withPlan,
+  withSpan,
 } from './plan.ts'
 
 const TODAY = '2026-09-14'
@@ -206,7 +208,7 @@ describe('реализм (Р-35)', () => {
       note('03'),
       note('04', { estMin: 90, status: 'done' }),
     ]
-    expect(planLoad(items)).toEqual({ minutes: 90, estimated: 2, total: 3 })
+    expect(planLoad(items)).toEqual({ minutes: 90, estimated: 2, total: 3, spans: 0 })
   })
 
   it('не влезает — на сколько; влезает — ноль', () => {
@@ -240,6 +242,88 @@ describe('порядок пунктов дня — Р-75', () => {
   it('перенос и возврат снимают место в дне', () => {
     expect(withPlan(note('01', { order: 2 }), TOMORROW)).not.toHaveProperty('order')
     expect(withPlan(note('01', { order: 2 }), null)).not.toHaveProperty('order')
+  })
+})
+
+describe('дело на период — Р-101', () => {
+  const FROM = '2026-10-12'
+  const TO = '2026-10-15'
+  const span = (over: Partial<Note> = {}) => note('01', { plannedFor: FROM, plannedTo: TO, ...over })
+
+  it('стоит в плане каждого дня периода, пока открыто', () => {
+    for (const day of ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15']) {
+      expect(ids(dayPlan([span()], day).open)).toEqual(['01'])
+    }
+    expect(dayPlan([span()], '2026-10-11').all).toEqual([])
+    expect(dayPlan([span()], '2026-10-16').all).toEqual([])
+  })
+
+  it('сделано — в день выполнения сделано, в следующих днях периода его нет', () => {
+    const done = span({ status: 'done', doneOn: '2026-10-13' })
+    expect(ids(dayPlan([done], '2026-10-13').done)).toEqual(['01'])
+    expect(dayPlan([done], '2026-10-14').all).toEqual([])
+    expect(dayPlan([done], '2026-10-15').all).toEqual([])
+    expect(dayPlan([done], '2026-10-12').all).toEqual([])
+    expect(doneOffPlan([done], '2026-10-13')).toEqual([])
+  })
+
+  it('сделано вне периода — в крайнем дне; позже конца — ещё и «вне плана»', () => {
+    expect(ids(dayPlan([span({ status: 'done', doneOn: '2026-10-10' })], FROM).done)).toEqual(['01'])
+    const late = span({ status: 'done', doneOn: '2026-10-17' })
+    expect(ids(dayPlan([late], TO).done)).toEqual(['01'])
+    expect(ids(doneOffPlan([late], '2026-10-17'))).toEqual(['01'])
+  })
+
+  it('не сделано к концу — на следующий день в «С прошлых дней», до того — нет', () => {
+    expect(overdue([span()], '2026-10-13')).toEqual([])
+    expect(overdue([span()], TO)).toEqual([])
+    expect(ids(overdue([span()], '2026-10-16'))).toEqual(['01'])
+  })
+
+  it('впереди — пока период не начался, днём начала', () => {
+    expect(ahead([span()], '2026-10-11').map((group) => [group.day, ids(group.notes)])).toEqual([[FROM, ['01']]])
+    expect(ahead([span()], FROM)).toEqual([])
+  })
+
+  it('перенос и возврат снимают период — дело снова на один день', () => {
+    const moved = withPlan(span(), '2026-10-20')
+    expect(moved).not.toHaveProperty('plannedTo')
+    expect(ids(dayPlan([moved], '2026-10-20').open)).toEqual(['01'])
+    expect(dayPlan([moved], '2026-10-21').all).toEqual([])
+    expect(withPlan(span(), null)).not.toHaveProperty('plannedTo')
+  })
+
+  it('последний день — позже первого; равный или раньше — та же запись', () => {
+    const single = note('01', { plannedFor: FROM, main: true })
+    expect(withSpan(single, FROM)).toBe(single)
+    expect(withSpan(single, '2026-10-11')).toBe(single)
+    expect(withSpan(note('01', { plannedFor: null }), TO).plannedTo).toBeUndefined()
+    const set = withSpan(single, TO)
+    expect(set.plannedTo).toBe(TO)
+    expect(set).not.toHaveProperty('main')
+    expect(withSpan(set, null)).not.toHaveProperty('plannedTo')
+  })
+
+  it('кривое поле — дело на один день, как без него', () => {
+    expect(spanEnd(span())).toBe(TO)
+    expect(spanEnd(span({ plannedTo: FROM }))).toBeNull()
+    expect(spanEnd(span({ plannedTo: '15.10' }))).toBeNull()
+    expect(spanEnd(span({ plannedFor: '12.10' }))).toBeNull()
+    const odd = span({ plannedTo: '2026-10-01' })
+    expect(ids(dayPlan([odd], FROM).open)).toEqual(['01'])
+    expect(dayPlan([odd], '2026-10-13').all).toEqual([])
+  })
+
+  it('главным не бывает, даже с отметкой со старой сборки', () => {
+    const plan = dayPlan([span({ main: true }), note('02', { plannedFor: FROM })], FROM)
+    expect(plan.main).toBeNull()
+    expect(ids(plan.open)).toEqual(['01', '02'])
+  })
+
+  it('оценка в реализм не входит, число таких дел названо', () => {
+    const items = [span({ estMin: 600 }), note('02', { plannedFor: FROM, estMin: 30 })]
+    expect(planLoad(items)).toEqual({ minutes: 30, estimated: 1, total: 1, spans: 1 })
+    expect(realism([span({ estMin: 600 })], 600)).toBeNull()
   })
 })
 

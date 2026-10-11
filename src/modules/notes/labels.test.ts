@@ -16,12 +16,14 @@ import {
   overdueLead,
   planFactText,
   plannedCountText,
+  planDayText,
   plannedLine,
   progressText,
   realismText,
   recallTitle,
   repeatText,
   shownText,
+  spanText,
   staleLead,
   staleNone,
   staleRest,
@@ -137,10 +139,11 @@ describe('подписи', () => {
 })
 
 describe('план дня', () => {
-  const load = (minutes: number, estimated: number, total: number, left: number): Realism => ({
+  const load = (minutes: number, estimated: number, total: number, left: number, spans = 0): Realism => ({
     minutes,
     estimated,
     total,
+    spans,
     left,
     over: Math.max(0, minutes - left),
   })
@@ -186,5 +189,23 @@ describe('план дня', () => {
   it('сделанное вне плана — откуда оно', () => {
     expect(offPlanMeta(captured(TODAY), TODAY)).toBe('не было в плане')
     expect(offPlanMeta({ ...captured(TODAY), plannedFor: '2026-09-12' }, TODAY)).toBe('из плана на вчера')
+    expect(offPlanMeta({ ...captured(TODAY), plannedFor: '2026-09-08', plannedTo: '2026-09-11' }, TODAY)).toBe(
+      'из плана на 08.09–11.09',
+    )
+  })
+
+  it('дело на период — подпись периода; в реализме названо, сколько таких не в счёте (Р-101)', () => {
+    const span = { ...captured(TODAY), plannedFor: '2026-10-12', plannedTo: '2026-10-15' }
+    expect(spanText(span)).toBe('12.10–15.10')
+    expect(spanText({ ...span, plannedTo: '2026-10-12' })).toBeNull()
+    expect(spanText(captured(TODAY))).toBeNull()
+    expect(planDayText(span, TODAY)).toBe('12.10–15.10')
+    expect(planDayText({ ...captured(TODAY), plannedFor: '2026-09-12' }, TODAY)).toBe('вчера')
+    expect(realismText(load(90, 1, 2, 600, 1))).toBe(
+      'Намечено 1 ч 30 мин по 1 пункту из 2, без 1 дела на период — до конца дня 10 ч: влезает, в запасе 8 ч 30 мин',
+    )
+    expect(realismText(load(0, 0, 1, 600, 2))).toBe(
+      'Влезает ли в день — не посчитать: у пункта нет оценки, без 2 дел на период. Оценка — тап по пункту',
+    )
   })
 })

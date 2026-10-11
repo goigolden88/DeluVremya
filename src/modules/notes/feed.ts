@@ -14,6 +14,7 @@ import { dateWords, escapeMarkdown as md, type FeedItem } from '../../shared/cor
 import type { Note } from '../../app/model.ts'
 import { goalOf, groupByMonth, isUnsorted } from './inbox.ts'
 import { firstLine, goalLine, KIND_NAMES, monthHeading } from './labels.ts'
+import { spanEnd } from './plan.ts'
 
 /** День в подписи: в ленте — `14.09`, месяц и год стоят заголовком; в выгрузке — полностью. */
 type DayFormat = (day: string) => string
@@ -32,7 +33,9 @@ function stateParts(note: Note, day: DayFormat): string[] {
   } else if (note.status === 'dropped') {
     parts.push('отброшено')
   } else if (note.plannedFor !== null) {
-    parts.push(`в плане на ${day(note.plannedFor)}`)
+    // Дело на период — с последним днём: «в плане на 12.10–15.10» (Р-101).
+    const to = spanEnd(note)
+    parts.push(`в плане на ${day(note.plannedFor)}${to === null ? '' : `–${day(to)}`}`)
   }
   if (note.main && note.plannedFor !== null) parts.push('главное')
   return parts

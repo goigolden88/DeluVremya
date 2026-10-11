@@ -15,6 +15,7 @@ import {
   OVERDUE_TITLE,
   overdueLead,
   PLAN_TITLE,
+  planDayText,
   realismText,
   shortText,
   TO_UNSORTED,
@@ -121,7 +122,7 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
               <PlanRow
                 key={note.id}
                 {...common(note)}
-                meta={dayText(note.plannedFor ?? '', today)}
+                meta={planDayText(note, today)}
                 actions={
                   <div className="row row--wrap plan-item__actions">
                     <button

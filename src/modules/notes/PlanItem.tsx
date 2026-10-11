@@ -3,8 +3,8 @@ import { addDays, isDateStr, type DateStr } from '../../shared/core/dates.ts'
 import { db } from '../../app/core.ts'
 import type { Note } from '../../app/model.ts'
 import { markDone, reopen, withText } from './inbox.ts'
-import { deleteConfirm, durationText, MOVE_TITLE, shortText, TO_UNSORTED } from './labels.ts'
-import { ESTIMATE_CHOICES, readEstimate, withEstimate, withPlan } from './plan.ts'
+import { deleteConfirm, durationText, MOVE_TITLE, shortText, spanText, TO_UNSORTED } from './labels.ts'
+import { ESTIMATE_CHOICES, readEstimate, spanEnd, withEstimate, withPlan, withSpan } from './plan.ts'
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
@@ -95,10 +95,10 @@ type RowProps = {
   onError: (message: string) => void
   /** Галочка «сделано» в строке — у пунктов сегодняшнего дня и сделанного вне плана. */
   check?: boolean
-  /** Главное ли — звездой; без `onMain` звезды нет. */
+  /** Главное ли — звездой; без `onMain` звезды нет, у дела на период — тоже (Р-101). */
   main?: boolean
   onMain?: () => void
-  /** Серая строка под текстом: день пункта, откуда он. */
+  /** Серая строка под текстом: день пункта, откуда он. Нет — у дела на период его период. */
   meta?: string
   /** Кнопки прямо в строке — у хвоста прошлых дней (Р-34). */
   actions?: ReactNode
@@ -130,6 +130,8 @@ export function PlanRow({
   const name = shortText(note.text)
   const [moving, setMoving] = useState(false)
   const movable = move && note.status === 'open'
+  const line = meta ?? spanText(note)
+  const star = spanEnd(note) === null ? onMain : undefined
 
   async function toggleDone() {
     try {
@@ -170,19 +172,19 @@ export function PlanRow({
             ↷
           </button>
         )}
-        {onMain && (
+        {star && (
           <button
             type="button"
             className="star-btn"
             aria-pressed={main}
             aria-label={`${main ? 'Снять главное' : 'Сделать главным'}: ${name}`}
-            onClick={onMain}
+            onClick={star}
           >
             {main ? '★' : '☆'}
           </button>
         )}
       </div>
-      {meta && <span className="muted note__meta">{meta}</span>}
+      {line && <span className="muted note__meta">{line}</span>}
       {actions}
       {movable && moving && (
         <MoveButtons note={note} today={today} onError={onError} onMoved={() => setMoving(false)} />
@@ -214,6 +216,9 @@ function PlanCard({
   const [estimateError, setEstimateError] = useState('')
   const edited = withText(note, text)
   const isOpen = note.status === 'open'
+  // Первый и последний день периода; у кривого дня плана периода не выбрать.
+  const from = note.plannedFor !== null && isDateStr(note.plannedFor) ? note.plannedFor : null
+  const to = spanEnd(note)
 
   async function save(next: Note) {
     if (next === note) return
@@ -296,6 +301,31 @@ function PlanCard({
         <button type="button" className="link-btn" onClick={() => void save(withEstimate(note, null))}>
           Без оценки
         </button>
+      )}
+
+      {/* Дело на период (Р-101): последний день — позже первого, один день — обычное дело. */}
+      {isOpen && from !== null && (
+        <>
+          <label className="field">
+            <span>По какой день</span>
+            <input
+              type="date"
+              name="plan-to"
+              min={addDays(from, 1)}
+              value={to ?? ''}
+              onChange={(event) => {
+                const day = event.target.value
+                if (day === '') void save(withSpan(note, null))
+                else if (isDateStr(day) && day > from) void save(withSpan(note, day))
+              }}
+            />
+          </label>
+          {to !== null && (
+            <button type="button" className="link-btn" onClick={() => void save(withSpan(note, null))}>
+              Один день — без периода
+            </button>
+          )}
+        </>
       )}
 
       {/* Порядок пунктов дня (Р-75). */}

@@ -5,6 +5,7 @@
  * ни сделано, `doneOn` — день факта. Удалённые не считаются: надгробием
  * уходят и пункты, снятые «Отменить» после шаблона. Перенесённый считается
  * днём, на котором стоит сейчас: прежнего дня запись не помнит (Р-38).
+ * Дело на период — один пункт в последний день периода (Р-101).
  *
  * Промежуток, а не неделя: на тех же расчётах встанут месяц и год (Р-52).
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
@@ -13,7 +14,12 @@
 import { inPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
 import type { Note } from '../../app/model.ts'
 import { normalize } from './inbox.ts'
-import { mainOf } from './plan.ts'
+import { mainOf, spanEnd } from './plan.ts'
+
+/** День пункта в плане против факта: день плана, у дела на период — последний день (Р-101). */
+function factDay(note: Note): string {
+  return spanEnd(note) ?? note.plannedFor ?? ''
+}
 
 /** Пункты плана промежутка: живые, открытые или сделанные, по порядку добавления. */
 export function plannedIn(notes: readonly Note[], period: Period): Note[] {
@@ -22,7 +28,7 @@ export function plannedIn(notes: readonly Note[], period: Period): Note[] {
       (note) =>
         !note.deleted &&
         note.plannedFor !== null &&
-        inPeriod(note.plannedFor, period) &&
+        inPeriod(factDay(note), period) &&
         (note.status === 'open' || note.status === 'done'),
     )
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -39,7 +45,8 @@ export type Repeat = {
 }
 
 /** Как считается план против факта (Р-44): число не врёт молча. */
-export const PLAN_FACT_BASIS = 'Пункт считается днём, на котором стоит сейчас; удалённые не считаются.'
+export const PLAN_FACT_BASIS =
+  'Пункт считается днём, на котором стоит сейчас, дело на период — последним днём периода; удалённые не считаются.'
 
 /** С какого числа дней одинаковый пункт считается повтором. */
 export const REPEAT_FROM = 2
@@ -76,7 +83,7 @@ export function planFact(notes: readonly Note[], period: Period, today: DateStr)
 
   const byDay = new Map<string, Note[]>()
   for (const item of items) {
-    const day = item.plannedFor ?? ''
+    const day = factDay(item)
     byDay.set(day, [...(byDay.get(day) ?? []), item])
   }
   let mainDays = 0
@@ -93,8 +100,8 @@ export function planFact(notes: readonly Note[], period: Period, today: DateStr)
   for (const item of items) {
     const key = normalize(item.text)
     const group = groups.get(key) ?? { text: item.text, days: new Set<string>(), done: new Set<string>() }
-    group.days.add(item.plannedFor ?? '')
-    if (item.status === 'done') group.done.add(item.plannedFor ?? '')
+    group.days.add(factDay(item))
+    if (item.status === 'done') group.done.add(factDay(item))
     groups.set(key, group)
   }
   const repeats = [...groups.values()]
@@ -107,11 +114,10 @@ export function planFact(notes: readonly Note[], period: Period, today: DateStr)
   return {
     planned: items.length,
     done: done.length,
-    late: done.filter((note) => note.doneOn !== undefined && note.plannedFor !== null && note.doneOn > note.plannedFor)
-      .length,
-    waiting: open.filter((note) => (note.plannedFor ?? '') < today).length,
-    today: open.filter((note) => note.plannedFor === today).length,
-    ahead: open.filter((note) => (note.plannedFor ?? '') > today).length,
+    late: done.filter((note) => note.doneOn !== undefined && note.doneOn > factDay(note)).length,
+    waiting: open.filter((note) => factDay(note) < today).length,
+    today: open.filter((note) => factDay(note) === today).length,
+    ahead: open.filter((note) => factDay(note) > today).length,
     mainDays,
     mainDone,
     estimated: estimated.length,

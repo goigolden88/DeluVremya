@@ -6,6 +6,7 @@
 import {
   days,
   daysBetween,
+  formatDate,
   formatDateLong,
   formatMonth,
   formatPeriod,
@@ -18,7 +19,7 @@ import type { Note, NoteKind } from '../../app/model.ts'
 import { quoted } from '../../ui/screenNames.ts'
 import { ageDays, type GoalProgress } from './inbox.ts'
 import type { PlanFact, Repeat } from './period.ts'
-import type { Realism } from './plan.ts'
+import { spanEnd, type Realism } from './plan.ts'
 
 /** Вид записи на переключателе и в карточке (Р-13, Р-31). */
 export const KIND_NAMES: Record<NoteKind, string> = {
@@ -168,16 +169,20 @@ export const ESTIMATE_HINT = 'Оценка — тап по пункту'
  * пунктам из скольких посчитано. Без оценок — так и сказано, а не ноль.
  */
 export function realismText(realism: Realism): string {
+  // Дела на период в сумму не входят — сказано, сколько их (Р-101).
+  const spans =
+    realism.spans > 0 ? `, без ${realism.spans} ${plural(realism.spans, ['дела', 'дел', 'дел'])} на период` : ''
   if (realism.estimated === 0) {
     const none =
       realism.total === 1
         ? 'у пункта нет оценки'
         : `оценки нет ни у одного из ${realism.total} ${plural(realism.total, ['пункта', 'пунктов', 'пунктов'])}`
-    return `Влезает ли в день — не посчитать: ${none}. ${ESTIMATE_HINT}`
+    return `Влезает ли в день — не посчитать: ${none}${spans}. ${ESTIMATE_HINT}`
   }
   const basis =
     `по ${realism.estimated} ${plural(realism.estimated, ['пункту', 'пунктам', 'пунктам'])}` +
-    (realism.estimated < realism.total ? ` из ${realism.total}` : '')
+    (realism.estimated < realism.total ? ` из ${realism.total}` : '') +
+    spans
   const left = realism.left > 0 ? `до конца дня ${durationText(realism.left)}` : 'окно дня закончилось'
   const spare = realism.left - realism.minutes
   const verdict =
@@ -204,9 +209,22 @@ export function overdueLead(count: number): string {
   return `${count} ${plural(count, ['пункт ждёт', 'пункта ждут', 'пунктов ждут'])} решения`
 }
 
+/** Подпись дела на период: «12.10–15.10». Null — дело на один день (Р-101). */
+export function spanText(note: Note): string | null {
+  const to = spanEnd(note)
+  if (to === null || note.plannedFor === null) return null
+  const short = (day: string) => formatDate(day).slice(0, 5)
+  return `${short(note.plannedFor)}–${short(to)}`
+}
+
+/** День пункта в хвосте: «вчера», «12 октября 2026»; у дела на период — период. */
+export function planDayText(note: Note, today: DateStr): string {
+  return spanText(note) ?? dayText(note.plannedFor ?? '', today)
+}
+
 /** Откуда сделанное вне плана: не стояло в плане — или стояло на другой день. */
 export function offPlanMeta(note: Note, today: DateStr): string {
-  return note.plannedFor === null ? 'не было в плане' : `из плана на ${dayText(note.plannedFor, today)}`
+  return note.plannedFor === null ? 'не было в плане' : `из плана на ${planDayText(note, today)}`
 }
 
 /** Отклик после «В план»: куда поставлено. */
