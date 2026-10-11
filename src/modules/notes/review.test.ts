@@ -39,6 +39,7 @@ describe('висяки — Р-46', () => {
     const later = withSomeday(note('01', { plannedFor: TODAY, main: true }))
     expect(later).toMatchObject({ status: 'someday', plannedFor: null })
     expect('main' in later).toBe(false)
+    expect(withSomeday(note('02', { plannedFor: TODAY, plannedTo: '2099-01-01' }))).not.toHaveProperty('plannedTo')
     expect(isUnsorted(later)).toBe(false)
     expect(isUnsorted(fromSomeday(later))).toBe(true)
   })

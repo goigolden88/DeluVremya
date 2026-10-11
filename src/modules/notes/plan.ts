@@ -20,9 +20,55 @@ export function planNote(text: string, today: DateStr, day: DateStr): Note | nul
   return note && { ...note, plannedFor: day }
 }
 
-/** Стоит в плане дня: живая, открытая или сделанная. */
+// ─── Дело на период (Р-101) ────────────────────────────────────────────────
+
+/**
+ * Последний день периода дела. Null — дело на один день: поля нет, или оно
+ * кривое, или не позже дня начала. Такое поле не значит ничего — дело
+ * стоит, как стояло бы без него.
+ */
+export function spanEnd(note: Note): DateStr | null {
+  const { plannedFor: from, plannedTo: to } = note
+  if (to === undefined || from === null || !isDateStr(from) || !isDateStr(to)) return null
+  return to > from ? to : null
+}
+
+/**
+ * Последний день периода — или снять период (`null`). Главным дело
+ * на период не бывает: отметка снимается. День не позже начала — та же
+ * запись: один день — обычное дело.
+ */
+export function withSpan(note: Note, to: DateStr | null): Note {
+  if (to === null) {
+    if (!('plannedTo' in note)) return note
+    const { plannedTo: _plannedTo, ...rest } = note
+    return rest
+  }
+  if (spanEnd({ ...note, plannedTo: to }) === null) return note
+  return { ...withoutMain(note), plannedTo: to }
+}
+
+/**
+ * В какой день сделанное дело на период стоит в плане: в день выполнения,
+ * а раньше начала или позже конца — в крайний день периода. В следующих
+ * днях периода его нет.
+ */
+function doneDay(note: Note, from: DateStr, to: DateStr): DateStr {
+  const day = note.doneOn !== undefined && isDateStr(note.doneOn) ? note.doneOn : from
+  return day < from ? from : day > to ? to : day
+}
+
+/**
+ * Стоит в плане дня: живая, открытая или сделанная. Дело на период —
+ * в каждом дне периода, пока открыто; сделанное — в день выполнения.
+ */
 function isPlannedOn(note: Note, day: DateStr): boolean {
-  return !note.deleted && note.plannedFor === day && (note.status === 'open' || note.status === 'done')
+  if (note.deleted || (note.status !== 'open' && note.status !== 'done')) return false
+  const to = spanEnd(note)
+  const from = note.plannedFor
+  if (to === null || from === null) return from === day
+  if (note.status === 'open') return day >= from && day <= to
+  return doneDay(note, from, to) === day
 }
 
 /** Порядок пунктов — порядок добавления: ULID сортируется по времени создания. */
@@ -43,12 +89,13 @@ function byPlace(a: Note, b: Note): number {
 /**
  * Главное дело среди пунктов дня. Слот один (Р-07); если после обмена
  * устройств отмечено два — позднее по времени правки, при равенстве —
- * по id: на обоих устройствах ответ один (Р-40).
+ * по id: на обоих устройствах ответ один (Р-40). Дело на период главным
+ * не бывает (Р-101), даже если отметку поставила старая сборка.
  */
 export function mainOf(items: readonly Note[]): Note | null {
   let found: Note | null = null
   for (const item of items) {
-    if (!item.main) continue
+    if (!item.main || spanEnd(item) !== null) continue
     if (
       found === null ||
       item.updatedAt > found.updatedAt ||
@@ -94,9 +141,10 @@ export function withoutMain(note: Note): Note {
 /**
  * Поставить на день или вернуть в неразобранное (`null`). Отметка главного
  * и место в дне снимаются: и то и другое выбирается на свой день (Р-34, Р-75).
+ * Период снимается так же — дело снова на один день (Р-101).
  */
 export function withPlan(note: Note, day: DateStr | null): Note {
-  const { order: _order, ...rest } = withoutMain(note)
+  const { order: _order, ...rest } = withSpan(withoutMain(note), null)
   return { ...rest, plannedFor: day }
 }
 
@@ -160,7 +208,8 @@ export function readEstimate(input: string): { minutes: number | null } | { erro
 /**
  * Хвост прошлых дней (Р-34): открытые пункты, чей день прошёл. Ждут решения,
  * сколько бы дней ни прошло. Старые сверху — ждут дольше. Кривая дата плана —
- * тоже здесь: ни в плане, ни в неразобранном её не было бы вовсе.
+ * тоже здесь: ни в плане, ни в неразобранном её не было бы вовсе. Дело
+ * на период — когда прошёл его последний день (Р-101).
  */
 export function overdue(notes: readonly Note[], today: DateStr): Note[] {
   return notes
@@ -169,7 +218,7 @@ export function overdue(notes: readonly Note[], today: DateStr): Note[] {
         !note.deleted &&
         note.status === 'open' &&
         note.plannedFor !== null &&
-        (!isDateStr(note.plannedFor) || note.plannedFor < today),
+        (!isDateStr(note.plannedFor) || (spanEnd(note) ?? note.plannedFor) < today),
     )
     .sort((a, b) => (a.plannedFor ?? '').localeCompare(b.plannedFor ?? '') || byPlace(a, b))
 }
@@ -205,7 +254,7 @@ export function ahead(notes: readonly Note[], today: DateStr): DayGroup[] {
  */
 export function doneOffPlan(notes: readonly Note[], today: DateStr): Note[] {
   return notes
-    .filter((note) => !note.deleted && note.status === 'done' && note.doneOn === today && note.plannedFor !== today)
+    .filter((note) => !note.deleted && note.status === 'done' && note.doneOn === today && !isPlannedOn(note, today))
     .sort(byId)
 }
 
@@ -221,18 +270,26 @@ export type PlanLoad = {
   minutes: number
   /** У скольких открытых пунктов оценка есть. */
   estimated: number
-  /** Сколько открытых пунктов всего. */
+  /** Сколько открытых пунктов всего — без дел на период. */
   total: number
+  /** Сколько открытых дел на период: их оценка в сумму не входит (Р-101). */
+  spans: number
 }
 
-/** Сумма оценок открытых пунктов — с основанием: по скольким из скольких. */
+/**
+ * Сумма оценок открытых пунктов — с основанием: по скольким из скольких.
+ * Дело на период не делается за один день: его оценка не в счёте, но число
+ * таких дел названо (Р-101).
+ */
 export function planLoad(items: readonly Note[]): PlanLoad {
   const open = items.filter((item) => item.status === 'open')
-  const estimated = open.filter((item) => item.estMin !== undefined)
+  const single = open.filter((item) => spanEnd(item) === null)
+  const estimated = single.filter((item) => item.estMin !== undefined)
   return {
     minutes: estimated.reduce((sum, item) => sum + (item.estMin ?? 0), 0),
     estimated: estimated.length,
-    total: open.length,
+    total: single.length,
+    spans: open.length - single.length,
   }
 }
 

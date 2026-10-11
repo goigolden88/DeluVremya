@@ -34,7 +34,9 @@ describe('заметки в ленте — Р-59', () => {
       note('later', { status: 'someday' }),
       note('goal', { kind: 'goal', status: 'done', doneOn: '2026-09-13' }),
       note('thought', { kind: 'thought' }),
+      note('span', { plannedFor: '2026-10-12', plannedTo: '2026-10-15' }),
     ])
+    expect(row(items, 'span')?.detail).toBe('дело · в плане на 12.10–15.10')
     expect(row(items, 'open')?.detail).toBe('дело')
     expect(row(items, 'done')?.detail).toBe('дело · сделано 14.09')
     expect(row(items, 'plan')?.detail).toBe('дело · в плане на 15.09 · главное')

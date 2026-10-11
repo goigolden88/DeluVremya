@@ -8,7 +8,7 @@
 import { addDays, daysBetween, inPeriod, isDateStr, weekPeriod, type DateStr, type Period } from '../../shared/core/dates.ts'
 import type { Note } from '../../app/model.ts'
 import { ageDays, compareNotes, goalsOf, isUnsorted, tasksOfGoal } from './inbox.ts'
-import { withoutMain } from './plan.ts'
+import { withoutMain, withSpan } from './plan.ts'
 
 // ─── Пороги (Р-48) ─────────────────────────────────────────────────────────
 
@@ -36,9 +36,9 @@ export function staleTasks(notes: readonly Note[], today: DateStr, days: number)
     .sort((a, b) => (a.capturedOn ?? '').localeCompare(b.capturedOn ?? '') || a.id.localeCompare(b.id))
 }
 
-/** «Когда-нибудь»: из неразобранного и из плана уходит, отметка главного снимается. */
+/** «Когда-нибудь»: из неразобранного и из плана уходит, отметка главного и период снимаются. */
 export function withSomeday(note: Note): Note {
-  return { ...withoutMain(note), plannedFor: null, status: 'someday' }
+  return { ...withSpan(withoutMain(note), null), plannedFor: null, status: 'someday' }
 }
 
 /** «Вернуть» — обратно в неразобранное. */

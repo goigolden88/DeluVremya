@@ -182,6 +182,17 @@ describe('план и факт — счёты без текстов (Я-14 «Fam
     ])
   })
 
+  it('дело на период — один пункт в неделе своего последнего дня (Р-101)', () => {
+    // С пятницы прошлой недели по вторник этой: в прошлой неделе его нет.
+    const span = data({ notes: [item('n1', 'Ремонт', '2026-09-18', { plannedTo: '2026-09-22' })] })
+    const result = sliced(span, MONDAY)
+    expect(metrics(result.periods[0]).filter((metric) => metric.key.startsWith('plan.')).map((m) => m.key)).toEqual([
+      'plan.planned',
+    ])
+    expect(byKey(result.periods[0])['plan.planned']?.value).toEqual({ n: 0, unit: 'count' })
+    expect(byKey(result.periods[1])['plan.planned']?.value).toEqual({ n: 1, unit: 'count' })
+  })
+
   it('без главного и без оценок — «не известно» с причиной', () => {
     const plain = data({ notes: [item('n1', 'Дело', '2026-09-14')] })
     const week = byKey(sliced(plain, MONDAY).periods[0])

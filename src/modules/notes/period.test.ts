@@ -102,3 +102,32 @@ describe('план против факта — Р-44', () => {
     expect(planFact([], WEEK, WEDNESDAY)).toMatchObject({ planned: 0, done: 0, mainDays: 0, estimated: 0, repeats: [] })
   })
 })
+
+describe('дело на период в плане против факта — Р-101', () => {
+  const NEXT = { from: '2026-09-14', to: '2026-09-20' }
+
+  it('один пункт — в последний день периода, а не в первый', () => {
+    // Со вторника по понедельник следующей недели: в этой неделе его нет.
+    const span = note('01', { plannedFor: '2026-09-08', plannedTo: '2026-09-14' })
+    expect(plannedIn([span], WEEK)).toEqual([])
+    expect(ids(plannedIn([span], NEXT))).toEqual(['01'])
+    expect(planFact([span], NEXT, WEDNESDAY)).toMatchObject({ planned: 1, ahead: 1 })
+  })
+
+  it('сделано внутри периода — в срок; открыто, пока период идёт, — впереди', () => {
+    const fact = planFact(
+      [
+        note('01', { plannedFor: '2026-09-07', plannedTo: '2026-09-10', status: 'done', doneOn: WEDNESDAY }),
+        note('02', { plannedFor: '2026-09-08', plannedTo: '2026-09-10' }),
+        note('03', { plannedFor: '2026-09-07', plannedTo: '2026-09-08' }),
+      ],
+      WEEK,
+      WEDNESDAY,
+    )
+    expect(fact).toMatchObject({ planned: 3, done: 1, late: 0, waiting: 1, today: 0, ahead: 1 })
+  })
+
+  it('кривое поле — пункт днём плана, как однодневный', () => {
+    expect(ids(plannedIn([note('01', { plannedTo: '2026-09-01' })], WEEK))).toEqual(['01'])
+  })
+})
