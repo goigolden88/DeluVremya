@@ -2,15 +2,18 @@ import { describe, expect, it } from 'vitest'
 import type { Note } from '../../app/model.ts'
 import { notesLink } from './feed.ts'
 import {
+  attachable,
+  attachDetail,
   captureForGoal,
   entryDetail,
+  findAttachable,
   findGoal,
   goalEntries,
   goalLink,
   goalTitle,
   goalVision,
 } from './goal.ts'
-import { goalIdOf, groupByMonth, isUnsorted, noteRef } from './inbox.ts'
+import { goalIdOf, groupByMonth, isUnsorted, noteRef, queryWords, withGoal } from './inbox.ts'
 
 function note(id: string, over: Partial<Note> = {}): Note {
   return {
@@ -90,5 +93,57 @@ describe('экран замысла — Р-103', () => {
     expect(goalIdOf(thought)).toBe('g')
     expect(goalEntries('g', [goal, thought]).map((each) => each.id)).toEqual([thought.id])
     expect(captureForGoal('   ', '2026-10-11', 'task', 'g')).toBeNull()
+  })
+})
+
+describe('«Прикрепить» и «Открепить» — задача #66', () => {
+  const other = note('o', { kind: 'goal', text: 'Байкал\nЛетом' })
+  const elsewhere = note('elsewhere', { refs: [noteRef('o')], text: 'Билеты' })
+  const notes = [
+    goal,
+    other,
+    of('mine'),
+    note('free', { capturedOn: '2026-09-01' }),
+    note('thought', { kind: 'thought', capturedOn: '2026-10-11' }),
+    note('planned', { plannedFor: '2026-10-15' }),
+    elsewhere,
+    note('done', { status: 'done', doneOn: '2026-10-11' }),
+    note('dropped', { status: 'dropped' }),
+    note('gone', { deleted: true }),
+  ]
+
+  it('в выборе — открытые дела и мысли, кроме уже этого замысла; замыслов нет', () => {
+    expect(attachable('g', notes).map((each) => each.id)).toEqual(['thought', 'planned', 'elsewhere', 'free'])
+  })
+
+  it('все уже здесь — выбирать нечего', () => {
+    expect(attachable('g', [goal, of('a'), of('b', { kind: 'thought' }), note('d', { status: 'done' })])).toEqual([])
+  })
+
+  it('поиск — как на «Заметках», и по названию замысла записи', () => {
+    const candidates = attachable('g', notes)
+    expect(findAttachable(candidates, queryWords('байкал'), notes).map((each) => each.id)).toEqual(['elsewhere'])
+    expect(findAttachable(candidates, queryWords('сентябрь'), notes).map((each) => each.id)).toEqual(['free'])
+    expect(findAttachable(candidates, queryWords('нет такого'), notes)).toEqual([])
+    expect(findAttachable(candidates, [], notes)).toEqual(candidates)
+  })
+
+  it('подпись называет, к какому замыслу запись относится сейчас', () => {
+    expect(attachDetail(elsewhere, notes)).toBe('дело · открыто · сейчас к «Байкал»')
+    expect(attachDetail(note('free'), notes)).toBe('дело · открыто')
+    // Замысел удалён — ссылка молчит (Р-31).
+    expect(attachDetail(elsewhere, [goal, elsewhere])).toBe('дело · открыто')
+  })
+
+  it('прикреплённая — в ленте и уходит из другого замысла; откреплённая — без замысла', () => {
+    const moved = withGoal(elsewhere, 'g')
+    expect(goalIdOf(moved)).toBe('g')
+    expect(goalEntries('g', [goal, other, moved]).map((each) => each.id)).toEqual(['elsewhere'])
+    expect(goalEntries('o', [goal, other, moved])).toEqual([])
+    expect(attachable('g', [goal, moved])).toEqual([])
+    const detached = withGoal(moved, null)
+    expect(goalIdOf(detached)).toBeNull()
+    expect(detached.refs).toBeUndefined()
+    expect(attachable('g', [goal, detached]).map((each) => each.id)).toEqual(['elsewhere'])
   })
 })

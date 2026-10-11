@@ -4,8 +4,18 @@ import { feedDateText } from '../shared/core/feed.ts'
 import { db } from '../app/core.ts'
 import type { Note, NoteKind } from '../app/model.ts'
 import { notesLink } from '../modules/notes/feed.ts'
-import { captureForGoal, entryDetail, findGoal, goalEntries, goalTitle, goalVision } from '../modules/notes/goal.ts'
-import { goalProgress, groupByMonth, markDone, reopen, withText } from '../modules/notes/inbox.ts'
+import {
+  attachable,
+  attachDetail,
+  captureForGoal,
+  entryDetail,
+  findAttachable,
+  findGoal,
+  goalEntries,
+  goalTitle,
+  goalVision,
+} from '../modules/notes/goal.ts'
+import { goalProgress, groupByMonth, markDone, queryWords, reopen, withGoal, withText } from '../modules/notes/inbox.ts'
 import { DONE_LABELS, doneLine, firstLine, KIND_NAMES, monthHeading, progressText, savedLine } from '../modules/notes/labels.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../shared/ui/Fold.tsx'
@@ -22,7 +32,8 @@ const ADD_KINDS: readonly NoteKind[] = ['task', 'thought']
 /**
  * Экран замысла `#/goal/<id>` (Р-103): сверху название и видение, ниже —
  * его дела и мысли по дням записи, свежие сверху. Отсюда же — новое дело
- * или мысль, сразу к замыслу.
+ * или мысль, сразу к замыслу; уже записанные — «Прикрепить» с поиском,
+ * обратно — «Открепить» в строке ленты.
  *
  * Список замыслов — по-прежнему блок на «Заметках»; вход сюда — «Открыть
  * замысел» в карточке и «замыслы без движения» обзора недели. Правка текста
@@ -34,6 +45,9 @@ export function Goal() {
   const names = useScreenNames()
   const today = useToday()
   const [adding, setAdding] = useState<NoteKind | null>(null)
+  /** Открыт выбор «Прикрепить» и что в его поиске. */
+  const [picking, setPicking] = useState(false)
+  const [query, setQuery] = useState('')
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState('')
@@ -85,6 +99,22 @@ export function Goal() {
     }
   }
 
+  /** Прикрепить — или открепить (`null`): связь та же строка в `refs` (Р-31). */
+  async function relink(note: Note, to: string | null) {
+    setSaved('')
+    setError('')
+    try {
+      await db.put('notes', withGoal(note, to))
+      if (to !== null) {
+        setPicking(false)
+        setQuery('')
+        setSaved(`Прикреплено: ${KIND_NAMES[note.kind].toLowerCase()}`)
+      }
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
   async function finish(note: Note) {
     setError('')
     try {
@@ -133,7 +163,19 @@ export function Goal() {
       <section className="block">
         <h2>Дела и мысли</h2>
 
-        {adding === null ? (
+        {picking ? (
+          <AttachPicker
+            goalId={goalId}
+            all={all}
+            query={query}
+            onQuery={setQuery}
+            onPick={(note) => void relink(note, goalId)}
+            onClose={() => {
+              setPicking(false)
+              setQuery('')
+            }}
+          />
+        ) : adding === null ? (
           <div className="row row--wrap">
             {ADD_KINDS.map((kind) => (
               <button
@@ -148,6 +190,16 @@ export function Goal() {
                 Добавить {KIND_NAMES[kind].toLowerCase()}
               </button>
             ))}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setPicking(true)
+                setSaved('')
+              }}
+            >
+              Прикрепить
+            </button>
           </div>
         ) : (
           <form
@@ -195,7 +247,7 @@ export function Goal() {
               </h3>
               <ul className="feed">
                 {group.notes.map((note) => (
-                  <GoalEntry key={note.id} note={note} />
+                  <GoalEntry key={note.id} note={note} onDetach={() => void relink(note, null)} />
                 ))}
               </ul>
             </div>
@@ -209,8 +261,9 @@ export function Goal() {
 /**
  * Строка ленты замысла. Неразобранное ведёт на «Заметки» к своей карточке
  * (Р-59); дело в плане и сделанное там не лежат — строка без перехода.
+ * Рядом — «Открепить»: запись остаётся в заметках, но без замысла.
  */
-function GoalEntry({ note }: { note: Note }) {
+function GoalEntry({ note, onDetach }: { note: Note; onDetach: () => void }) {
   const link = notesLink(note)
   const row = (
     <>
@@ -227,7 +280,7 @@ function GoalEntry({ note }: { note: Note }) {
     </>
   )
   return (
-    <li>
+    <li className="goal-entry">
       {link ? (
         <Link className="feed__row" to={link}>
           {row}
@@ -235,7 +288,76 @@ function GoalEntry({ note }: { note: Note }) {
       ) : (
         <div className="feed__row">{row}</div>
       )}
+      <button type="button" className="link-btn" onClick={onDetach}>
+        Открепить
+      </button>
     </li>
+  )
+}
+
+/**
+ * Выбор «Прикрепить»: открытые дела и мысли, кроме уже этого замысла, с поиском
+ * как на «Заметках». У записи другого замысла — к какому она сейчас: выбор
+ * её переведёт (Р-31, Р-102).
+ */
+function AttachPicker({
+  goalId,
+  all,
+  query,
+  onQuery,
+  onPick,
+  onClose,
+}: {
+  goalId: string
+  all: readonly Note[]
+  query: string
+  onQuery: (query: string) => void
+  onPick: (note: Note) => void
+  onClose: () => void
+}) {
+  const candidates = attachable(goalId, all)
+  const shown = findAttachable(candidates, queryWords(query), all)
+
+  return (
+    <div className="form">
+      {candidates.length === 0 ? (
+        <p className="muted">Нечего прикрепить: все дела и мысли уже здесь</p>
+      ) : (
+        <>
+          <input
+            type="search"
+            name="attach-search"
+            className="search"
+            autoFocus
+            value={query}
+            placeholder="Поиск: слова в любом порядке, «март», 12.03.2026"
+            onChange={(event) => onQuery(event.target.value)}
+          />
+          {shown.length === 0 ? (
+            <p className="muted">Ничего не нашлось</p>
+          ) : (
+            <ul className="feed">
+              {shown.map((note) => (
+                <li key={note.id}>
+                  <button type="button" className="feed__row feed__pick" onClick={() => onPick(note)}>
+                    <span className="feed__date">{feedDateText(note.capturedOn ?? '')}</span>
+                    <span className="feed__main">
+                      <span className="feed__title">{firstLine(note.text)}</span>
+                      <span className="feed__detail muted">{attachDetail(note, all)}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      <div className="form__actions">
+        <button type="button" className="btn" onClick={onClose}>
+          Отмена
+        </button>
+      </div>
+    </div>
   )
 }
 
