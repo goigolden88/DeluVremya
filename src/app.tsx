@@ -7,6 +7,7 @@ import { Layout, type Tab } from './shared/ui/Layout.tsx'
 import { useScreenNames } from './ui/useScreenNames.ts'
 import { Today } from './screens/Today.tsx'
 import { Feed } from './screens/Feed.tsx'
+import { Goal } from './screens/Goal.tsx'
 import { Help } from './screens/Help.tsx'
 import { Inbox } from './screens/Inbox.tsx'
 import { Month } from './screens/Month.tsx'
@@ -43,6 +44,8 @@ export function App() {
           <Route path="/" element={<Shell />}>
             <Route index element={<Today />} />
             <Route path="inbox" element={<Inbox />} />
+            {/* Экран замысла (Р-103): не вкладка — список замыслов блоком на «Заметках». */}
+            <Route path="goal/:id" element={<Goal />} />
             <Route path="settings" element={<Settings />} />
             {/* Цель ярлыка «Учесть время» (`?go=time`, Р-16): адрес не меняется. */}
             <Route path="time" element={<TimeScreen />} />

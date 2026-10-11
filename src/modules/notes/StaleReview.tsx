@@ -16,6 +16,7 @@ import {
   stuckLead,
   stuckMeta,
 } from './labels.ts'
+import { goalLink } from './goal.ts'
 import { withPlan } from './plan.ts'
 import { STALE_BATCH, staleTasks, stuckGoals, withSomeday } from './review.ts'
 import { useNotes } from './useNotes.ts'
@@ -143,7 +144,7 @@ export function StaleReview({ today, staleDays, goalDays }: { today: DateStr; st
           <ul className="plain">
             {stuck.map(({ goal, since }) => (
               <li key={goal.id}>
-                <Link to="/inbox">{firstLine(goal.text)}</Link> <span className="muted">— {stuckMeta(since)}</span>
+                <Link to={goalLink(goal.id)}>{firstLine(goal.text)}</Link> <span className="muted">— {stuckMeta(since)}</span>
               </li>
             ))}
           </ul>

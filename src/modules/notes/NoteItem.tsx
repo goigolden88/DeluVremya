@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { DateStr } from '../../shared/core/dates.ts'
 import { db } from '../../app/core.ts'
 import type { Note } from '../../app/model.ts'
 import { goalOf, goalProgress, linksOf, NOTE_KINDS, tasksOfGoal, withGoal, withKind, withText } from './inbox.ts'
 import { ageText, deleteConfirm, DONE_LABELS, firstLine, goalLine, KIND_NAMES, progressText } from './labels.ts'
+import { goalLink } from './goal.ts'
 import { PlanButtons } from './PlanItem.tsx'
 
 function describe(error: unknown): string {
@@ -165,7 +167,17 @@ function NoteCard({
         </label>
       )}
 
-      {note.kind === 'goal' && <GoalTasks goal={note} notes={notes} />}
+      {note.kind === 'goal' && (
+        <>
+          <GoalTasks goal={note} notes={notes} />
+          {/* Видение, дела и мысли по датам, «Добавить» — на экране замысла (Р-103). */}
+          <div className="row row--wrap">
+            <Link className="btn" to={goalLink(note.id)}>
+              Открыть замысел
+            </Link>
+          </div>
+        </>
+      )}
 
       {/* В план — только дело: мысль и замысел на день не ставятся. */}
       {note.kind === 'task' && note.status === 'open' && (
