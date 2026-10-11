@@ -19,6 +19,8 @@ import {
   noteRef,
   queryWords,
   reopen,
+  tasksOfGoal,
+  thoughtsOfGoal,
   withGoal,
   withKind,
   withText,
@@ -211,10 +213,13 @@ describe('правки из карточки — Р-30', () => {
     expect(withKind(one, 'task')).toBe(one)
   })
 
-  it('перестав быть делом, запись теряет замысел, но не чужие связи — Р-31', () => {
+  it('дело ↔ мысль замысел сохраняет; став замыслом, запись его теряет, но не чужие связи — Р-102', () => {
     const task = note('01A', { refs: ['dnevniki:x', noteRef('01G')] })
-    expect(withKind(task, 'thought').refs).toEqual(['dnevniki:x'])
-    expect(withKind(note('01B', { refs: [noteRef('01G')] }), 'goal').refs).toBeUndefined()
+    const thought = withKind(task, 'thought')
+    expect(thought.refs).toEqual(['dnevniki:x', 'note:01G'])
+    expect(withKind(thought, 'task').refs).toEqual(['dnevniki:x', 'note:01G'])
+    expect(withKind(task, 'goal').refs).toEqual(['dnevniki:x'])
+    expect(withKind(note('01B', { kind: 'thought', refs: [noteRef('01G')] }), 'goal').refs).toBeUndefined()
   })
 
   it('«Сделано» ставит день, «Отменить» возвращает как было', () => {
@@ -249,7 +254,7 @@ describe('замысел и его дела — Р-31', () => {
     expect(goalOf(note('01B'), [goal])).toBeNull()
   })
 
-  it('сколько дел и сколько сделано: удалённые, отброшенные и мысли не в счёт', () => {
+  it('сколько дел, сколько сделано и сколько мыслей: удалённые и отброшенные не в счёт', () => {
     const notes = [
       goal,
       withGoal(note('01A'), '01G'),
@@ -257,8 +262,17 @@ describe('замысел и его дела — Р-31', () => {
       withGoal(note('01C', { status: 'dropped' }), '01G'),
       withGoal(note('01D', { deleted: true }), '01G'),
       withGoal(note('01E', { kind: 'thought' }), '01G'),
+      withGoal(note('01H', { kind: 'thought', deleted: true }), '01G'),
       withGoal(note('01F'), '01X'),
     ]
-    expect(goalProgress('01G', notes)).toEqual({ total: 2, done: 1 })
+    expect(goalProgress('01G', notes)).toEqual({ total: 2, done: 1, thoughts: 1 })
+    expect(tasksOfGoal('01G', notes).map((each) => each.id)).toEqual(['01B', '01A'])
+    expect(thoughtsOfGoal('01G', notes).map((each) => each.id)).toEqual(['01E'])
+  })
+
+  it('мысль относится к замыслу так же, как дело — Р-102', () => {
+    const thought = withGoal(note('01M', { kind: 'thought' }), '01G')
+    expect(goalOf(thought, [goal, thought])?.text).toBe('Выучить испанский')
+    expect(matchesQuery(thought, ['испанский'], goalOf(thought, [goal, thought])?.text)).toBe(true)
   })
 })

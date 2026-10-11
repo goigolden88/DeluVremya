@@ -120,9 +120,11 @@ describe('числа с основанием', () => {
     expect(shownText(3, 12)).toBe('Показано 3 из 12')
   })
 
-  it('дела замысла — сколько и сколько сделано', () => {
-    expect(progressText({ total: 0, done: 0 })).toBe('дел пока нет')
-    expect(progressText({ total: 3, done: 1 })).toBe('3 дела, сделано 1')
+  it('дела замысла — сколько и сколько сделано; мысли — если есть (Р-102)', () => {
+    expect(progressText({ total: 0, done: 0, thoughts: 0 })).toBe('дел пока нет')
+    expect(progressText({ total: 3, done: 1, thoughts: 0 })).toBe('3 дела, сделано 1')
+    expect(progressText({ total: 3, done: 1, thoughts: 2 })).toBe('3 дела, сделано 1 · мыслей 2')
+    expect(progressText({ total: 0, done: 0, thoughts: 1 })).toBe('дел пока нет · мыслей 1')
   })
 })
 

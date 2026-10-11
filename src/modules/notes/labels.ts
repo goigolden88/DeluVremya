@@ -87,10 +87,14 @@ export function monthHeading(month: string | null): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-/** Дела замысла — число с основанием: «3 дела, сделано 1». */
+/**
+ * Дела замысла — число с основанием: «3 дела, сделано 1»; есть мысли —
+ * «… · мыслей 2» (Р-102). Мыслей нет — части о них нет.
+ */
 export function progressText(progress: GoalProgress): string {
-  if (progress.total === 0) return 'дел пока нет'
-  return `${counted(progress.total, ['дело', 'дела', 'дел'])}, сделано ${progress.done}`
+  const tasks =
+    progress.total === 0 ? 'дел пока нет' : `${counted(progress.total, ['дело', 'дела', 'дел'])}, сделано ${progress.done}`
+  return progress.thoughts > 0 ? `${tasks} · мыслей ${progress.thoughts}` : tasks
 }
 
 /** Отклик после записи. */
@@ -128,7 +132,7 @@ export function firstLine(text: string): string {
   return text.split('\n')[0] ?? ''
 }
 
-/** Подпись дела со ссылкой на замысел. */
+/** Подпись дела или мысли со ссылкой на замысел. */
 export function goalLine(goal: Note): string {
   return `к замыслу «${firstLine(goal.text)}»`
 }

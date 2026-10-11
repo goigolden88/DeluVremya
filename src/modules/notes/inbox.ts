@@ -151,11 +151,14 @@ export function withText(note: Note, text: string): Note | null {
   return trimmed === note.text ? note : { ...note, text: trimmed }
 }
 
-/** Смена вида. Переставая быть делом, запись теряет ссылку на замысел: она про дело (Р-31). */
+/**
+ * Смена вида. Дело и мысль замысел сохраняют; став замыслом, запись теряет
+ * ссылку: замысел к замыслу не относится (Р-31, уточнено Р-102).
+ */
 export function withKind(note: Note, kind: NoteKind): Note {
   if (note.kind === kind) return note
   const next = { ...note, kind }
-  return kind === 'task' ? next : withGoal(next, null)
+  return kind === 'goal' ? withGoal(next, null) : next
 }
 
 /** Сделано — или замысел достигнут: из неразобранного и из блока замыслов уходит. */
@@ -178,7 +181,7 @@ export function noteRef(id: string): string {
   return `${NOTE_REF}${id}`
 }
 
-/** id замысла, к которому относится дело. Null — ни к какому. */
+/** id замысла, к которому относится дело или мысль (Р-102). Null — ни к какому. */
 export function goalIdOf(note: Note): string | null {
   const ref = note.refs?.find((each) => each.startsWith(NOTE_REF))
   return ref === undefined ? null : ref.slice(NOTE_REF.length)
@@ -197,7 +200,7 @@ export function withGoal(note: Note, goalId: string | null): Note {
 }
 
 /**
- * Замысел дела — живая запись вида «замысел». Удалённый или переделанный
+ * Замысел дела или мысли — живая запись вида «замысел». Удалённый или переделанный
  * в другой вид не показывается: ссылка просто молчит (Р-31).
  */
 export function goalOf(note: Note, notes: readonly Note[]): Note | null {
@@ -206,17 +209,31 @@ export function goalOf(note: Note, notes: readonly Note[]): Note | null {
   return notes.find((each) => each.id === id && !each.deleted && each.kind === 'goal') ?? null
 }
 
-/** Дела замысла: живые, не отброшенные, в порядке экрана. */
-export function tasksOfGoal(goalId: string, notes: readonly Note[]): Note[] {
+/** Записи замысла одного вида: живые, не отброшенные, в порядке экрана. */
+function ofGoal(goalId: string, kind: NoteKind, notes: readonly Note[]): Note[] {
   return notes
-    .filter((note) => !note.deleted && note.kind === 'task' && note.status !== 'dropped' && goalIdOf(note) === goalId)
+    .filter((note) => !note.deleted && note.kind === kind && note.status !== 'dropped' && goalIdOf(note) === goalId)
     .sort(compareNotes)
 }
 
-export type GoalProgress = { total: number; done: number }
+/** Дела замысла. */
+export function tasksOfGoal(goalId: string, notes: readonly Note[]): Note[] {
+  return ofGoal(goalId, 'task', notes)
+}
 
-/** Сколько дел у замысла и сколько из них сделано — число с основанием. */
+/** Мысли о замысле (Р-102). */
+export function thoughtsOfGoal(goalId: string, notes: readonly Note[]): Note[] {
+  return ofGoal(goalId, 'thought', notes)
+}
+
+export type GoalProgress = { total: number; done: number; thoughts: number }
+
+/** Сколько дел у замысла, сколько из них сделано и сколько мыслей — число с основанием. */
 export function goalProgress(goalId: string, notes: readonly Note[]): GoalProgress {
   const tasks = tasksOfGoal(goalId, notes)
-  return { total: tasks.length, done: tasks.filter((task) => task.status === 'done').length }
+  return {
+    total: tasks.length,
+    done: tasks.filter((task) => task.status === 'done').length,
+    thoughts: thoughtsOfGoal(goalId, notes).length,
+  }
 }

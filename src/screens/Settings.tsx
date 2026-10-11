@@ -607,7 +607,7 @@ function ReviewSection() {
             />
           </label>
           <label className="field">
-            <span>Замысел без движения — ни одного дела столько дней</span>
+            <span>Замысел без движения — ни дел, ни мыслей столько дней</span>
             <input
               name="review-goal"
               inputMode="numeric"
