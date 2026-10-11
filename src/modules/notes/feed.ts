@@ -22,8 +22,11 @@ type DayFormat = (day: string) => string
 const shortDay: DayFormat = (day) => (isDateStr(day) ? formatDate(day).slice(0, 5) : day)
 const fullDay: DayFormat = (day) => (isDateStr(day) ? formatDate(day) : day)
 
-/** Вид и состояние: «дело · сделано 14.09», «дело · в плане на 15.09 · главное», «мысль». */
-function stateParts(note: Note, day: DayFormat): string[] {
+/**
+ * Вид и состояние: «дело · сделано 14.09», «дело · в плане на 15.09 · главное», «мысль».
+ * Дни — `14.09`, если `day` не задан; так же — в ленте замысла.
+ */
+export function stateParts(note: Note, day: DayFormat = shortDay): string[] {
   const parts = [KIND_NAMES[note.kind].toLowerCase()]
   if (note.status === 'done') {
     const word = note.kind === 'goal' ? 'достигнут' : 'сделано'
@@ -46,11 +49,17 @@ function opensOnNotes(note: Note): boolean {
   return isUnsorted(note) || (note.kind === 'goal' && note.status === 'open')
 }
 
+/** Переход к карточке записи на «Заметках» — из ленты и с экрана замысла. Null — её там нет. */
+export function notesLink(note: Note): string | null {
+  return opensOnNotes(note) ? `/inbox?open=${encodeURIComponent(note.id)}` : null
+}
+
 export function noteFeed(notes: readonly Note[]): FeedItem[] {
   return notes
     .filter((note) => !note.deleted)
     .map((note): FeedItem => {
       const goal = goalOf(note, notes)
+      const link = notesLink(note)
       // Весь текст, замысел и дни плана и выполнения ищутся, но в строке их нет.
       const extra = [
         note.text,
@@ -67,7 +76,7 @@ export function noteFeed(notes: readonly Note[]): FeedItem[] {
         title: firstLine(note.text),
         detail: [...stateParts(note, shortDay), ...(goal ? [goalLine(goal)] : [])].join(' · '),
         extra,
-        ...(opensOnNotes(note) ? { link: `/inbox?open=${encodeURIComponent(note.id)}` } : {}),
+        ...(link !== null ? { link } : {}),
       }
     })
 }
