@@ -1,9 +1,9 @@
 /**
  * Ядро «Делу Время» — собранное по его конфигу (Р-83).
  *
- * Код приложения берёт `db`, `sync`, `layout` и `importing` отсюда. К хранилищу
- * обращаются только через этот `db`: напрямую в IndexedDB не ходит никто,
- * кроме `shared/core/db.ts`. Общий интерфейс ядра получает те же объекты
+ * Код приложения берёт `db`, `sync`, `layout` и `importing` отсюда; `sync`
+ * в демо нет. К хранилищу обращаются только через этот `db`: напрямую
+ * в IndexedDB не ходит никто, кроме `shared/core/db.ts`. Общий интерфейс ядра получает те же объекты
  * контекстом — `<CoreProvider>` в `app.tsx` (Я-03 «FamilyCore»).
  */
 
@@ -14,6 +14,8 @@ import { createSync } from '../shared/core/sync.ts'
 import { config } from './config.ts'
 
 export const db = createDb(config)
-export const sync = createSync(config, db)
+// В демо синхронизации нет (Я-44 «FamilyCore»): база выдуманная, и `createSync`
+// на ней падает — чтобы ни одна запись демо не уехала в `DeluVremyaData`.
+export const sync = db.demo ? undefined : createSync(config, db)
 export const layout = createLayout(config)
 export const importing = createImporting(config)

@@ -15,6 +15,7 @@ import { SpecialToday } from '../modules/time/Special.tsx'
 import { TimeDay } from '../modules/time/TimeDay.tsx'
 import { ReviewCall } from './Review.tsx'
 import { useFirstRun } from '../shared/screens/useFirstRun.ts'
+import { DemoOffer } from '../shared/ui/Demo.tsx'
 import { useWhatsNew } from '../shared/screens/useWhatsNew.ts'
 import { Welcome } from './Welcome.tsx'
 import { WhatsNew } from '../shared/screens/WhatsNew.tsx'
@@ -64,7 +65,9 @@ export function Today() {
       {/* Сегодня особый день — плашкой; отмечают на «Учёте» (Р-91). */}
       <SpecialToday day={day} />
 
-      {/* Первый запуск: пока база пуста и приветствие не закрыли. */}
+      {/* Первый запуск: демо — один раз и только устройству без токена «семья»
+          (Я-45 «FamilyCore»), затем приветствие, пока база пуста и его не закрыли. */}
+      <DemoOffer own={OWN_STORES} />
       {first.welcome && <Welcome onDone={first.dismissWelcome} />}
 
       {/* После обновления — что поменялось (Р-65). Свежей установке — ничего. */}

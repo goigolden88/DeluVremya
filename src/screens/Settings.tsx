@@ -11,6 +11,7 @@ import type { SyncedStore } from '../app/model.ts'
 import { reminders } from '../notify.ts'
 import type { ReminderStatus, ReminderWindow, RemindResult, Wake } from '../shared/notify.ts'
 import { backupNote, backupSummary } from '../shared/ui/backup.ts'
+import { DemoSettings } from '../shared/ui/Demo.tsx'
 import { Fold } from '../shared/ui/Fold.tsx'
 import { InstallNote } from '../shared/ui/Install.tsx'
 import { ReportBug } from '../shared/ui/Report.tsx'
@@ -114,6 +115,9 @@ export function Settings() {
           </span>
         </Link>
       </section>
+
+      {/* Демо-данные (Я-44 «FamilyCore»): вход в любой момент, в демо — выход. */}
+      <DemoSettings />
 
       <About state={state} />
     </>
