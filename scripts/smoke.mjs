@@ -557,7 +557,11 @@ const CORS = [
  * Перехваченный запрос. Отвечает всегда: запрос без ответа повис бы,
  * и прогон ждал бы его молча.
  */
+/** Сколько запросов к GitHub перехвачено: демо не должно сделать ни одного (Я-44 «FamilyCore»). */
+let githubHits = 0
+
 async function onGitHub({ requestId, request }) {
+  githubHits++
   debug(`перехвачен ${request.method} ${request.url}`)
   if (github.down) {
     await send('Fetch.failRequest', { requestId, errorReason: 'InternetDisconnected' })
@@ -680,10 +684,19 @@ async function scenario() {
     has(start, 'справка') && !has(start, 'появится следующими'),
     line(start, 'Обзор недели'),
   )
+  check(
+    'на пустой базе без токена — предложение демо — Я-45 «FamilyCore»',
+    has(start, 'Посмотреть на демо-данных?') && has(start, 'Открыть демо'),
+    line(start, 'демо'),
+  )
   await act(`byText('button', 'Понятно')?.click()`)
   await sleep(400)
   await reload()
   check('«Понятно» убирает приветствие и после перезапуска', !has(await screen(), 'С чего начать'))
+  await act(`byText('button', 'Нет, начну своё')?.click()`)
+  await sleep(400)
+  await reload()
+  check('«Нет, начну своё» — предложение демо больше не показывается — Я-45 «FamilyCore»', !has(await screen(), 'Посмотреть на демо-данных?'))
 
   // ─ Входящие руками: одно поле и кнопка (Р-09).
   await go('/inbox')
@@ -1327,6 +1340,8 @@ async function scenario() {
   await markScenario()
 
   await routineSinceScenario()
+
+  await demoScenario()
 
   // ─ Service worker: без него нет ни офлайна, ни автообновления.
   const worker = await run(`Promise.race([
@@ -3253,6 +3268,75 @@ async function polishScenario() {
     ordered.indexOf('Порядок два') !== -1 && ordered.indexOf('Порядок два') < ordered.indexOf('Порядок один'),
     `два на ${ordered.indexOf('Порядок два')}, один на ${ordered.indexOf('Порядок один')}`,
   )
+}
+
+/**
+ * Демо-данные (Я-44, Я-45 «FamilyCore»): вход из настроек на устройстве
+ * с настоящими записями и токеном; в демо — полоса, выдуманный план,
+ * своих записей не видно, синхронизации нет и в сеть не идёт ни один
+ * запрос; «Выйти» спрашивает, отказ оставляет в демо; выход возвращает
+ * свои записи и стирает демо-базу.
+ */
+async function demoScenario() {
+  const bar = 'Демо: данные выдуманные'
+  await go('/')
+  const own = await screen()
+  check('до демо — свой план на месте', has(own, 'Порядок один') && !has(own, bar), line(own, 'Порядок'))
+
+  await go('/settings')
+  await unfold('Демо-данные')
+  // Счёт — с нажатия: перезагрузка в демо тоже не должна звать сеть.
+  const hitsBefore = githubHits
+  await probe('window.__smokeOld = true')
+  await act(`byText('button', 'Открыть демо')?.click()`)
+  await settle(hasOnPage(bar))
+  await go('/')
+  const inDemo = await screen()
+  check(
+    'демо: полоса и выдуманный план вместо своего — Я-44 «FamilyCore»',
+    has(inDemo, bar) && has(inDemo, 'Дописать отчёт по проекту') && !has(inDemo, 'Порядок один'),
+    line(inDemo, 'Демо'),
+  )
+
+  // Запись в демо — и пауза дольше тихого окна синхронизации.
+  await go('/inbox')
+  await act(`
+    set(document.querySelector('textarea[name=text]'), 'Запись в демо');
+    byText('button', 'Записать')?.click();
+  `)
+  await sleep(4000)
+  check('в демо ни одного запроса к GitHub — Я-44 «FamilyCore»', githubHits === hitsBefore, `запросов ${githubHits - hitsBefore}`)
+
+  await go('/settings')
+  const settings = await screen()
+  check(
+    'в демо «Синхронизации» в настройках нет, «Демо-данные» — с выходом',
+    !has(settings, 'Синхронизация') && has(settings, 'Выйти из демо'),
+    line(settings, 'демо'),
+  )
+
+  await act(`window.confirm = () => false; document.querySelector('.demo-bar__leave')?.click()`)
+  await sleep(700)
+  check('«Выйти» с отказом — демо остаётся — Я-45 «FamilyCore»', has(await screen(), bar))
+
+  await probe('window.__smokeOld = true')
+  await act(`window.confirm = (text) => { localStorage.setItem('smokeAsked', text); return true }; document.querySelector('.demo-bar__leave')?.click()`)
+  await settle()
+  await go('/')
+  const back = await screen()
+  const asked = await probe(`localStorage.getItem('smokeAsked')`)
+  const bases = await run(`indexedDB.databases().then((list) => list.map((each) => each.name).join(', '))`)
+  check(
+    'выход: спросил, свой план вернулся, демо-база стёрта — Я-44, Я-45 «FamilyCore»',
+    has(asked ?? '', 'сотрётся') &&
+      has(back, 'Порядок один') &&
+      !has(back, bar) &&
+      !has(back, 'Дописать отчёт по проекту') &&
+      !String(bases).includes('deluvremya-demo'),
+    `${asked}; базы: ${bases}`,
+  )
+  await go('/inbox')
+  check('запись, сделанная в демо, в свои не попала', !has(await screen(), 'Запись в демо'))
 }
 
 /**

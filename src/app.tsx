@@ -34,7 +34,7 @@ import { watchCategoryMerges } from './modules/time/useCatalog.ts'
  * нового» — берёт базу и синхронизацию из `CoreProvider` (Я-03 «FamilyCore»).
  */
 export function App() {
-  useEffect(() => sync.startAutoSync(), [])
+  useEffect(() => sync?.startAutoSync(), [])
   useEffect(() => watchCategoryMerges(), [])
 
   return (

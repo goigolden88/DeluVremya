@@ -9,6 +9,7 @@
  */
 
 import type { AppConfig } from '../shared/core/model.ts'
+import { demo } from '../screens/demo.ts'
 import { summary } from '../screens/summary.ts'
 import { migrations, SCHEMA_VERSION, SYNCED_STORES, type StoreRecord } from './model.ts'
 
@@ -79,6 +80,10 @@ export const config: AppConfig<StoreRecord> = {
   // репозитория данных (Р-87; Я-16 «FamilyCore»). Считается из живых
   // синхронизируемых записей и дня, без настроек устройства.
   summary,
+
+  // Демо-данные (Я-44, Я-45 «FamilyCore»): выдуманные записи от дня входа —
+  // своя база `deluvremya-demo` без синхронизации. Полнота — `demo.test.ts`.
+  demo,
 
   // Свои правила промпта — 1–4; общие ядро допишет следом. Правила про поля
   // живут в описаниях разделов `modules/<имя>/import.ts`, а не здесь.
