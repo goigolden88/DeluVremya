@@ -3288,8 +3288,9 @@ async function demoScenario() {
   // Счёт — с нажатия: перезагрузка в демо тоже не должна звать сеть.
   const hitsBefore = githubHits
   await probe('window.__smokeOld = true')
-  await act(`byText('button', 'Открыть демо')?.click()`)
+  await act(`window.confirm = (text) => { localStorage.setItem('smokeEnterAsked', text); return true }; byText('button', 'Открыть демо')?.click()`)
   await settle(hasOnPage(bar))
+  check('«Открыть демо» в настройках спрашивает — Я-46 «FamilyCore»', String(await run(`localStorage.getItem('smokeEnterAsked')`)).includes('сотрётся при выходе'))
   await go('/')
   const inDemo = await screen()
   check(
