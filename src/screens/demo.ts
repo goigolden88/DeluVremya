@@ -15,7 +15,7 @@
 import { addDays, daysBetween, weekPeriod, weekStart, type DateStr } from '../shared/core/dates.ts'
 import { ulid } from '../shared/core/id.ts'
 import type { Category, DayTemplate, Note, Review, Sleep, SpecialDays, StoreRecord, TimeBlock } from '../app/model.ts'
-import { initialCategories, initialPresets } from '../modules/time/categories.ts'
+import { initialCategories, initialPresets, type SeedCategory } from '../modules/time/categories.ts'
 import { STARTER } from '../modules/time/starter.ts'
 
 /** Записи демо по хранилищам — форма `AppConfig.demo`. */
@@ -25,15 +25,27 @@ export type DemoData = { [S in keyof StoreRecord]: StoreRecord[S][] }
 const TIME_DAYS = 14
 
 /**
- * Неделя учёта по категориям стартового набора: минуты по дням недели,
- * с понедельника. Ноль — блока нет. Похоже на жизнь, а не на таблицу:
- * ютуб растёт к выходным, зарядку пропускают.
+ * Категории демо: стартовый набор и два выдуманных занятия перед «Прочим» —
+ * в наборе нет бездельного, а без него неделя не похожа на жизнь.
+ */
+const OTHER = 'Прочее'
+const SEED: readonly SeedCategory[] = [
+  ...STARTER.filter((each) => each.name !== OTHER),
+  { name: 'Гитара', kind: 'neutral', presets: [30, 60], group: 'Развитие' },
+  { name: 'Сериалы', kind: 'idle', presets: [30, 60], group: 'Отдых' },
+  ...STARTER.filter((each) => each.name === OTHER),
+]
+
+/**
+ * Неделя учёта по категориям демо: минуты по дням недели, с понедельника.
+ * Ноль — блока нет. Похоже на жизнь, а не на таблицу: сериалы растут
+ * к выходным, зарядку пропускают.
  */
 const WEEK: Readonly<Record<string, readonly number[]>> = {
   Зарядка: [15, 15, 0, 15, 15, 0, 30],
   Чтение: [30, 0, 45, 30, 0, 60, 90],
-  Шахматы: [0, 30, 0, 0, 60, 0, 0],
-  Ютуб: [30, 60, 30, 45, 90, 120, 60],
+  Гитара: [0, 30, 0, 0, 60, 0, 0],
+  Сериалы: [30, 60, 30, 45, 90, 120, 60],
   Прогулка: [0, 30, 0, 30, 0, 90, 60],
   Прочее: [60, 45, 30, 60, 30, 0, 0],
 }
@@ -45,7 +57,7 @@ export function demo(day: DateStr): DemoData {
   /** `Base` записи: id по времени входа, по порядку. */
   const base = () => ({ id: ulid(stamp + n++), updatedAt: at })
 
-  const categories: Category[] = initialCategories(STARTER).map((category) =>
+  const categories: Category[] = initialCategories(SEED).map((category) =>
     category.name === 'Чтение' ? { ...category, norm: { minDays: 4, minMinutes: 180 } } : category,
   )
   const idOf = (name: string): string => categories.find((category) => category.name === name)?.id ?? ''
@@ -82,8 +94,8 @@ export function demo(day: DateStr): DemoData {
     task('Записаться к стоматологу', yesterday, { estMin: 10 }),
     // Входящие: записано одной строкой, не разобрано.
     task('Подарок маме на день рождения', null, { capturedOn: yesterday }),
-    { ...task('Читать перед сном вместо ютуба — засыпаю быстрее', null), kind: 'thought', capturedOn: day },
-    task('Выучить дебют за белых', null, { status: 'someday', capturedOn: addDays(day, -10) }),
+    { ...task('Читать перед сном вместо сериалов — засыпаю быстрее', null), kind: 'thought', capturedOn: day },
+    task('Разобрать на гитаре новую песню', null, { status: 'someday', capturedOn: addDays(day, -10) }),
   ]
 
   const time: TimeBlock[] = []
@@ -105,7 +117,7 @@ export function demo(day: DateStr): DemoData {
       ...base(),
       weekStart: lastWeek.from,
       doneAt: `${addDays(lastWeek.to, 1)}T19:30:00.000Z`,
-      note: 'Ютуба больше, чем хотелось; чтение держится.',
+      note: 'Сериалов больше, чем хотелось; чтение держится.',
     },
   ]
 
@@ -134,7 +146,7 @@ export function demo(day: DateStr): DemoData {
 
   return {
     categories,
-    presets: initialPresets(STARTER),
+    presets: initialPresets(SEED),
     templates,
     notes,
     time,

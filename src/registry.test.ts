@@ -50,6 +50,11 @@ describe('импорт записей', () => {
     expect(prompt).not.toContain('Дневники')
   })
 
+  it('промпт без личных занятий: уезжает к любому, кто открыл приложение', () => {
+    const prompt = importPrompt('2026-09-13').toLowerCase()
+    for (const word of ['ютуб', 'шахмат', 'покер']) expect(prompt).not.toContain(word)
+  })
+
   it('пример из промпта проходит собственную проверку без единого замечания', () => {
     const plan = planImport(JSON.stringify(example()), empty(), ctx())
     expect(plan.issues).toEqual([])

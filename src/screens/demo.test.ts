@@ -37,6 +37,15 @@ describe('демо «Делу Время»', () => {
     for (const note of data.notes) for (const ref of note.refs ?? []) expect(notes.has(ref)).toBe(true)
   })
 
+  it('учёт разнообразный: есть и полезное, и бездельное, у всех категорий демо — блоки', () => {
+    const data = demo(DAY)
+    const used = new Set(data.time.map((block) => block.categoryId))
+    const kinds = new Set(data.categories.filter((category) => used.has(category.id)).map((category) => category.kind))
+    expect(kinds.has('useful')).toBe(true)
+    expect(kinds.has('idle')).toBe(true)
+    expect(data.categories.every((category) => used.has(category.id))).toBe(true)
+  })
+
   it('другой день — другие даты: демо не стареет', () => {
     const later = '2026-12-01'
     expect(demo(later).notes.some((note) => note.plannedFor === later)).toBe(true)

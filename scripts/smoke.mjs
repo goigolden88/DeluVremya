@@ -818,6 +818,13 @@ async function scenario() {
     line(archived, 'Архив'),
   )
 
+  // Для фоновой ниже: своя, а не из набора — её удаляют переносом.
+  await act(`
+    set(document.querySelector('input[name=category]'), 'Подкаст');
+    byText('button', 'Добавить')?.click();
+  `)
+  await sleep(700)
+
   // ─ Кнопки строкой на категорию: название раз, на кнопках минуты; сверх двух — по «ещё».
   await act(`byText('button', 'Чтение')?.click()`)
   await sleep(400)
@@ -1024,10 +1031,10 @@ async function scenario() {
     set(field, ${JSON.stringify(value)});
     field.dispatchEvent(new Event('change', { bubbles: true }));
   `
-  await act(pick('block-category', 'cat:ютуб'))
+  await act(pick('block-category', 'cat:чтение'))
   await sleep(300)
   await act(`
-    ${pick('block-bg', 'cat:шахматы')}
+    ${pick('block-bg', 'cat:подкаст')}
     set(document.querySelector('input[name=block-minutes]'), '60');
   `)
   await sleep(300)
@@ -1038,10 +1045,10 @@ async function scenario() {
   const background = await screen()
   check(
     'фоновая — отдельной строкой, в сумму дня не входит — п. 4',
-    has(background, 'Учтено 2 ч 5 мин · 3 блока') && has(background, 'Фоном, в сумму не входит: Шахматы 1 ч'),
+    has(background, 'Учтено 2 ч 5 мин · 3 блока') && has(background, 'Фоном, в сумму не входит: Подкаст 1 ч'),
     line(background, 'Фоном, в сумму'),
   )
-  check('в списке дня у блока видна фоновая', has(background, 'Ютуб · 1 ч · фоном Шахматы'), line(background, 'фоном Шахматы'))
+  check('в списке дня у блока видна фоновая', has(background, 'Чтение · 1 ч · фоном Подкаст'), line(background, 'фоном Подкаст'))
 
   // ─ Удаление категории (Р-22): пустая — после подтверждения, с блоками —
   // только переносом. Подтверждение в безголовом браузере некому нажать.
@@ -1058,7 +1065,7 @@ async function scenario() {
   const emptied = await screen()
   check('пустая категория удаляется — и из списка, и не в архив', !has(emptied, 'Лишняя'), line(emptied, 'Лишняя'))
 
-  await act(`byText('button', 'Шахматы')?.click()`)
+  await act(`byText('button', 'Подкаст')?.click()`)
   await sleep(400)
   await act(`byText('button', 'Удалить')?.click()`)
   await sleep(400)
@@ -1072,7 +1079,7 @@ async function scenario() {
   await sleep(300)
   await act(`byText('button', 'Перенести и удалить')?.click()`)
   await sleep(700)
-  check('категория с блоками удалена после переноса', !has(await screen(), 'Шахматы'))
+  check('категория с блоками удалена после переноса', !has(await screen(), 'Подкаст'))
 
   // Архивную — прямо из архива, возвращать ради этого незачем.
   await unfold('Архив')
@@ -1083,7 +1090,7 @@ async function scenario() {
   const transferred = await screen()
   check(
     'блоки перешли в выбранную — и фоновая тоже',
-    has(transferred, 'Ютуб · 1 ч · фоном Прочее') && has(transferred, 'Фоном, в сумму не входит: Прочее 1 ч'),
+    has(transferred, 'Чтение · 1 ч · фоном Прочее') && has(transferred, 'Фоном, в сумму не входит: Прочее 1 ч'),
     line(transferred, 'фоном Прочее'),
   )
 
@@ -1274,7 +1281,7 @@ async function scenario() {
     version: 1,
     time: [
       { date: '2026-02-03', category: 'Бег', minutes: 30 },
-      { date: '2026-02-03', category: 'чтение', minutes: 45, background: 'Ютуб' },
+      { date: '2026-02-03', category: 'чтение', minutes: 45, background: 'Прогулка' },
       { date: '2026-02-03', category: 'Чтение', minutes: 45 },
       { date: '03.02.2026', category: 'Чтение', minutes: 20 },
     ],
@@ -1306,7 +1313,7 @@ async function scenario() {
     'импортированный день открывается полем даты, фоновая — отдельно — Р-27',
     pickedHash === '#/time?day=2026-02-03' &&
       has(imported, 'Учтено 1 ч 15 мин · 2 блока') &&
-      has(imported, 'Фоном, в сумму не входит: Ютуб 45 мин'),
+      has(imported, 'Фоном, в сумму не входит: Прогулка 45 мин'),
     `${pickedHash}; ${line(imported, 'Учтено')}`,
   )
   await go('/settings')

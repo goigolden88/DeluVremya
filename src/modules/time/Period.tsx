@@ -175,7 +175,7 @@ export function PeriodTime({
             : rows.map((row) => line(row, false))}
         </tbody>
       </table>
-      {withBackground && <p className="muted">Фоновое в сумму не входит: час ютуба под покер — один час.</p>}
+      {withBackground && <p className="muted">Фоновое в сумму не входит: час прогулки с подкастом — один час.</p>}
     </>
   )
   const shares = (
