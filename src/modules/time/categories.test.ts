@@ -81,6 +81,13 @@ describe('стартовый набор', () => {
     for (const each of STARTER) expect(each.presets.every(isMinutes)).toBe(true)
     expect(STARTER.some((each) => each.name === 'Прочее')).toBe(true)
   })
+
+  it('набор приложения — без личных занятий и без новых названий', () => {
+    // Новое название — лишняя пустая категория на каждом свежем устройстве
+    // владельца (шапка starter.ts): состав меняется только сознательно.
+    expect(STARTER.map((each) => each.name)).toEqual(['Зарядка', 'Чтение', 'Прогулка', 'Прочее'])
+    expect([...new Set(STARTER.flatMap((each) => (each.group ? [each.group] : [])))]).toEqual(['Движение', 'Развитие'])
+  })
 })
 
 describe('id и название категории', () => {
