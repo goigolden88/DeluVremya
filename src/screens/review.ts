@@ -114,6 +114,20 @@ export function reviewNotice(reviews: readonly Review[], today: DateStr): Notice
   }
 }
 
+// ─── Факты соседей (Р-86) ──────────────────────────────────────────────────
+
+/**
+ * «Сводка» «Тотального Учёта» — соседом по адресу, а не именем владельца:
+ * копия на другом аккаунте ведёт на «Учёт» того же аккаунта. Срезы соседей
+ * обзор не читает — только ссылка (Р-86).
+ */
+export const FAMILY_SUMMARY_PATH = '../TotalUchet/'
+
+/** Адрес «Сводки» от адреса самого приложения: `origin` и `base` сборки. */
+export function familySummaryUrl(origin: string, base: string): string {
+  return new URL(FAMILY_SUMMARY_PATH, new URL(base, origin)).href
+}
+
 // ─── Пороги (Р-48) ─────────────────────────────────────────────────────────
 
 /** Ключи в `settings`: пороги у каждого устройства свои. */
