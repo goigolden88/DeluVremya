@@ -132,7 +132,13 @@ export function Review() {
 
       <section className="block">
         <h2>Время недели</h2>
-        <PeriodTime period={weekPeriod(week)} today={today} scope="review" />
+        {/* Против прошлой недели — тем же вторым столбцом, что у месяца (Р-105). */}
+        <PeriodTime
+          period={weekPeriod(week)}
+          today={today}
+          scope="review"
+          compare={{ period: weekPeriod(addDays(week, -7)), label: 'Прошлая неделя', own: 'Неделя' }}
+        />
       </section>
 
       <section className="block">
