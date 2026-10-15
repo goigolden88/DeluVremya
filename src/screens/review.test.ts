@@ -5,6 +5,7 @@ import {
   DEFAULT_THRESHOLDS,
   doneText,
   dueWeek,
+  familySummaryUrl,
   markReviewed,
   parseThresholds,
   readThreshold,
@@ -82,6 +83,13 @@ describe('звать к обзору — Р-41, Р-51', () => {
   it('напоминание — про ту же неделю, после обзора — молчит', () => {
     expect(reviewNotice([], SUNDAY)?.body).toContain('7–13 сентября 2026')
     expect(reviewNotice([review('2026-09-07')], SUNDAY)).toBeNull()
+  })
+})
+
+describe('ссылка на «Сводку» соседа — Р-86', () => {
+  it('ведёт на «Учёт» того же аккаунта', () => {
+    expect(familySummaryUrl('https://goigolden88.github.io', '/DeluVremya/')).toBe('https://goigolden88.github.io/TotalUchet/')
+    expect(familySummaryUrl('https://friend.github.io', '/DeluVremya/')).toBe('https://friend.github.io/TotalUchet/')
   })
 })
 

@@ -14,7 +14,7 @@ import { WeekNorms } from '../modules/time/Week.tsx'
 import { quoted } from '../ui/screenNames.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../shared/ui/useToday.ts'
-import { doneText, markReviewed, REVIEW_MINUTES, reviewCall, reviewOf, viewedWeek } from './review.ts'
+import { doneText, familySummaryUrl, markReviewed, REVIEW_MINUTES, reviewCall, reviewOf, viewedWeek } from './review.ts'
 import { closedMonth, monthLabel } from './period.ts'
 import { useReviews, useThresholds } from './useReview.ts'
 
@@ -194,6 +194,22 @@ export function Review() {
         </form>
         {saved && <p className="added">{saved}</p>}
         {error && <p className="error">Не записалось: {error}</p>}
+      </section>
+
+      {/* Факты соседей — не здесь, а в метаприложении (Р-86): только ссылка. */}
+      <section className="block">
+        <h2>Факты соседей</h2>
+        <p>
+          <a
+            className="btn"
+            href={familySummaryUrl(window.location.origin, import.meta.env.BASE_URL)}
+            target="_blank"
+            rel="noopener"
+          >
+            Сводка семьи
+          </a>
+        </p>
+        <p className="muted">В «Тотальном Учёте» — факты соседей за неделю: здоровье, еда, деньги.</p>
       </section>
     </>
   )
