@@ -15,7 +15,7 @@ import {
   goalTitle,
   goalVision,
 } from '../modules/notes/goal.ts'
-import { goalProgress, groupByMonth, markDone, queryWords, reopen, withGoal, withText } from '../modules/notes/inbox.ts'
+import { compareNotes, goalProgress, groupByMonth, markDone, queryWords, reopen, withGoal, withText } from '../modules/notes/inbox.ts'
 import { DONE_LABELS, doneLine, firstLine, KIND_NAMES, monthHeading, progressText, savedLine } from '../modules/notes/labels.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../shared/ui/Fold.tsx'
@@ -53,6 +53,8 @@ export function Goal() {
   const [saved, setSaved] = useState('')
   /** Последнее «Достигнут» — его снимает «Отменить». */
   const [finished, setFinished] = useState<Note | null>(null)
+  /** Последнее «Открепить» — запись уже без замысла; его снимает «Отменить». */
+  const [detached, setDetached] = useState<Note | null>(null)
   const [error, setError] = useState('')
 
   if (read.error) return <p className="error">Записи не прочитались: {read.error}</p>
@@ -77,6 +79,11 @@ export function Goal() {
   const goalId = goal.id
   const vision = goalVision(goal)
   const entries = goalEntries(goalId, all)
+  // Откреплённая стоит на своём месте строкой «Откреплено», пока её не вернули.
+  // Берётся нынешний вид записи: её могли поправить, пока висит «Отменить».
+  const detachedNow = detached && all.find((note) => note.id === detached.id && !note.deleted)
+  const undetachable = detachedNow && !entries.includes(detachedNow) ? detachedNow : null
+  const shown = undetachable ? [...entries, undetachable].sort(compareNotes) : entries
   const meta = [progressText(goalProgress(goalId, all))]
   if (goal.status === 'done') meta.unshift(goal.doneOn ? `достигнут ${feedDateText(goal.doneOn)}` : 'достигнут')
 
@@ -104,12 +111,26 @@ export function Goal() {
     setSaved('')
     setError('')
     try {
-      await db.put('notes', withGoal(note, to))
+      const next = await db.put('notes', withGoal(note, to))
       if (to !== null) {
         setPicking(false)
         setQuery('')
         setSaved(`Прикреплено: ${KIND_NAMES[note.kind].toLowerCase()}`)
+      } else {
+        setDetached(next)
       }
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
+  /** Вернуть откреплённое к этому замыслу: место в ленте — по дню записи, то же. */
+  async function undetach() {
+    if (!undetachable) return
+    setError('')
+    try {
+      await db.put('notes', withGoal(undetachable, goalId))
+      setDetached(null)
     } catch (failure) {
       setError(describe(failure))
     }
@@ -236,19 +257,30 @@ export function Goal() {
         {saved && <p className="muted">{saved}</p>}
         {error && <p className="error">Не записалось: {error}</p>}
 
-        {entries.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="stub">Пока ничего: добавьте дело или мысль.</p>
         ) : (
-          groupByMonth(entries).map((group) => (
+          groupByMonth(shown).map((group) => (
             <div key={group.month ?? 'без даты'} className="month-group">
               <h3 className="unit__name">
                 {monthHeading(group.month)}
                 <span className="muted"> · {group.notes.length}</span>
               </h3>
               <ul className="feed">
-                {group.notes.map((note) => (
-                  <GoalEntry key={note.id} note={note} onDetach={() => void relink(note, null)} />
-                ))}
+                {group.notes.map((note) =>
+                  note === undetachable ? (
+                    <li key={note.id} className="goal-entry">
+                      <p className="added feed__row">
+                        <span>Откреплено</span>
+                        <button type="button" className="link-btn" onClick={() => void undetach()}>
+                          Отменить
+                        </button>
+                      </p>
+                    </li>
+                  ) : (
+                    <GoalEntry key={note.id} note={note} onDetach={() => void relink(note, null)} />
+                  ),
+                )}
               </ul>
             </div>
           ))
