@@ -1777,6 +1777,90 @@ async function planScenario() {
   )
 
   await templatesScenario()
+  await spanScenario()
+}
+
+/**
+ * Дело на период (Р-101): «По какой день» в карточке дела на «Заметках» —
+ * конец раньше начала даёт ошибку и в план не ставит, верный — период
+ * в строке плана; в карточке пункта плана срок виден и правится, день
+ * не позже начала не пишется. Дело заводится своё и в конце удаляется:
+ * шаблоны и счёт плана дальше его не видят.
+ */
+async function spanScenario() {
+  const text = 'Покрасить забор'
+  const short = (day) => `${day.slice(8, 10)}.${day.slice(5, 7)}`
+  const today = localDay()
+  const tomorrow = localDay(1)
+  const unsorted = () =>
+    run(`[...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === 'Неразобранное')?.closest('section')?.innerText ?? ''`)
+  // Строка пункта в плане «Сегодня» — по тексту; из неё — подпись и поле карточки.
+  const item = `[...document.querySelectorAll('li.plan-item')].find((el) => el.querySelector('button.plan-item__text')?.textContent.trim() === ${JSON.stringify(text)})`
+  const itemMeta = () => run(`${item}?.querySelector(':scope > .note__meta')?.textContent ?? ''`)
+  const cardTo = () => run(`${item}?.querySelector('.plan-card input[name=plan-to]')?.value ?? null`)
+  const setCardTo = (day) => act(`set(${item}?.querySelector('.plan-card input[name=plan-to]'), ${JSON.stringify(day)})`)
+
+  await go('/inbox')
+  await act(`
+    set(document.querySelector('textarea[name=text]'), ${JSON.stringify(text)});
+    byText('button', 'Записать')?.click();
+  `)
+  await sleep(700)
+  await act(`startsWith('.note__main', ${JSON.stringify(text)})?.click()`)
+  await sleep(400)
+
+  // ─ Конец раньше начала: по завтра, а начать — послезавтра.
+  await act(`set(document.querySelector('.note__card input[name=plan-to]'), ${JSON.stringify(tomorrow)})`)
+  await sleep(300)
+  await act(`set(document.querySelector('.note__card input[name=plan-day]'), ${JSON.stringify(localDay(2))})`)
+  await sleep(700)
+  const refused = await screen()
+  const stayed = await unsorted()
+  check(
+    '«По какой день» в карточке дела: конец раньше начала — ошибка словами, в план не ставится — Р-101',
+    has(refused, '«По какой день» — позже дня начала') && !has(refused, 'Поставлено на') && has(stayed, text),
+    `${line(refused, 'По какой день»')}; ${line(refused, 'Поставлено')}; в неразобранном: ${has(stayed, text) ? 'да' : 'нет'}`,
+  )
+
+  // ─ Верный срок: с сегодня по завтра — период в строке плана.
+  await act(`byText('.note__card button', 'На сегодня')?.click()`)
+  await sleep(700)
+  const planned = await screen()
+  await go('/')
+  const fromNote = await itemMeta()
+  check(
+    '«По какой день» в карточке дела и «На сегодня»: дело в плане, срок — в его строке — Р-101',
+    has(planned, 'Поставлено на сегодня') && !has(planned, 'позже дня начала') && fromNote === `${short(today)}–${short(tomorrow)}`,
+    `${line(planned, 'Поставлено')}; в строке плана «${fromNote}»`,
+  )
+
+  // ─ Карточка пункта плана: срок виден в поле; день не позже начала не пишется, позже — пишется.
+  // С «const», а не со скобки: строка «[…» склеилась бы с концом помощников.
+  await act(`const row = ${item}; row?.querySelector('button.plan-item__text')?.click()`)
+  await sleep(400)
+  const shownTo = await cardTo()
+  await setCardTo(localDay(-1))
+  await sleep(700)
+  const kept = await itemMeta()
+  const keptTo = await cardTo()
+  await setCardTo(localDay(3))
+  await sleep(700)
+  const moved = await itemMeta()
+  check(
+    '«По какой день» в карточке пункта плана: срок в поле; раньше начала — не пишется, позже — новый период в строке — Р-101',
+    shownTo === tomorrow &&
+      kept === `${short(today)}–${short(tomorrow)}` &&
+      keptTo === tomorrow &&
+      moved === `${short(today)}–${short(localDay(3))}`,
+    `в поле «${shownTo}»; после дня раньше начала — «${kept}», поле «${keptTo}»; после третьего дня — «${moved}»`,
+  )
+
+  await act(`
+    window.confirm = () => true;
+    const card = ${item}?.querySelector('.plan-card');
+    [...(card?.querySelectorAll('button') ?? [])].find((el) => el.textContent.trim() === 'Удалить')?.click();
+  `)
+  await sleep(700)
 }
 
 /**
@@ -2188,6 +2272,29 @@ async function monthScenario() {
   // ─ Неделя, закрывшая июль: карточка в обзоре ведёт к итогам июля; другая неделя — без неё (Р-54).
   await go('/review?week=2024-08-05')
   const plainWeek = await screen()
+
+  // ─ Прошлая неделя вторым столбцом (Р-105): у недели 5 августа своих блоков нет,
+  //   у прошлой — 31 июля и 1 августа из Стыка, со своим основанием.
+  const weekTime = await section('Время недели')
+  const weekProbe = await run(`(() => {
+    const block = [...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === 'Время недели')?.closest('section')
+    const row = [...(block?.querySelectorAll('table.stats tbody tr') ?? [])]
+      .find((each) => each.querySelector('td')?.textContent.trim() === 'Стык')
+    return JSON.stringify({
+      head: [...(block?.querySelectorAll('table.stats thead th') ?? [])].map((el) => el.textContent.trim()),
+      own: [...(row?.querySelectorAll('td') ?? [])].map((el) => el.textContent.trim()),
+    })
+  })()`)
+  const previousWeek = JSON.parse(weekProbe ?? '{}')
+  check(
+    'обзор недели: прошлая неделя — вторым столбцом и строкой со своим основанием — Р-105',
+    has(weekTime, 'Ничего не учтено') &&
+      has(weekTime, 'Прошлая неделя: учтено 2 ч · 2 блока · учёт был в 2 днях из 7') &&
+      JSON.stringify(previousWeek.head) === JSON.stringify(['', 'Неделя', 'Прошлая неделя']) &&
+      JSON.stringify(previousWeek.own) === JSON.stringify(['Стык', '—', '2 ч']),
+    `${line(weekTime, 'Прошлая неделя:')}; ${weekProbe}`,
+  )
+
   await go('/review?week=2024-07-29')
   const closing = await screen()
   await act(`byText('a', 'Итоги месяца')?.click()`)
@@ -2609,9 +2716,10 @@ async function notesScenario() {
 
 /**
  * Экран замысла (Р-103): вход из карточки, название и видение, лента,
- * «Добавить мысль» и «Добавить дело», переход к неразобранному, «не найден».
+ * «Добавить мысль» и «Добавить дело», «Прикрепить» и «Открепить» с «Отменить»,
+ * переход к неразобранному, «не найден».
  * На входе — замысел «Выучить испанский» с делом «Купить фильтр для воды»;
- * добавленное в конце удаляется, текст замысла — возвращается.
+ * добавленное в конце удаляется, прикреплённое — откреплено, текст замысла — возвращается.
  */
 async function goalScenario() {
   await go('/inbox')
@@ -2666,6 +2774,75 @@ async function goalScenario() {
     has(added, 'Сериалы с субтитрами') && has(added, 'Купить учебник') && has(added, '2 дела, сделано 0 · мыслей 1'),
     line(added, 'дела,'),
   )
+
+  // ─ «Прикрепить» уже записанное и «Открепить» с «Отменить» (#66, #79). Берётся
+  //   дело «Статья про сон» из «Поделиться»; в конце оно снова без замысла.
+  const shared = 'Статья про сон'
+  const titles = async () =>
+    JSON.parse(
+      (await run(`JSON.stringify([...document.querySelectorAll('.goal-entry .feed__title')].map((el) => el.textContent.trim()))`)) ??
+        '[]',
+    )
+  const goalMeta = () => run(`document.querySelector('.screen-head .goal__title ~ .muted')?.textContent ?? ''`)
+  const detach = () =>
+    act(`
+      const row = [...document.querySelectorAll('.goal-entry')]
+        .find((el) => el.querySelector('.feed__title')?.textContent.trim() === ${JSON.stringify(shared)});
+      [...(row?.querySelectorAll('button') ?? [])].find((el) => el.textContent.trim() === 'Открепить')?.click();
+    `)
+  const detachedRow = () =>
+    run(`[...document.querySelectorAll('.goal-entry')].find((el) => el.textContent.includes('Откреплено'))?.innerText ?? ''`)
+
+  await act(`byText('button', 'Прикрепить')?.click()`)
+  await sleep(400)
+  await act(`set(document.querySelector('input[name=attach-search]'), 'сон')`)
+  await sleep(400)
+  await act(`
+    const pick = [...document.querySelectorAll('button.feed__pick')]
+      .find((el) => el.querySelector('.feed__title')?.textContent.trim() === ${JSON.stringify(shared)});
+    pick?.click();
+  `)
+  await sleep(700)
+  const attached = await screen()
+  const attachedTitles = await titles()
+  const attachedMeta = await goalMeta()
+  check(
+    '«Прикрепить» на экране замысла: выбранное поиском дело — в ленте и в счёте замысла — #66',
+    has(attached, 'Прикреплено: дело') && attachedTitles.includes(shared) && has(attachedMeta, '3 дела, сделано 0 · мыслей 1'),
+    `${line(attached, 'Прикреплено')}; лента: ${attachedTitles.join(', ')}; ${attachedMeta}`,
+  )
+
+  await detach()
+  await sleep(700)
+  const detachedTitles = await titles()
+  const detachedLine = await detachedRow()
+  const detachedMeta = await goalMeta()
+  check(
+    '«Открепить»: дело ушло из ленты и счёта, на его месте «Откреплено» и «Отменить» — #66, #79',
+    !detachedTitles.includes(shared) &&
+      has(detachedLine, 'Откреплено') &&
+      has(detachedLine, 'Отменить') &&
+      has(detachedMeta, '2 дела, сделано 0 · мыслей 1'),
+    `лента: ${detachedTitles.join(', ')}; строка «${detachedLine.replace(/\s+/g, ' ')}»; ${detachedMeta}`,
+  )
+
+  await act(`
+    const row = [...document.querySelectorAll('.goal-entry')].find((el) => el.textContent.includes('Откреплено'));
+    [...(row?.querySelectorAll('button') ?? [])].find((el) => el.textContent.trim() === 'Отменить')?.click();
+  `)
+  await sleep(700)
+  const returnedTitles = await titles()
+  const returnedLine = await detachedRow()
+  const returnedMeta = await goalMeta()
+  check(
+    '«Отменить» после «Открепить» возвращает дело в ленту и счёт замысла — #79',
+    returnedTitles.includes(shared) && returnedLine === '' && has(returnedMeta, '3 дела, сделано 0 · мыслей 1'),
+    `лента: ${returnedTitles.join(', ')}; ${returnedMeta}`,
+  )
+
+  // Обратно без замысла: дальше сценарий ждёт у него два дела.
+  await detach()
+  await sleep(700)
 
   // ─ Блок «Замыслы» за неделю и за месяц (Р-104): записанное сегодня — движение, тап — экран замысла.
   const goalsBlock = () =>
