@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../shared/core/db.ts'
 import { config } from '../../app/config.ts'
 import type { Note, NoteRepeat } from '../../app/model.ts'
+import { notesLink, stateParts } from './feed.ts'
 import { goalIdOf, inboxOf, isUnsorted, tasksOfGoal } from './inbox.ts'
 import { dayPlan, mainOf, overdue } from './plan.ts'
 import {
@@ -354,5 +355,12 @@ describe('словами', () => {
 
   it('кривое правило — так и сказано', () => {
     expect(patternLine(pattern({ from: 'x', every: 'days', step: 1 }))).toBe('правило не читается')
+  })
+
+  it('в ленте образец — «повтор» и открывается на «Заметках»', () => {
+    const daily = pattern({ from: TODAY, every: 'days', step: 1 })
+    expect(stateParts(daily)).toEqual(['дело', 'повтор'])
+    expect(notesLink(daily)).toBe('/inbox?open=01P')
+    expect(notesLink(occurrence(daily, TODAY))).toBeNull()
   })
 })

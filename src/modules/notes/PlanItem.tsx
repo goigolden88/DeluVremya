@@ -5,6 +5,8 @@ import type { Note } from '../../app/model.ts'
 import { markDone, reopen, withText } from './inbox.ts'
 import { deleteConfirm, durationText, MOVE_TITLE, shortText, spanText, TO_UNSORTED } from './labels.ts'
 import { ESTIMATE_CHOICES, readEstimate, spanEnd, withEstimate, withPlan, withSpan } from './plan.ts'
+import { patternIdOf } from './repeat.ts'
+import { RepeatOrigin, RepeatSetup } from './Repeat.tsx'
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
@@ -106,6 +108,8 @@ type RowProps = {
   move?: boolean
   /** Место среди открытых пунктов дня: «Выше» и «Ниже» в карточке (Р-75). */
   place?: Place
+  /** Повтор, из которого встал пункт (Р-106): в карточке — ссылка на его правку. */
+  pattern?: Note | null
 }
 
 /**
@@ -125,6 +129,7 @@ export function PlanRow({
   actions,
   move = false,
   place,
+  pattern = null,
 }: RowProps) {
   const done = note.status === 'done'
   const name = shortText(note.text)
@@ -189,26 +194,31 @@ export function PlanRow({
       {movable && moving && (
         <MoveButtons note={note} today={today} onError={onError} onMoved={() => setMoving(false)} />
       )}
-      {open && <PlanCard note={note} today={today} withDone={!check} place={place} onError={onError} />}
+      {open && (
+        <PlanCard note={note} today={today} withDone={!check} place={place} pattern={pattern} onError={onError} />
+      )}
     </li>
   )
 }
 
 /**
  * Карточка пункта: текст, оценка, другой день, возврат в неразобранное,
- * «Сделано» — где в строке нет галочки, — и «Удалить».
+ * «Повторять» — или, у пункта повтора, откуда он (Р-106), — «Сделано»,
+ * где в строке нет галочки, и «Удалить».
  */
 function PlanCard({
   note,
   today,
   withDone,
   place,
+  pattern,
   onError,
 }: {
   note: Note
   today: DateStr
   withDone: boolean
   place?: Place | undefined
+  pattern: Note | null
   onError: (message: string) => void
 }) {
   const [text, setText] = useState(note.text)
@@ -345,6 +355,13 @@ function PlanCard({
           <span className="plan__label">{MOVE_TITLE}</span>
           <MoveButtons note={note} today={today} onError={onError} />
         </>
+      )}
+
+      {/* Пункт повтора правится сам по себе; повтор целиком — на «Заметках» (Р-106). */}
+      {pattern !== null ? (
+        <RepeatOrigin pattern={pattern} />
+      ) : (
+        isOpen && patternIdOf(note) === null && <RepeatSetup note={note} today={today} onError={onError} />
       )}
 
       <div className="row row--wrap">

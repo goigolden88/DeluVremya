@@ -33,6 +33,8 @@ import {
 } from '../modules/notes/labels.ts'
 import { noteAnchor, NoteItem } from '../modules/notes/NoteItem.tsx'
 import { plannedCount, withPlan } from '../modules/notes/plan.ts'
+import { patternsOf } from '../modules/notes/repeat.ts'
+import { RepeatItem, REPEATS_TITLE } from '../modules/notes/Repeat.tsx'
 import { fromSomeday, somedayOf } from '../modules/notes/review.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../shared/ui/Fold.tsx'
@@ -215,6 +217,7 @@ export function Inbox() {
 
   const all = read.notes ?? []
   const someday = somedayOf(all)
+  const repeats = patternsOf(all)
   const words = queryWords(query)
   const goals = goalsOf(all)
   const shownGoals = goals.filter((goal) => matchesQuery(goal, words))
@@ -421,6 +424,32 @@ export function Inbox() {
               </p>
             )}
           </section>
+
+          {/* Повторы — правила, а не дела: в неразобранном их нет, в план встают их пункты (Р-106). */}
+          {repeats.length > 0 && (
+            <Fold
+              id="notes:repeats"
+              title={REPEATS_TITLE}
+              summary={repeats.length}
+              folded
+              reveal={repeats.some((note) => note.id === openId)}
+            >
+              <ul className="plain">
+                {repeats.map((note) => (
+                  <RepeatItem
+                    key={note.id}
+                    pattern={note}
+                    notes={all}
+                    today={today}
+                    open={openId === note.id}
+                    onToggle={() => setOpenId(openId === note.id ? null : note.id)}
+                    onError={setError}
+                    anchor={noteAnchor(note.id)}
+                  />
+                ))}
+              </ul>
+            </Fold>
+          )}
 
           {/* Отложенное из разбора висяков: без блока «когда-нибудь» значило бы «пропало» (Р-46). */}
           {someday.length > 0 && (

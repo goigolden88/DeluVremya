@@ -1,6 +1,8 @@
 import { days, plural, timeSpan } from '../shared/core/dates.ts'
 import { QUIET_MS, RETRY_MS } from '../shared/core/sync.ts'
 import { RECALL_WEEKS, STALE_BATCH } from '../modules/notes/review.ts'
+import { EVERY_NAMES, REPEAT_EVERY } from '../modules/notes/repeat.ts'
+import { REPEAT_LABEL, REPEATS_TITLE } from '../modules/notes/Repeat.tsx'
 import { DAY_WINDOW } from '../modules/time/day.ts'
 import {
   MARK_USUAL,
@@ -133,6 +135,16 @@ export function Help() {
         <p>
           Шаблон дня — «Сохранить план как шаблон», дальше одним тапом. То, что в этот день уже стоит,
           второй раз не встаёт. Привычки — это пункты шаблона.
+        </p>
+        <p>
+          Дело по датам — «{REPEAT_LABEL}» в карточке дела на {quoted(names.inbox)} или в плане: с какого дня
+          (сразу — день, на который дело стоит, или сегодня), как часто — {REPEAT_EVERY.map((every) => `«${EVERY_NAMES[every]}»`).join(', ')}, —
+          и, по желанию, до какого дня. Месяц с числом, которого в месяце нет, — в последний день месяца. Дело
+          уходит в блок «{REPEATS_TITLE}» на {quoted(names.inbox)}, а в план встаёт его пункт, когда открыт план
+          дня, на который выпадает повтор. Дни, когда приложение не открывали, задним числом не заполняются.
+          Пункт отмечается, переносится и удаляется как обычный — повтор идёт дальше, удалённый сам не вернётся.
+          Тап по повтору в «{REPEATS_TITLE}» — правка текста, оценки, «главного» и правила: меняются пункты с
+          сегодняшнего дня, ещё не отмеченные. «Остановить повтор» убирает и их.
         </p>
       </Fold>
 

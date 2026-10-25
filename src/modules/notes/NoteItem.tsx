@@ -8,6 +8,7 @@ import { ageText, deleteConfirm, DONE_LABELS, firstLine, goalLine, KIND_NAMES, p
 import { goalLink } from './goal.ts'
 import { withPlanSpan } from './plan.ts'
 import { PlanButtons } from './PlanItem.tsx'
+import { RepeatSetup } from './Repeat.tsx'
 
 /** Последний день периода не позже первого — дело в план не уходит (Р-101). */
 const SPAN_ERROR = '«По какой день» — позже дня начала'
@@ -216,6 +217,8 @@ function NoteCard({
           </label>
           {spanError && <p className="error">{spanError}</p>}
           <PlanButtons note={note} today={today} onMove={plan} />
+          {/* Или повторять по датам: дело уйдёт в «Повторы» (Р-106). */}
+          <RepeatSetup note={note} today={today} onError={onError} />
         </>
       )}
 
