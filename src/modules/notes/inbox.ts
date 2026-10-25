@@ -64,9 +64,18 @@ export function compareNotes(a: Note, b: Note): number {
   return b.id.localeCompare(a.id)
 }
 
-/** Лежит в неразобранном: не в плане, открыто, не замысел — у него свой блок (Р-31). */
+/**
+ * Лежит в неразобранном: не в плане, открыто, не замысел и не образец повтора —
+ * у них свои блоки (Р-31, Р-106).
+ */
 export function isUnsorted(note: Note): boolean {
-  return !note.deleted && note.plannedFor === null && note.status === 'open' && note.kind !== 'goal'
+  return (
+    !note.deleted &&
+    note.plannedFor === null &&
+    note.status === 'open' &&
+    note.kind !== 'goal' &&
+    note.repeat === undefined
+  )
 }
 
 /** Неразобранное в порядке экрана. */
@@ -209,10 +218,20 @@ export function goalOf(note: Note, notes: readonly Note[]): Note | null {
   return notes.find((each) => each.id === id && !each.deleted && each.kind === 'goal') ?? null
 }
 
-/** Записи замысла одного вида: живые, не отброшенные, в порядке экрана. */
+/**
+ * Записи замысла одного вида: живые, не отброшенные, в порядке экрана.
+ * Образец повтора — правило, а не дело: в счёт идут его пункты дней (Р-106).
+ */
 function ofGoal(goalId: string, kind: NoteKind, notes: readonly Note[]): Note[] {
   return notes
-    .filter((note) => !note.deleted && note.kind === kind && note.status !== 'dropped' && goalIdOf(note) === goalId)
+    .filter(
+      (note) =>
+        !note.deleted &&
+        note.kind === kind &&
+        note.status !== 'dropped' &&
+        note.repeat === undefined &&
+        goalIdOf(note) === goalId,
+    )
     .sort(compareNotes)
 }
 
