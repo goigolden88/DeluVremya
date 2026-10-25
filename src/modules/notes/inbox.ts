@@ -67,13 +67,19 @@ export function compareNotes(a: Note, b: Note): number {
 const NONE: ReadonlySet<string> = new Set()
 
 /**
- * Лежит в неразобранном: не в плане, открыто, не замысел — у него свой блок (Р-31).
+ * Лежит в неразобранном: не в плане, открыто, не замысел и не образец повтора —
+ * у них свои блоки (Р-31, Р-107).
  * `observed` — id наблюдений недели: итог недели, разбирать в нём нечего (Р-106).
  * Чьи это наблюдения, модуль не знает — список даёт тот, кто читает обзоры.
  */
 export function isUnsorted(note: Note, observed: ReadonlySet<string> = NONE): boolean {
   return (
-    !note.deleted && note.plannedFor === null && note.status === 'open' && note.kind !== 'goal' && !observed.has(note.id)
+    !note.deleted &&
+    note.plannedFor === null &&
+    note.status === 'open' &&
+    note.kind !== 'goal' &&
+    note.repeat === undefined &&
+    !observed.has(note.id)
   )
 }
 
@@ -222,10 +228,20 @@ export function goalOf(note: Note, notes: readonly Note[]): Note | null {
   return notes.find((each) => each.id === id && !each.deleted && each.kind === 'goal') ?? null
 }
 
-/** Записи замысла одного вида: живые, не отброшенные, в порядке экрана. */
+/**
+ * Записи замысла одного вида: живые, не отброшенные, в порядке экрана.
+ * Образец повтора — правило, а не дело: в счёт идут его пункты дней (Р-107).
+ */
 function ofGoal(goalId: string, kind: NoteKind, notes: readonly Note[]): Note[] {
   return notes
-    .filter((note) => !note.deleted && note.kind === kind && note.status !== 'dropped' && goalIdOf(note) === goalId)
+    .filter(
+      (note) =>
+        !note.deleted &&
+        note.kind === kind &&
+        note.status !== 'dropped' &&
+        note.repeat === undefined &&
+        goalIdOf(note) === goalId,
+    )
     .sort(compareNotes)
 }
 

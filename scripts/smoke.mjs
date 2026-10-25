@@ -1778,6 +1778,82 @@ async function planScenario() {
 
   await templatesScenario()
   await spanScenario()
+  await repeatScenario()
+}
+
+/**
+ * Повтор дела (Р-107): «Повторять» в карточке дела на «Заметках» — дело
+ * уходит из неразобранного в «Повторы» с правилом словами; на «Сегодня» —
+ * его пункт; удалённый пункт после нового открытия плана не возвращается;
+ * «Остановить повтор» убирает блок. Повтор заводится свой и в конце
+ * останавливается: дальше его никто не видит.
+ */
+async function repeatScenario() {
+  const text = 'Полить цветы'
+  const today = localDay()
+  const short = `${today.slice(8, 10)}.${today.slice(5, 7)}`
+  const section = (selector, title) =>
+    run(`[...document.querySelectorAll(${JSON.stringify(selector)})].find((el) => el.textContent.trim() === ${JSON.stringify(title)})?.closest('section')?.innerText ?? ''`)
+  const item = `[...document.querySelectorAll('li.plan-item')].find((el) => el.querySelector('button.plan-item__text')?.textContent.trim() === ${JSON.stringify(text)})`
+
+  await go('/inbox')
+  await act(`
+    set(document.querySelector('textarea[name=text]'), ${JSON.stringify(text)});
+    byText('button', 'Записать')?.click();
+  `)
+  await sleep(700)
+  await act(`startsWith('.note__main', ${JSON.stringify(text)})?.click()`)
+  await sleep(400)
+  await act(`byText('.note__card button', 'Повторять')?.click()`)
+  await sleep(400)
+  await act(`byText('.note__card button', 'Каждые N дней')?.click()`)
+  await sleep(300)
+  await act(`byText('.note__card button[type=submit]', 'Повторять')?.click()`)
+  await sleep(700)
+  await unfold('Повторы')
+  const unsorted = await section('h2', 'Неразобранное')
+  const repeats = await section('.fold__btn', 'Повторы')
+  check(
+    '«Повторять» в карточке дела: из неразобранного — в «Повторы», правило словами — Р-107',
+    !has(unsorted, text) && has(repeats, text) && has(repeats, `каждый день, с ${short}`),
+    repeats.replace(/\s+/g, ' ').slice(0, 100),
+  )
+
+  await go('/')
+  await waitFor(`${item}`, 5000)
+  const planned = await run(`${item}?.innerText ?? ''`)
+  await act(`const row = ${item}; row?.querySelector('button.plan-item__text')?.click()`)
+  await sleep(400)
+  const origin = await run(`${item}?.querySelector('.plan-card')?.innerText ?? ''`)
+  check(
+    'открыт план дня — пункт повтора в нём; в карточке — откуда он и где правится — Р-107',
+    has(planned, text) && has(origin, 'Повтор: каждый день') && has(origin, 'Править повтор'),
+    `${planned.replace(/\s+/g, ' ')}; ${line(origin, 'Повтор:')}`,
+  )
+
+  await act(`
+    window.confirm = () => true;
+    const card = ${item}?.querySelector('.plan-card');
+    [...(card?.querySelectorAll('button') ?? [])].find((el) => el.textContent.trim() === 'Удалить')?.click();
+  `)
+  await sleep(700)
+  await go('/inbox')
+  await go('/')
+  await sleep(700)
+  const gone = await run(`Boolean(${item})`)
+  check('удалённый пункт повтора после нового открытия плана не возвращается — Р-107', gone === false)
+
+  await go('/inbox')
+  await unfold('Повторы')
+  await act(`startsWith('.note__main', ${JSON.stringify(text)})?.click()`)
+  await sleep(400)
+  await act(`
+    window.confirm = () => true;
+    byText('.note__card button', 'Остановить повтор')?.click();
+  `)
+  await sleep(700)
+  const stopped = await screen()
+  check('«Остановить повтор» — повтора и блока «Повторы» больше нет — Р-107', !has(stopped, text) && !has(stopped, 'Повторы'))
 }
 
 /**

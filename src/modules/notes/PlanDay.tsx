@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DateStr } from '../../shared/core/dates.ts'
 import { db } from '../../app/core.ts'
 import type { Note } from '../../app/model.ts'
@@ -34,6 +34,7 @@ import {
 } from './plan.ts'
 import { PlanRow } from './PlanItem.tsx'
 import { PlanTemplates } from './PlanTemplates.tsx'
+import { dueOccurrences, patternOf } from './repeat.ts'
 import { useNotes } from './useNotes.ts'
 
 function describe(error: unknown): string {
@@ -53,6 +54,21 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
+  /** Пункты повторов, уже предложенные базе: надгробие слияние не пропустит, и просить снова незачем. */
+  const offered = useRef(new Set<string>())
+
+  // Открыт план дня — встают пункты повторов на сегодня (Р-107). Прошлые дни
+  // задним числом не заполняются. Слиянием с неподвижным штампом, как
+  // стартовые категории: удалённый пункт не вернётся, настоящая правка
+  // с другого устройства победит.
+  const notes = read.notes
+  useEffect(() => {
+    if (notes === null) return
+    const due = dueOccurrences(notes, today).filter((note) => !offered.current.has(note.id))
+    if (due.length === 0) return
+    for (const note of due) offered.current.add(note.id)
+    db.merge('notes', due, 'imported').catch((failure: unknown) => setError(describe(failure)))
+  }, [notes, today])
 
   if (read.error) return <p className="error">Записи не прочитались: {read.error}</p>
   if (read.notes === null) return null
@@ -101,6 +117,7 @@ export function PlanDay({ today, left }: { today: DateStr; left: number }) {
     open: openId === note.id,
     onToggle: () => setOpenId(openId === note.id ? null : note.id),
     onError: setError,
+    pattern: patternOf(note, all),
   })
 
   return (
