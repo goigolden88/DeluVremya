@@ -4,14 +4,11 @@ import { addDays, isDateStr, type DateStr } from '../../shared/core/dates.ts'
 import { db } from '../../app/core.ts'
 import type { Note } from '../../app/model.ts'
 import { goalOf, goalProgress, linksOf, NOTE_KINDS, tasksOfGoal, withGoal, withKind, withText } from './inbox.ts'
-import { ageText, deleteConfirm, DONE_LABELS, firstLine, goalLine, KIND_NAMES, progressText } from './labels.ts'
+import { ageText, deleteConfirm, DONE_LABELS, firstLine, goalLine, KIND_NAMES, progressText, SPAN_ERROR } from './labels.ts'
 import { goalLink } from './goal.ts'
 import { withPlanSpan } from './plan.ts'
 import { PlanButtons } from './PlanItem.tsx'
 import { RepeatSetup } from './Repeat.tsx'
-
-/** Последний день периода не позже первого — дело в план не уходит (Р-101). */
-const SPAN_ERROR = '«По какой день» — позже дня начала'
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'

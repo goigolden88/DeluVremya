@@ -37,8 +37,98 @@ function patternLink(id: string): string {
 }
 
 /**
- * Правило повтора: с какого дня, как часто, до какого — по желанию.
- * Кривое — причина под кнопкой, ничего не пишется.
+ * Поля правила: с какого дня, как часто, до какого — по желанию. Общие
+ * для формы правила в карточке и для записи дела на «Заметках» (Р-108).
+ */
+export function RuleFields({ draft, onChange }: { draft: RuleDraft; onChange: (part: Partial<RuleDraft>) => void }) {
+  return (
+    <>
+      <label className="field">
+        <span>С какого дня</span>
+        <input
+          type="date"
+          name="repeat-from"
+          value={draft.from}
+          onChange={(event) => {
+            const day = event.target.value
+            if (isDateStr(day)) onChange({ from: day })
+          }}
+        />
+      </label>
+
+      <div className="chips" role="group" aria-label="Как часто">
+        {REPEAT_EVERY.map((every) => (
+          <button
+            key={every}
+            type="button"
+            className={draft.every === every ? 'chip chip--on' : 'chip'}
+            aria-pressed={draft.every === every}
+            onClick={() => onChange({ every })}
+          >
+            {EVERY_NAMES[every]}
+          </button>
+        ))}
+      </div>
+
+      {draft.every === 'days' && (
+        <label className="field">
+          <span>Каждые сколько дней</span>
+          <input
+            name="repeat-step"
+            inputMode="numeric"
+            value={draft.step}
+            onChange={(event) => onChange({ step: event.target.value })}
+          />
+        </label>
+      )}
+      {draft.every === 'week' && (
+        <div className="chips" role="group" aria-label="Дни недели">
+          {WEEKDAY_NAMES.map((name, index) => {
+            const day = index + 1
+            const on = draft.weekdays.includes(day)
+            return (
+              <button
+                key={name}
+                type="button"
+                className={on ? 'chip chip--on' : 'chip'}
+                aria-pressed={on}
+                onClick={() => onChange({ weekdays: toggleWeekday(draft.weekdays, day) })}
+              >
+                {name}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {draft.every === 'month' && (
+        <label className="field">
+          <span>Какого числа — в коротком месяце последний день</span>
+          <input
+            name="repeat-month-day"
+            inputMode="numeric"
+            value={draft.monthDay}
+            onChange={(event) => onChange({ monthDay: event.target.value })}
+          />
+        </label>
+      )}
+
+      <label className="field">
+        <span>До какого дня — по желанию</span>
+        <input
+          type="date"
+          name="repeat-until"
+          min={draft.from}
+          value={draft.until}
+          onChange={(event) => onChange({ until: event.target.value })}
+        />
+      </label>
+    </>
+  )
+}
+
+/**
+ * Правило повтора: поля и кнопка. Кривое — причина под кнопкой,
+ * ничего не пишется.
  */
 function RuleForm({
   rule,
@@ -78,86 +168,7 @@ function RuleForm({
         save()
       }}
     >
-      <label className="field">
-        <span>С какого дня</span>
-        <input
-          type="date"
-          name="repeat-from"
-          value={draft.from}
-          onChange={(event) => {
-            const day = event.target.value
-            if (isDateStr(day)) change({ from: day })
-          }}
-        />
-      </label>
-
-      <div className="chips" role="group" aria-label="Как часто">
-        {REPEAT_EVERY.map((every) => (
-          <button
-            key={every}
-            type="button"
-            className={draft.every === every ? 'chip chip--on' : 'chip'}
-            aria-pressed={draft.every === every}
-            onClick={() => change({ every })}
-          >
-            {EVERY_NAMES[every]}
-          </button>
-        ))}
-      </div>
-
-      {draft.every === 'days' && (
-        <label className="field">
-          <span>Каждые сколько дней</span>
-          <input
-            name="repeat-step"
-            inputMode="numeric"
-            value={draft.step}
-            onChange={(event) => change({ step: event.target.value })}
-          />
-        </label>
-      )}
-      {draft.every === 'week' && (
-        <div className="chips" role="group" aria-label="Дни недели">
-          {WEEKDAY_NAMES.map((name, index) => {
-            const day = index + 1
-            const on = draft.weekdays.includes(day)
-            return (
-              <button
-                key={name}
-                type="button"
-                className={on ? 'chip chip--on' : 'chip'}
-                aria-pressed={on}
-                onClick={() => change({ weekdays: toggleWeekday(draft.weekdays, day) })}
-              >
-                {name}
-              </button>
-            )
-          })}
-        </div>
-      )}
-      {draft.every === 'month' && (
-        <label className="field">
-          <span>Какого числа — в коротком месяце последний день</span>
-          <input
-            name="repeat-month-day"
-            inputMode="numeric"
-            value={draft.monthDay}
-            onChange={(event) => change({ monthDay: event.target.value })}
-          />
-        </label>
-      )}
-
-      <label className="field">
-        <span>До какого дня — по желанию</span>
-        <input
-          type="date"
-          name="repeat-until"
-          min={draft.from}
-          value={draft.until}
-          onChange={(event) => change({ until: event.target.value })}
-        />
-      </label>
-
+      <RuleFields draft={draft} onChange={change} />
       {error && <p className="error">{error}</p>}
       <div className="row row--wrap">
         <button type="submit" className="btn">

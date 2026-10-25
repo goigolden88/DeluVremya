@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { addDays, type DateStr } from '../shared/core/dates.ts'
+import { addDays, isDateStr, type DateStr } from '../shared/core/dates.ts'
 import { db } from '../app/core.ts'
 import type { Note, NoteKind } from '../app/model.ts'
+import { captureDraft, type CaptureWhen } from '../modules/notes/capture.ts'
 import {
-  captureNote,
   DEFAULT_KIND,
   goalOf,
   goalsOf,
@@ -33,8 +33,8 @@ import {
 } from '../modules/notes/labels.ts'
 import { noteAnchor, NoteItem } from '../modules/notes/NoteItem.tsx'
 import { plannedCount, withPlan } from '../modules/notes/plan.ts'
-import { patternsOf } from '../modules/notes/repeat.ts'
-import { RepeatItem, REPEATS_TITLE } from '../modules/notes/Repeat.tsx'
+import { draftOfRule, patternLine, patternsOf, stopPattern, type RuleDraft } from '../modules/notes/repeat.ts'
+import { REPEAT_LABEL, RepeatItem, REPEATS_TITLE, RuleFields } from '../modules/notes/Repeat.tsx'
 import { fromSomeday, somedayOf } from '../modules/notes/review.ts'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../shared/ui/Fold.tsx'
@@ -46,6 +46,18 @@ import { useReviews } from './useReview.ts'
 
 /** Чипы отбора неразобранного: замыслы живут своим блоком (Р-31). */
 const UNSORTED_KINDS = NOTE_KINDS.filter((kind) => kind !== 'goal')
+
+/** Куда дело при записи (Р-73, Р-108): чип под видом; не выбран — в неразобранное. */
+type Choice = 'today' | 'tomorrow' | 'other' | 'repeat'
+
+const CHOICE_NAMES: Record<Choice, string> = {
+  today: 'На сегодня',
+  tomorrow: 'На завтра',
+  other: 'Другой день',
+  repeat: REPEAT_LABEL,
+}
+
+const CHOICES = Object.keys(CHOICE_NAMES) as Choice[]
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
@@ -68,8 +80,13 @@ export function Inbox() {
   const field = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState(shared)
   const [kind, setKind] = useState<NoteKind>(DEFAULT_KIND)
-  /** В план при записи (Р-73): день или null — во входящие. */
-  const [when, setWhen] = useState<DateStr | null>(null)
+  /** Куда дело при записи (Р-73, Р-108): null — во входящие. */
+  const [when, setWhen] = useState<Choice | null>(null)
+  /** «Другой день»: день — строкой поля, пустой — не выбран; «По какой день» — по желанию (Р-101). */
+  const [otherDay, setOtherDay] = useState('')
+  const [otherTo, setOtherTo] = useState<DateStr | null>(null)
+  /** Кривой день, период или правило: запись не пишется, текст остаётся. */
+  const [captureError, setCaptureError] = useState('')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState('')
   const [error, setError] = useState('')
@@ -80,10 +97,14 @@ export function Inbox() {
   const [finished, setFinished] = useState<Note | null>(null)
   /** Последнее «В план» — его тоже снимает «Отменить». */
   const [planned, setPlanned] = useState<Note | null>(null)
+  /** Последний повтор, поставленный при записи, — «Отменить» убирает его целиком. */
+  const [repeated, setRepeated] = useState<Note | null>(null)
   const read = useNotes()
   const reviews = useReviews()
   const names = useScreenNames()
   const today = useToday()
+  /** «Повторять»: правило, как в карточке; первый день — сегодня (Р-107). */
+  const [rule, setRule] = useState<RuleDraft>(() => draftOfRule(null, today))
 
   // Второе «Поделиться», пока экран открыт, приходит новым адресом.
   useEffect(() => {
@@ -139,20 +160,51 @@ export function Inbox() {
     )
   }, [scrollTo, loaded])
 
+  /** Выбор под видом — в черновик записи. */
+  function captureWhen(): CaptureWhen {
+    switch (when) {
+      case 'today':
+        return { at: 'day', day: today, to: null }
+      case 'tomorrow':
+        return { at: 'day', day: addDays(today, 1), to: null }
+      case 'other':
+        return { at: 'day', day: otherDay, to: otherTo }
+      case 'repeat':
+        return { at: 'repeat', rule }
+      case null:
+        return { at: 'unsorted' }
+    }
+  }
+
+  function choose(next: Choice | null) {
+    setCaptureError('')
+    setWhen(next)
+    // Каждый раз с чистого: день и правило прошлого выбора молча не ложатся.
+    setOtherDay('')
+    setOtherTo(null)
+    setRule(draftOfRule(null, today))
+  }
+
   async function save() {
-    const draft = captureNote(text, today, kind, when)
+    const draft = captureDraft(text, today, kind, captureWhen())
     if (!draft) return
+    // Кривой день, период или правило — не пишется, текст остаётся.
+    if ('error' in draft) {
+      setCaptureError(draft.error)
+      return
+    }
     setBusy(true)
     setSaved('')
     setError('')
     try {
-      const stored = await db.put('notes', draft)
+      const stored = await db.put('notes', draft.note)
       setText('')
       setSaved(savedLine(kind))
-      // Поставленное в план — с «Отменить», как «В план» из карточки.
+      // Поставленное в план — с «Отменить», как «В план» из карточки; повтор — тоже.
       setPlanned(stored.plannedFor !== null ? stored : null)
+      setRepeated(stored.repeat !== undefined ? stored : null)
       setFinished(null)
-      setWhen(null)
+      choose(null)
       // Вид — на каждую запись свой: выбранная раз «Мысль» не должна
       // молча лечь и на следующую (Р-13).
       setKind(DEFAULT_KIND)
@@ -170,6 +222,7 @@ export function Inbox() {
     try {
       setFinished(await db.put('notes', markDone(note, today)))
       setPlanned(null)
+      setRepeated(null)
       setOpenId(null)
     } catch (failure) {
       setError(describe(failure))
@@ -194,6 +247,7 @@ export function Inbox() {
     try {
       setPlanned(await db.put('notes', next))
       setFinished(null)
+      setRepeated(null)
       setOpenId(null)
     } catch (failure) {
       setError(describe(failure))
@@ -206,6 +260,21 @@ export function Inbox() {
     try {
       await db.put('notes', withPlan(planned, null))
       setPlanned(null)
+    } catch (failure) {
+      setError(describe(failure))
+    }
+  }
+
+  // Повтор, поставленный при записи, убирается целиком — как «Остановить повтор»:
+  // с ним и пункт, если «Сегодня» уже успел его поставить (Р-107).
+  async function unrepeat() {
+    if (!repeated) return
+    setError('')
+    const notes = read.notes ?? []
+    const current = notes.find((note) => note.id === repeated.id) ?? repeated
+    try {
+      await db.putMany('notes', stopPattern(current, notes, today))
+      setRepeated(null)
     } catch (failure) {
       setError(describe(failure))
     }
@@ -287,32 +356,75 @@ export function Inbox() {
               aria-pressed={each === kind}
               onClick={() => {
                 setKind(each)
-                if (each !== 'task') setWhen(null)
+                if (each !== 'task') choose(null)
               }}
             >
               {KIND_NAMES[each]}
             </button>
           ))}
         </div>
-        {/* В план сразу — только дело и только по желанию: не выбрал — во входящие (Р-73). */}
+        {/* В план или повтором сразу — только дело и только по желанию: не выбрал — во входящие (Р-73, Р-108). */}
         {kind === 'task' && (
           <div className="chips" role="group" aria-label="В план при записи">
-            {[
-              { day: today, label: 'На сегодня' },
-              { day: addDays(today, 1), label: 'На завтра' },
-            ].map((each) => (
+            {CHOICES.map((each) => (
               <button
-                key={each.label}
+                key={each}
                 type="button"
-                className={when === each.day ? 'chip chip--on' : 'chip'}
-                aria-pressed={when === each.day}
-                onClick={() => setWhen(when === each.day ? null : each.day)}
+                className={when === each ? 'chip chip--on' : 'chip'}
+                aria-pressed={when === each}
+                onClick={() => choose(when === each ? null : each)}
               >
-                {each.label}
+                {CHOICE_NAMES[each]}
               </button>
             ))}
           </div>
         )}
+        {kind === 'task' && when === 'other' && (
+          <>
+            {/* Сегодня или завтра в поле — то же, что их чипы. */}
+            <label className="field">
+              <span>На день</span>
+              <input
+                type="date"
+                name="capture-day"
+                min={today}
+                value={otherDay}
+                onChange={(event) => {
+                  const day = event.target.value
+                  setCaptureError('')
+                  if (day === '' || (isDateStr(day) && day >= today)) setOtherDay(day)
+                }}
+              />
+            </label>
+            {/* Сразу на период (Р-101): необязательно, без него — на один день. */}
+            <label className="field">
+              <span>По какой день</span>
+              <input
+                type="date"
+                name="capture-to"
+                min={addDays(isDateStr(otherDay) ? otherDay : today, 1)}
+                value={otherTo ?? ''}
+                onChange={(event) => {
+                  const day = event.target.value
+                  setCaptureError('')
+                  if (day === '') setOtherTo(null)
+                  else if (isDateStr(day) && day > today) setOtherTo(day)
+                }}
+              />
+            </label>
+          </>
+        )}
+        {/* Та же форма правила, что в карточке дела (Р-107): дело уйдёт в «Повторы». */}
+        {kind === 'task' && when === 'repeat' && (
+          <RuleFields
+            draft={rule}
+            onChange={(part) => {
+              setCaptureError('')
+              setRule({ ...rule, ...part })
+            }}
+          />
+        )}
+        {captureError && <p className="error">{captureError}</p>}
         <div className="form__actions">
           <button type="submit" className="btn btn--primary" disabled={busy || !text.trim()}>
             Записать
@@ -333,6 +445,16 @@ export function Inbox() {
         <p className="added">
           <span>{plannedLine(planned.plannedFor ?? today, today)}</span>
           <button type="button" className="link-btn" onClick={() => void unplan()}>
+            Отменить
+          </button>
+        </p>
+      )}
+      {repeated && (
+        <p className="added">
+          <span>
+            Повтор: {patternLine(repeated)} — в блоке «{REPEATS_TITLE}»
+          </span>
+          <button type="button" className="link-btn" onClick={() => void unrepeat()}>
             Отменить
           </button>
         </p>
