@@ -37,7 +37,7 @@ export function stateParts(note: Note, day: DayFormat = shortDay): string[] {
   } else if (note.status === 'dropped') {
     parts.push('отброшено')
   } else if (note.repeat !== undefined) {
-    // Образец повтора (Р-106): в план встают его пункты, сам он — правило.
+    // Образец повтора (Р-107): в план встают его пункты, сам он — правило.
     parts.push('повтор')
   } else if (note.plannedFor !== null) {
     // Дело на период — с последним днём: «в плане на 12.10–15.10» (Р-101).
@@ -50,23 +50,24 @@ export function stateParts(note: Note, day: DayFormat = shortDay): string[] {
 
 /**
  * Открывается ли карточка на «Заметках»: там лежат неразобранное, замыслы
- * в работе (Р-59) и повторы (Р-106).
+ * в работе (Р-59) и повторы (Р-107).
+ * `observed` — id наблюдений недели: в неразобранном их нет (Р-106).
  */
-function opensOnNotes(note: Note): boolean {
-  return isUnsorted(note) || (note.kind === 'goal' && note.status === 'open') || isPattern(note)
+function opensOnNotes(note: Note, observed?: ReadonlySet<string>): boolean {
+  return isUnsorted(note, observed) || (note.kind === 'goal' && note.status === 'open') || isPattern(note)
 }
 
 /** Переход к карточке записи на «Заметках» — из ленты и с экрана замысла. Null — её там нет. */
-export function notesLink(note: Note): string | null {
-  return opensOnNotes(note) ? `/inbox?open=${encodeURIComponent(note.id)}` : null
+export function notesLink(note: Note, observed?: ReadonlySet<string>): string | null {
+  return opensOnNotes(note, observed) ? `/inbox?open=${encodeURIComponent(note.id)}` : null
 }
 
-export function noteFeed(notes: readonly Note[]): FeedItem[] {
+export function noteFeed(notes: readonly Note[], observed?: ReadonlySet<string>): FeedItem[] {
   return notes
     .filter((note) => !note.deleted)
     .map((note): FeedItem => {
       const goal = goalOf(note, notes)
-      const link = notesLink(note)
+      const link = notesLink(note, observed)
       // Весь текст, замысел и дни плана и выполнения ищутся, но в строке их нет.
       const extra = [
         note.text,

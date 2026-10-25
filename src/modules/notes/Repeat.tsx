@@ -23,7 +23,7 @@ import {
   type RuleDraft,
 } from './repeat.ts'
 
-/** Заголовок блока на «Заметках» и кнопка в карточке дела (Р-106). */
+/** Заголовок блока на «Заметках» и кнопка в карточке дела (Р-107). */
 export const REPEATS_TITLE = 'Повторы'
 export const REPEAT_LABEL = 'Повторять'
 
@@ -174,7 +174,7 @@ function RuleForm({
 }
 
 /**
- * «Повторять» в карточке дела — на «Заметках» и в плане (Р-106). Дело
+ * «Повторять» в карточке дела — на «Заметках» и в плане (Р-107). Дело
  * становится повтором: уходит в блок «Повторы», а в план встают его пункты.
  * Первый день — день, на который дело стоит, иначе сегодня.
  */
@@ -234,7 +234,7 @@ type ItemProps = {
   anchor: string
 }
 
-/** Строка повтора в блоке «Повторы»: текст и правило словами, тап — правка (Р-106). */
+/** Строка повтора в блоке «Повторы»: текст и правило словами, тап — правка (Р-107). */
 export function RepeatItem({ pattern, notes, today, open, onToggle, onError, anchor }: ItemProps) {
   const meta = [patternLine(pattern)]
   if (pattern.estMin !== undefined) meta.push(durationText(pattern.estMin))

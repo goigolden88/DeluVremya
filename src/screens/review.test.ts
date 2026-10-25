@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { Review } from '../app/model.ts'
+import type { Note, Review } from '../app/model.ts'
+import { noteFeed } from '../modules/notes/feed.ts'
+import { captureNote, inboxOf, noteRef } from '../modules/notes/inbox.ts'
 import {
   CALL_DAYS,
   DEFAULT_THRESHOLDS,
@@ -7,6 +9,7 @@ import {
   dueWeek,
   familySummaryUrl,
   markReviewed,
+  observedIds,
   parseThresholds,
   readThreshold,
   reviewCall,
@@ -65,6 +68,41 @@ describe('один обзор на неделю — Р-42', () => {
     const at = new Date(2026, 8, 13, 19, 5).toISOString()
     expect(doneText(review('2026-09-07', { doneAt: at }))).toBe('Обзор проведён 13 сентября 2026 в 19:05')
     expect(doneText(review('2026-09-07', { doneAt: 'вчера' }))).toBe('Обзор проведён')
+  })
+})
+
+describe('наблюдение недели — не в неразобранном — Р-106', () => {
+  // Старое наблюдение записано прежде, новое — только что, тем же путём, что `Review.tsx`.
+  const old = { ...(captureNote('Старое наблюдение', '2026-09-06', 'thought') as Note), id: 'OLD' }
+  const fresh = captureNote('Новое наблюдение', SUNDAY, 'thought') as Note
+  const thought = captureNote('Обычная мысль', SUNDAY, 'thought') as Note
+  const task = captureNote('Позвонить в сервис', SUNDAY) as Note
+  const notes = [old, fresh, thought, task]
+  const reviews = [
+    review('2026-08-31', { refs: [noteRef(old.id)] }),
+    markReviewed(null, '2026-09-07', '2026-09-13T18:00:00.000Z', [noteRef(fresh.id)]),
+  ]
+
+  it('наблюдения — старое и новое — уходят; обычная мысль и дело остаются', () => {
+    const observed = observedIds(reviews)
+    expect([...observed].sort()).toEqual([fresh.id, 'OLD'].sort())
+    expect(inboxOf(notes, observed).map((note) => note.text).sort()).toEqual(['Обычная мысль', 'Позвонить в сервис'])
+    // Без списка — как раньше: план дня и висяки берут только дела.
+    expect(inboxOf(notes)).toHaveLength(4)
+  })
+
+  it('обзор удалён — его наблюдение снова в неразобранном; ссылки не на заметки — мимо', () => {
+    const observed = observedIds([review('2026-08-31', { refs: [noteRef(old.id)], deleted: true }), review('2026-09-07', { refs: ['time:X'] })])
+    expect(observed.size).toBe(0)
+    expect(inboxOf([old], observed)).toHaveLength(1)
+  })
+
+  it('в ленте наблюдение есть, но карточку на «Заметках» не открывает', () => {
+    const items = noteFeed(notes, observedIds(reviews))
+    expect(items.map((item) => item.id).sort()).toEqual(notes.map((note) => note.id).sort())
+    expect(items.find((item) => item.id === fresh.id)?.date).toBe(SUNDAY)
+    expect(items.find((item) => item.id === fresh.id)?.link).toBeUndefined()
+    expect(items.find((item) => item.id === thought.id)?.link).toBe(`/inbox?open=${thought.id}`)
   })
 })
 

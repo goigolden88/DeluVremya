@@ -64,23 +64,28 @@ export function compareNotes(a: Note, b: Note): number {
   return b.id.localeCompare(a.id)
 }
 
+const NONE: ReadonlySet<string> = new Set()
+
 /**
  * Лежит в неразобранном: не в плане, открыто, не замысел и не образец повтора —
- * у них свои блоки (Р-31, Р-106).
+ * у них свои блоки (Р-31, Р-107).
+ * `observed` — id наблюдений недели: итог недели, разбирать в нём нечего (Р-106).
+ * Чьи это наблюдения, модуль не знает — список даёт тот, кто читает обзоры.
  */
-export function isUnsorted(note: Note): boolean {
+export function isUnsorted(note: Note, observed: ReadonlySet<string> = NONE): boolean {
   return (
     !note.deleted &&
     note.plannedFor === null &&
     note.status === 'open' &&
     note.kind !== 'goal' &&
-    note.repeat === undefined
+    note.repeat === undefined &&
+    !observed.has(note.id)
   )
 }
 
 /** Неразобранное в порядке экрана. */
-export function inboxOf(notes: readonly Note[]): Note[] {
-  return notes.filter(isUnsorted).sort(compareNotes)
+export function inboxOf(notes: readonly Note[], observed: ReadonlySet<string> = NONE): Note[] {
+  return notes.filter((note) => isUnsorted(note, observed)).sort(compareNotes)
 }
 
 /** Замыслы в работе: не достигнуты, не отброшены, не удалены. */
@@ -190,6 +195,11 @@ export function noteRef(id: string): string {
   return `${NOTE_REF}${id}`
 }
 
+/** id заметки из ссылки в `refs`. Null — ссылка не на заметку. */
+export function noteIdOf(ref: string): string | null {
+  return ref.startsWith(NOTE_REF) ? ref.slice(NOTE_REF.length) : null
+}
+
 /** id замысла, к которому относится дело или мысль (Р-102). Null — ни к какому. */
 export function goalIdOf(note: Note): string | null {
   const ref = note.refs?.find((each) => each.startsWith(NOTE_REF))
@@ -220,7 +230,7 @@ export function goalOf(note: Note, notes: readonly Note[]): Note | null {
 
 /**
  * Записи замысла одного вида: живые, не отброшенные, в порядке экрана.
- * Образец повтора — правило, а не дело: в счёт идут его пункты дней (Р-106).
+ * Образец повтора — правило, а не дело: в счёт идут его пункты дней (Р-107).
  */
 function ofGoal(goalId: string, kind: NoteKind, notes: readonly Note[]): Note[] {
   return notes

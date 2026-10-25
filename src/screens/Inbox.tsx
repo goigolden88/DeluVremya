@@ -41,6 +41,8 @@ import { Fold } from '../shared/ui/Fold.tsx'
 import { monthFoldedByDefault } from '../shared/ui/monthFold.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../shared/ui/useToday.ts'
+import { observedIds } from './review.ts'
+import { useReviews } from './useReview.ts'
 
 /** Чипы отбора неразобранного: замыслы живут своим блоком (Р-31). */
 const UNSORTED_KINDS = NOTE_KINDS.filter((kind) => kind !== 'goal')
@@ -53,7 +55,8 @@ function describe(error: unknown): string {
  * Заметки (Р-32) — адрес `/inbox`: одна точка захвата всего, что пришло
  * в голову или прилетело ссылкой, — замена «Избранному» Телеграма.
  * Здесь лежит неразобранное: дела отсюда уходят в план дня, мысли —
- * в обзор недели. Замыслы — своим блоком (Р-31).
+ * в обзор недели. Замыслы — своим блоком (Р-31). Наблюдений недели здесь
+ * нет — они в ленте и в обзоре (Р-106).
  *
  * Сюда же приходит то, чем поделились: `launch.ts` кладёт текст
  * в `?shared=` (Р-16). Поле подставляется, но записывается только по кнопке:
@@ -78,6 +81,7 @@ export function Inbox() {
   /** Последнее «В план» — его тоже снимает «Отменить». */
   const [planned, setPlanned] = useState<Note | null>(null)
   const read = useNotes()
+  const reviews = useReviews()
   const names = useScreenNames()
   const today = useToday()
 
@@ -121,7 +125,9 @@ export function Inbox() {
     )
   }, [opened, setParams])
 
-  const loaded = read.notes !== null
+  // Записи — когда прочитаны и заметки, и обзоры: без обзоров наблюдения
+  // мелькнули бы в неразобранном (Р-106). Обзоры не прочитались — показ без них.
+  const loaded = read.notes !== null && (reviews.reviews !== null || reviews.error !== '')
   useEffect(() => {
     if (scrollTo === null || !loaded) return
     const target = scrollTo
@@ -221,7 +227,8 @@ export function Inbox() {
   const words = queryWords(query)
   const goals = goalsOf(all)
   const shownGoals = goals.filter((goal) => matchesQuery(goal, words))
-  const unsorted = inboxOf(all)
+  // Наблюдения недели — итог, не разбор: в неразобранное не идут (Р-106).
+  const unsorted = inboxOf(all, observedIds(reviews.reviews ?? []))
   const counts = kindCounts(unsorted)
   const waiting = plannedCount(all)
   // У дела ищется и название его замысла: «испанский» находит его дела.
@@ -332,8 +339,9 @@ export function Inbox() {
       )}
       {error && <p className="error">Не записалось: {error}</p>}
       {read.error && <p className="error">Записи не прочитались: {read.error}</p>}
+      {reviews.error && <p className="error">Обзоры не прочитались: {reviews.error}</p>}
 
-      {read.notes !== null && (
+      {loaded && (
         <>
           {all.length > 0 && (
             <input
@@ -425,7 +433,7 @@ export function Inbox() {
             )}
           </section>
 
-          {/* Повторы — правила, а не дела: в неразобранном их нет, в план встают их пункты (Р-106). */}
+          {/* Повторы — правила, а не дела: в неразобранном их нет, в план встают их пункты (Р-107). */}
           {repeats.length > 0 && (
             <Fold
               id="notes:repeats"

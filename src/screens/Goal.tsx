@@ -21,6 +21,8 @@ import { useNotes } from '../modules/notes/useNotes.ts'
 import { Fold } from '../shared/ui/Fold.tsx'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../shared/ui/useToday.ts'
+import { observedIds } from './review.ts'
+import { useReviews } from './useReview.ts'
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
@@ -42,6 +44,7 @@ const ADD_KINDS: readonly NoteKind[] = ['task', 'thought']
 export function Goal() {
   const { id = '' } = useParams()
   const read = useNotes()
+  const reviews = useReviews()
   const names = useScreenNames()
   const today = useToday()
   const [adding, setAdding] = useState<NoteKind | null>(null)
@@ -79,6 +82,7 @@ export function Goal() {
   const goalId = goal.id
   const vision = goalVision(goal)
   const entries = goalEntries(goalId, all)
+  const observed = observedIds(reviews.reviews ?? [])
   // Откреплённая стоит на своём месте строкой «Откреплено», пока её не вернули.
   // Берётся нынешний вид записи: её могли поправить, пока висит «Отменить».
   const detachedNow = detached && all.find((note) => note.id === detached.id && !note.deleted)
@@ -278,7 +282,12 @@ export function Goal() {
                       </p>
                     </li>
                   ) : (
-                    <GoalEntry key={note.id} note={note} onDetach={() => void relink(note, null)} />
+                    <GoalEntry
+                      key={note.id}
+                      note={note}
+                      observed={observed}
+                      onDetach={() => void relink(note, null)}
+                    />
                   ),
                 )}
               </ul>
@@ -292,11 +301,20 @@ export function Goal() {
 
 /**
  * Строка ленты замысла. Неразобранное ведёт на «Заметки» к своей карточке
- * (Р-59); дело в плане и сделанное там не лежат — строка без перехода.
- * Рядом — «Открепить»: запись остаётся в заметках, но без замысла.
+ * (Р-59); дело в плане, сделанное и наблюдение недели (Р-106) там не лежат —
+ * строка без перехода. Рядом — «Открепить»: запись остаётся в заметках,
+ * но без замысла.
  */
-function GoalEntry({ note, onDetach }: { note: Note; onDetach: () => void }) {
-  const link = notesLink(note)
+function GoalEntry({
+  note,
+  observed,
+  onDetach,
+}: {
+  note: Note
+  observed: ReadonlySet<string>
+  onDetach: () => void
+}) {
+  const link = notesLink(note, observed)
   const row = (
     <>
       <span className="feed__date">{feedDateText(note.capturedOn ?? '')}</span>

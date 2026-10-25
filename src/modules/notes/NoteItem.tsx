@@ -217,7 +217,7 @@ function NoteCard({
           </label>
           {spanError && <p className="error">{spanError}</p>}
           <PlanButtons note={note} today={today} onMove={plan} />
-          {/* Или повторять по датам: дело уйдёт в «Повторы» (Р-106). */}
+          {/* Или повторять по датам: дело уйдёт в «Повторы» (Р-107). */}
           <RepeatSetup note={note} today={today} onError={onError} />
         </>
       )}
