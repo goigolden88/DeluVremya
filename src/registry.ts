@@ -30,6 +30,7 @@ import { importNotes, notesImportSpec } from './modules/notes/import.ts'
 import { timeFeed, timeMarkdown } from './modules/time/feed.ts'
 import { importTime, timeImportSpec } from './modules/time/import.ts'
 import { SPECIAL_LABEL, specialFeed, specialMarkdown } from './modules/time/specials.ts'
+import { observedIds } from './screens/review.ts'
 import { reviewFeed, reviewMarkdown } from './screens/reviewFeed.ts'
 
 /**
@@ -61,7 +62,8 @@ type KindEntry = {
 export const KINDS: { readonly [K in RecordKind]: KindEntry } = {
   note: {
     label: 'Заметки и план',
-    feed: (data) => noteFeed(data.notes),
+    // Наблюдение недели карточку на «Заметках» не открывает: в неразобранном его нет (Р-106).
+    feed: (data) => noteFeed(data.notes, observedIds(data.reviews)),
     markdown: (data, _day, period) => noteMarkdown(data.notes, period),
     import: { spec: notesImportSpec, run: importNotes },
   },

@@ -64,14 +64,22 @@ export function compareNotes(a: Note, b: Note): number {
   return b.id.localeCompare(a.id)
 }
 
-/** Лежит в неразобранном: не в плане, открыто, не замысел — у него свой блок (Р-31). */
-export function isUnsorted(note: Note): boolean {
-  return !note.deleted && note.plannedFor === null && note.status === 'open' && note.kind !== 'goal'
+const NONE: ReadonlySet<string> = new Set()
+
+/**
+ * Лежит в неразобранном: не в плане, открыто, не замысел — у него свой блок (Р-31).
+ * `observed` — id наблюдений недели: итог недели, разбирать в нём нечего (Р-106).
+ * Чьи это наблюдения, модуль не знает — список даёт тот, кто читает обзоры.
+ */
+export function isUnsorted(note: Note, observed: ReadonlySet<string> = NONE): boolean {
+  return (
+    !note.deleted && note.plannedFor === null && note.status === 'open' && note.kind !== 'goal' && !observed.has(note.id)
+  )
 }
 
 /** Неразобранное в порядке экрана. */
-export function inboxOf(notes: readonly Note[]): Note[] {
-  return notes.filter(isUnsorted).sort(compareNotes)
+export function inboxOf(notes: readonly Note[], observed: ReadonlySet<string> = NONE): Note[] {
+  return notes.filter((note) => isUnsorted(note, observed)).sort(compareNotes)
 }
 
 /** Замыслы в работе: не достигнуты, не отброшены, не удалены. */
@@ -179,6 +187,11 @@ const NOTE_REF = 'note:'
 
 export function noteRef(id: string): string {
   return `${NOTE_REF}${id}`
+}
+
+/** id заметки из ссылки в `refs`. Null — ссылка не на заметку. */
+export function noteIdOf(ref: string): string | null {
+  return ref.startsWith(NOTE_REF) ? ref.slice(NOTE_REF.length) : null
 }
 
 /** id замысла, к которому относится дело или мысль (Р-102). Null — ни к какому. */

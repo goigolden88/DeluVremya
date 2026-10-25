@@ -2,7 +2,8 @@
  * Обзор недели: какая неделя к обзору, проведён ли он, когда звать
  * (Р-41, Р-42, Р-51), пороги разбора (Р-48).
  *
- * Чистые функции: знают только даты и запись `Review`. Расчёты недели —
+ * Чистые функции: знают только даты и запись `Review`; ссылку на заметку
+ * читают правилом модуля заметок. Расчёты недели —
  * в модулях, каждый своё; блоки сводит `Review.tsx`.
  */
 
@@ -18,6 +19,7 @@ import {
   type DateStr,
 } from '../shared/core/dates.ts'
 import type { Review } from '../app/model.ts'
+import { noteIdOf } from '../modules/notes/inbox.ts'
 import { GOAL_STILL_DAYS, MAX_THRESHOLD, MIN_THRESHOLD, STALE_DAYS } from '../modules/notes/review.ts'
 
 // ─── Неделя (Р-41) ─────────────────────────────────────────────────────────
@@ -70,6 +72,23 @@ export function markReviewed(existing: Review | null, week: DateStr, at: string,
     doneAt: at,
     ...(all.length > 0 ? { refs: all } : {}),
   }
+}
+
+/**
+ * Наблюдения недели — id заметок, на которые ссылаются живые обзоры (Р-49).
+ * В неразобранное они не идут (Р-106): пометки у самой мысли нет, и старые
+ * наблюдения узнаются только так.
+ */
+export function observedIds(reviews: readonly Review[]): Set<string> {
+  const ids = new Set<string>()
+  for (const review of reviews) {
+    if (review.deleted) continue
+    for (const ref of review.refs ?? []) {
+      const id = noteIdOf(ref)
+      if (id !== null) ids.add(id)
+    }
+  }
+  return ids
 }
 
 /** Когда проведён — по часам устройства. Кривое время — без даты, а не падение. */
