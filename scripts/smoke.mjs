@@ -3371,6 +3371,50 @@ async function polishScenario() {
     `${line(captured, 'Поставлено')}; мысль без чипов: ${asThought}`,
   )
 
+  // ─ Повтор при записи (Р-108): кривое правило не пишется, текст остаётся;
+  //   верное — дело сразу в «Повторах», не в неразобранном.
+  await go('/inbox')
+  const chip = (name) =>
+    `[...document.querySelectorAll('[aria-label="В план при записи"] button')].find((el) => el.textContent.trim() === ${JSON.stringify(name)})?.click()`
+  await act(`
+    set(document.querySelector('textarea[name=text]'), 'Повтор с записи');
+    ${chip('Повторять')};
+  `)
+  await sleep(400)
+  // Единственный выбранный день недели снят — правило кривое.
+  await act(`document.querySelector('[aria-label="Дни недели"] button[aria-pressed=true]')?.click()`)
+  await sleep(300)
+  await act(`byText('button', 'Записать')?.click()`)
+  await sleep(500)
+  const badRule = await screen()
+  const kept = await run(`document.querySelector('textarea[name=text]')?.value ?? ''`)
+  await act(`document.querySelector('[aria-label="Дни недели"] button')?.click()`)
+  await sleep(300)
+  await act(`byText('button', 'Записать')?.click()`)
+  await sleep(700)
+  const repeatedNow = await screen()
+  const unsortedNow = await run(
+    `[...document.querySelectorAll('section')].find((el) => el.querySelector(':scope > h2')?.textContent.trim() === 'Неразобранное')?.innerText ?? ''`,
+  )
+  check(
+    'дело при записи — «Повторять»: кривое правило не пишется, верное — сразу в «Повторах», с «Отменить» — Р-108',
+    has(badRule, 'Не выбран ни один день недели') &&
+      kept === 'Повтор с записи' &&
+      has(repeatedNow, 'в блоке «Повторы»') &&
+      !has(unsortedNow, 'Повтор с записи'),
+    `${line(badRule, 'Не выбран')}; текст: ${kept}; ${line(repeatedNow, 'в блоке «Повторы»')}`,
+  )
+  await act(
+    `const undoRepeat = [...document.querySelectorAll('p.added')].find((el) => el.textContent.includes('в блоке «Повторы»'))?.querySelector('button'); undoRepeat?.click()`,
+  )
+  await sleep(700)
+  const undone = await screen()
+  check(
+    '«Отменить» после повтора при записи убирает повтор целиком — Р-108',
+    !has(undone, 'в блоке «Повторы»') && !has(undone, 'Повтор с записи'),
+    line(undone, 'Повтор'),
+  )
+
   // ─ Группы категорий (Р-81): новая установка — со стартовыми группами; новая
   //   группа — из карточки; итог дня — строкой группы.
   await go('/time/categories')

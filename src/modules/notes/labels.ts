@@ -237,6 +237,9 @@ export function plannedLine(day: DateStr, today: DateStr): string {
   return `Поставлено на ${dayText(day, today)}`
 }
 
+/** Последний день периода не позже первого — дело в план не уходит (Р-101). */
+export const SPAN_ERROR = '«По какой день» — позже дня начала'
+
 // ─── Шаблоны дня (Р-39) ────────────────────────────────────────────────────
 
 export const TEMPLATES_TITLE = 'Шаблоны'
