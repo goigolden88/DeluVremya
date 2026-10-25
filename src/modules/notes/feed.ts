@@ -44,22 +44,25 @@ export function stateParts(note: Note, day: DayFormat = shortDay): string[] {
   return parts
 }
 
-/** Открывается ли карточка на «Заметках»: там лежат неразобранное и замыслы в работе (Р-59). */
-function opensOnNotes(note: Note): boolean {
-  return isUnsorted(note) || (note.kind === 'goal' && note.status === 'open')
+/**
+ * Открывается ли карточка на «Заметках»: там лежат неразобранное и замыслы в работе (Р-59).
+ * `observed` — id наблюдений недели: в неразобранном их нет (Р-106).
+ */
+function opensOnNotes(note: Note, observed?: ReadonlySet<string>): boolean {
+  return isUnsorted(note, observed) || (note.kind === 'goal' && note.status === 'open')
 }
 
 /** Переход к карточке записи на «Заметках» — из ленты и с экрана замысла. Null — её там нет. */
-export function notesLink(note: Note): string | null {
-  return opensOnNotes(note) ? `/inbox?open=${encodeURIComponent(note.id)}` : null
+export function notesLink(note: Note, observed?: ReadonlySet<string>): string | null {
+  return opensOnNotes(note, observed) ? `/inbox?open=${encodeURIComponent(note.id)}` : null
 }
 
-export function noteFeed(notes: readonly Note[]): FeedItem[] {
+export function noteFeed(notes: readonly Note[], observed?: ReadonlySet<string>): FeedItem[] {
   return notes
     .filter((note) => !note.deleted)
     .map((note): FeedItem => {
       const goal = goalOf(note, notes)
-      const link = notesLink(note)
+      const link = notesLink(note, observed)
       // Весь текст, замысел и дни плана и выполнения ищутся, но в строке их нет.
       const extra = [
         note.text,

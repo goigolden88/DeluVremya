@@ -186,7 +186,8 @@ export function Review() {
             <textarea name="observation" value={text} onChange={(event) => setText(event.target.value)} />
           </label>
           <p className="muted">
-            Запишется мыслью на экран {quoted(names.inbox)} и вернётся в обзоре через несколько недель.
+            Запишется мыслью: будет здесь и в «Ленте», в неразобранное {quoted(names.inbox)} не ляжет —
+            разбирать в итоге недели нечего. Через несколько недель вернётся в обзоре.
           </p>
           <div className="form__actions">
             <button
