@@ -38,15 +38,39 @@ export function SpecialDay({ day }: { day: DateStr }) {
   const [open, setOpen] = useState(false)
   /** Что сделала форма — строкой: период мог и не задеть показанный день. */
   const [done, setDone] = useState('')
+  /** Убранный период, каким был до «Убрать», — его возвращает «Отменить» (Р-109). */
+  const [removed, setRemoved] = useState<SpecialDays | null>(null)
+  const [error, setError] = useState('')
 
   if (data.status === 'failed') return <p className="error">Особые дни не прочитались: {data.error}</p>
   if (data.status !== 'ready') return null
 
   const special = specialOn(data.specials, day)
-  const close = (line: string) => {
+  const close = (line: string, gone: SpecialDays | null = null) => {
     setOpen(false)
     setDone(line)
+    setRemoved(gone)
+    setError('')
   }
+  const reset = () => {
+    setDone('')
+    setRemoved(null)
+    setError('')
+  }
+  // Пишется тот же объект, без `deleted`; `put` даёт новый `updatedAt`,
+  // и надгробие с другого устройства возврат не перебьёт.
+  const undo = async (back: SpecialDays) => {
+    setError('')
+    try {
+      await db.put('specials', back)
+      setDone('')
+      setRemoved(null)
+    } catch (failure) {
+      setError(`Не записалось: ${describe(failure)}`)
+    }
+  }
+  // Период вернулся другим путём — синхронизацией — отменять нечего.
+  const undoable = removed !== null && !data.specials.some((each) => each.id === removed.id)
 
   return (
     <section className="block special-day">
@@ -57,7 +81,7 @@ export function SpecialDay({ day }: { day: DateStr }) {
           aria-expanded={open}
           onClick={() => {
             setOpen(!open)
-            setDone('')
+            reset()
           }}
         >
           <PlateText special={special} />
@@ -69,7 +93,7 @@ export function SpecialDay({ day }: { day: DateStr }) {
             className="btn"
             onClick={() => {
               setOpen(true)
-              setDone('')
+              reset()
             }}
           >
             Особый день
@@ -84,7 +108,17 @@ export function SpecialDay({ day }: { day: DateStr }) {
           onDone={close}
         />
       )}
-      {done && <p className="muted">{done}</p>}
+      {done && (
+        <p className="muted added">
+          <span>{done}</span>
+          {removed && undoable && (
+            <button type="button" className="link-btn" onClick={() => void undo(removed)}>
+              Отменить
+            </button>
+          )}
+        </p>
+      )}
+      {error && <p className="error">{error}</p>}
     </section>
   )
 }
@@ -109,7 +143,8 @@ export function SpecialToday({ day }: { day: DateStr }) {
  * Форма периода: «с», «по», название. Новый — с показанного дня по него же.
  * Пересечение и «по» раньше «с» не сохраняются — причина словами (Р-91).
  *
- * `onDone` — строка о сделанном; пустая — отменено.
+ * `onDone` — строка о сделанном; пустая — отменено. После «Убрать» вторым
+ * — период, каким был до удаления: его вернёт «Отменить» (Р-109).
  */
 function SpecialForm({
   day,
@@ -120,18 +155,18 @@ function SpecialForm({
   day: DateStr
   existing?: SpecialDays
   specials: SpecialDays[]
-  onDone: (line: string) => void
+  onDone: (line: string, removed?: SpecialDays) => void
 }) {
   const [draft, setDraft] = useState<SpecialDraft>(() => draftOf(day, existing))
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (patch: Partial<SpecialDraft>) => setDraft((current) => ({ ...current, ...patch }))
 
-  async function run(action: () => Promise<string>) {
+  async function run(action: () => Promise<string>, removed?: SpecialDays) {
     setBusy(true)
     setProblem('')
     try {
-      onDone(await action())
+      onDone(await action(), removed)
     } catch (failure) {
       setProblem(`Не записалось: ${describe(failure)}`)
     } finally {
@@ -195,7 +230,7 @@ function SpecialForm({
               void run(async () => {
                 await db.remove('specials', existing.id)
                 return `Убрано: «${specialTitle(existing)}», ${datesText(existing)}.`
-              })
+              }, existing)
             }
           >
             Убрать

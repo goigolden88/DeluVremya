@@ -8,7 +8,16 @@ import { BlockForm } from './BlockForm.tsx'
 import { DaySleep } from './DaySleep.tsx'
 import { categoryEditPath, hiddenPresets, presetLines, shownPresets, type PresetLine } from './categories.ts'
 import { byGroup, groupMinutes, hasGroups } from './groups.ts'
-import { blockFromPreset, blocksOn, categoryName, clearDayBlocks, daySummary, type DaySummary } from './day.ts'
+import {
+  blockFromPreset,
+  blocksOn,
+  canUndo,
+  categoryName,
+  clearDayBlocks,
+  daySummary,
+  type BlockAction,
+  type DaySummary,
+} from './day.ts'
 import {
   addedLine,
   blocksWord,
@@ -20,6 +29,7 @@ import {
   NO_GROUP,
   presetFullLabel,
   presetLabel,
+  removedLine,
   savedLine,
   summaryLine,
   UNKNOWN_CATEGORY,
@@ -63,8 +73,8 @@ export function TimeDay({
   const timer = useTimer()
   const navigate = useNavigate()
   const longPress = useLongPress()
-  /** Последний тап — его снимает «Отменить» (Р-20). */
-  const [last, setLast] = useState<{ block: TimeBlock; name: string } | null>(null)
+  /** Последний тап или «Убрать» — его снимает «Отменить» (Р-20, Р-109). */
+  const [last, setLast] = useState<BlockAction | null>(null)
   const [error, setError] = useState('')
   /** Смена ключа сбрасывает форму «задним числом» после записи. */
   const [retroKey, setRetroKey] = useState(0)
@@ -85,8 +95,8 @@ export function TimeDay({
   const lines = presetLines(catalog.categories, catalog.presets)
   // Окно — показанного дня (Р-94): прошлый день — со своим распорядком.
   const summary = daySummary(time.blocks, catalog.categories, day, new Date(), dayWindow(sleep.records, day))
-  // Блок, снятый из списка, «Отменить» больше не предлагает.
-  const undoable = last !== null && time.blocks.some((each) => each.id === last.block.id)
+  // Блок, снятый или вернувшийся другим путём, «Отменить» больше не предлагает.
+  const undoable = last !== null && canUndo(last, time.blocks)
   const categoryTotal =
     last === null ? 0 : (summary.byCategory.find((each) => each.categoryId === last.block.categoryId)?.minutes ?? 0)
   const nameOf = (id: string) => categoryName(catalog.categories, id) ?? UNKNOWN_CATEGORY
@@ -104,22 +114,34 @@ export function TimeDay({
   const add = (category: Category, preset: Preset) =>
     write(async () => {
       const block = await db.put('time', blockFromPreset(preset, day))
-      setLast({ block, name: category.name })
+      setLast({ kind: 'added', block, name: category.name })
     })
 
+  // Сразу, без вопроса: промах пальцем снимает «Отменить» в строке отклика (Р-109).
   const remove = (block: TimeBlock) =>
     write(async () => {
       await db.remove('time', block.id)
-      if (last?.block.id === block.id) setLast(null)
+      setLast({ kind: 'removed', block, name: nameOf(block.categoryId) })
+    })
+
+  // Добавленный — снимается; убранный — пишется тем, каким был до «Убрать»:
+  // без `deleted`, а `put` даёт новый `updatedAt`, и надгробие на другом
+  // устройстве возврат не перебьёт.
+  const undo = (action: BlockAction) =>
+    write(async () => {
+      if (action.kind === 'added') await db.remove('time', action.block.id)
+      else await db.put('time', action.block)
+      setLast(null)
     })
 
   // Все блоки дня одной записью — после подтверждения, чтобы не стереть случайно.
+  // Отклик прошлого действия уходит: последнее теперь — очистка.
   const clear = () => {
     const cleared = clearDayBlocks(time.blocks, day)
     if (cleared.length === 0 || !window.confirm(clearDayConfirm(cleared.length, day))) return
     void write(async () => {
       await db.putMany('time', cleared)
-      if (last && cleared.some((block) => block.id === last.block.id)) setLast(null)
+      setLast(null)
     })
   }
 
@@ -202,8 +224,12 @@ export function TimeDay({
 
         {last && undoable && (
           <p className="added">
-            <span>{addedLine(last.name, last.block.minutes, categoryTotal)}</span>
-            <button type="button" className="link-btn" onClick={() => void remove(last.block)}>
+            <span>
+              {last.kind === 'added'
+                ? addedLine(last.name, last.block.minutes, categoryTotal)
+                : removedLine(last.name, last.block.minutes)}
+            </span>
+            <button type="button" className="link-btn" onClick={() => void undo(last)}>
               Отменить
             </button>
           </p>
@@ -302,6 +328,8 @@ function Summary({ summary, categories }: { summary: DaySummary; categories: Cat
 /**
  * Блоки дня, свежие сверху. Тап по блоку открывает правку той же формой,
  * что и ввод задним числом; снимается любой, не только последний (Р-20).
+ * «Убрать» — и в строке, и в форме — уходит наверх: строка отклика
+ * с «Отменить» одна на день (Р-109).
  */
 function DayBlocks({
   blocks,
@@ -361,6 +389,10 @@ function DayBlocks({
                   today={today}
                   existing={block}
                   onDone={() => setEditing(null)}
+                  onRemove={(removed) => {
+                    setEditing(null)
+                    onRemove(removed)
+                  }}
                 />
               )}
             </li>

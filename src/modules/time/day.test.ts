@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, TimeBlock } from '../../app/model.ts'
 import { createPreset } from './categories.ts'
-import { blockFromPreset, blocksOn, clearDayBlocks, daySummary, DAY_WINDOW, viewedDay, windowElapsed, windowLeft } from './day.ts'
+import {
+  blockFromPreset,
+  blocksOn,
+  canUndo,
+  clearDayBlocks,
+  daySummary,
+  DAY_WINDOW,
+  viewedDay,
+  windowElapsed,
+  windowLeft,
+} from './day.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
 const DAY = '2026-09-13'
@@ -25,6 +35,24 @@ describe('блок из кнопки', () => {
   it('два тапа — два блока, а не один (Р-20)', () => {
     const preset = createPreset('cat:чтение', 30)
     expect(blockFromPreset(preset, DAY).id).not.toBe(blockFromPreset(preset, DAY).id)
+  })
+})
+
+describe('«Отменить» после действия с блоком', () => {
+  const reading = block('01A', 'a', 30)
+
+  it('добавленный — пока он живой (Р-20)', () => {
+    const added = { kind: 'added', block: reading, name: 'Чтение' } as const
+    expect(canUndo(added, [reading])).toBe(true)
+    expect(canUndo(added, [])).toBe(false)
+    expect(canUndo(added, [{ ...reading, deleted: true }])).toBe(false)
+  })
+
+  it('убранный — пока его не вернули (Р-109)', () => {
+    const removed = { kind: 'removed', block: reading, name: 'Чтение' } as const
+    expect(canUndo(removed, [])).toBe(true)
+    expect(canUndo(removed, [{ ...reading, deleted: true }])).toBe(true)
+    expect(canUndo(removed, [reading])).toBe(false)
   })
 })
 
