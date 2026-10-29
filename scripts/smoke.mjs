@@ -930,9 +930,66 @@ async function scenario() {
     line(undone, 'Неучтено'),
   )
 
+  // ─ «Убрать» — сразу, со строкой «Убрано · Отменить» (Р-109).
   await act(`document.querySelector('[aria-label^="Убрать: Чтение"]')?.click()`)
   await sleep(700)
-  check('блок снимается из списка дня', has(await screen(), 'За день ничего не учтено'))
+  const removedBlock = await screen()
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const restoredBlock = await screen()
+  check(
+    '«Убрать» в строке блока — сразу, «Убрано» и «Отменить»; «Отменить» возвращает блок — Р-109',
+    has(removedBlock, 'За день ничего не учтено') &&
+      has(removedBlock, 'Убрано: Чтение · 30 мин') &&
+      has(removedBlock, 'Отменить') &&
+      has(restoredBlock, 'Учтено 30 мин · 1 блок') &&
+      !has(restoredBlock, 'Убрано'),
+    `${line(removedBlock, 'Убрано')} → ${line(restoredBlock, 'Учтено')}`,
+  )
+
+  // В форме блока — та же строка; блок возвращается с заметкой.
+  const blockForm = `document.querySelector('.tblock')?.closest('li')?.querySelector('form')`
+  await act(`document.querySelector('.tblock__main')?.click()`)
+  await sleep(400)
+  await act(`
+    set(${blockForm}?.querySelector('textarea[name=block-note]'), 'до главы');
+    ${blockForm}?.querySelector('button[type=submit]')?.click();
+  `)
+  await sleep(700)
+  await act(`document.querySelector('.tblock__main')?.click()`)
+  await sleep(400)
+  await act(`${blockForm}?.querySelector('.btn--danger')?.click()`)
+  await sleep(700)
+  const removedInForm = await screen()
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const restoredInForm = await screen()
+  check(
+    '«Убрать» в форме блока — та же строка; «Отменить» возвращает блок с заметкой — Р-109',
+    has(removedInForm, 'Убрано: Чтение · 30 мин') &&
+      has(removedInForm, 'За день ничего не учтено') &&
+      has(restoredInForm, 'Учтено 30 мин · 1 блок') &&
+      has(restoredInForm, 'до главы'),
+    `${line(removedInForm, 'Убрано')} → ${line(restoredInForm, 'Учтено')}`,
+  )
+
+  // Отменяется только последнее: после «Убрать» тап по кнопке сменяет строку.
+  await act(`document.querySelector('[aria-label^="Убрать: Чтение"]')?.click()`)
+  await sleep(700)
+  await act(`preset('Чтение +60')?.click()`)
+  await sleep(700)
+  const afterNext = await screen()
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const lastUndone = await screen()
+  check(
+    'после «Убрать» новый блок сменяет строку отклика: «Отменить» — про последнее действие — Р-109',
+    has(afterNext, 'Записано: Чтение, 1 ч') &&
+      !has(afterNext, 'Убрано') &&
+      has(lastUndone, 'За день ничего не учтено') &&
+      !has(lastUndone, 'Отменить'),
+    `${line(afterNext, 'Записано')} → ${line(lastUndone, 'За день')}`,
+  )
 
   // ─ «Очистить день»: все блоки дня одной записью, после подтверждения.
   await act(`preset('Чтение +30')?.click()`)
@@ -3721,6 +3778,20 @@ async function specialsScenario() {
   await sleep(700)
   const removedScreen = await screen()
   const removedPlate = await plate()
+  // «Отменить» возвращает период (Р-109); затем он убирается снова — сценарий
+  // кончается без периода.
+  await act(`byText('button', 'Отменить')?.click()`)
+  await sleep(700)
+  const restoredPlate = await plate()
+  check(
+    'после «Убрать» у особого дня — «Отменить», оно возвращает период — Р-109',
+    has(removedScreen, 'Отменить') && has(restoredPlate, 'Сплав по реке'),
+    `«${restoredPlate}»`,
+  )
+  await act(`document.querySelector('button.special')?.click()`)
+  await sleep(400)
+  await act(`byText('button', 'Убрать')?.click()`)
+  await sleep(700)
   await go('/')
   const todayAfter = await plate()
   check(

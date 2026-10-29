@@ -17,7 +17,9 @@ function describe(error: unknown): string {
  * самой короткой кнопкой категории (01-Проект, модуль 3). У даты — кнопки
  * «сегодня» и «вчера» (Р-19).
  *
- * `onDone` — записано (блок) или отменено (null).
+ * `onDone` — записано (блок) или отменено (null). `onRemove` — «Убрать»
+ * правимого блока: снимает и откликается вызывающий, у него строка
+ * с «Отменить» (Р-109). Отдаётся блок, каким он был до правок в форме.
  */
 export function BlockForm({
   categories,
@@ -27,6 +29,7 @@ export function BlockForm({
   defaultDate,
   existing,
   onDone,
+  onRemove,
 }: {
   categories: Category[]
   presets: Preset[]
@@ -37,6 +40,7 @@ export function BlockForm({
   defaultDate?: DateStr
   existing?: TimeBlock
   onDone: (saved: TimeBlock | null) => void
+  onRemove?: (block: TimeBlock) => void
 }) {
   // Архивная категория правимого блока остаётся в выборе: иначе форма
   // молча переписала бы его на первую попавшуюся.
@@ -181,19 +185,11 @@ export function BlockForm({
       <div className="form__actions">
         {existing && (
           <>
-            <button
-              type="button"
-              className="btn btn--danger"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await db.remove('time', existing.id)
-                  return null
-                })
-              }
-            >
-              Убрать
-            </button>
+            {onRemove && (
+              <button type="button" className="btn btn--danger" disabled={busy} onClick={() => onRemove(existing)}>
+                Убрать
+              </button>
+            )}
             <button type="button" className="btn" disabled={busy} onClick={() => onDone(null)}>
               Отмена
             </button>

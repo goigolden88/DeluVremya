@@ -144,6 +144,23 @@ export type DaySummary = {
   unaccounted: number
 }
 
+/**
+ * Последнее действие с блоком на экране дня — его снимает «Отменить»:
+ * тап по кнопке (Р-20) или «Убрать» (Р-109). `block` — каким был до
+ * действия: убранный возвращается им же, без `deleted`.
+ */
+export type BlockAction = { kind: 'added' | 'removed'; block: TimeBlock; name: string }
+
+/**
+ * «Отменить» ещё про этот блок: добавленный — пока он живой, убранный —
+ * пока не живой. Блок мог уйти или вернуться другим путём — синхронизацией
+ * или из списка дня, — и тогда отменять уже нечего.
+ */
+export function canUndo(action: BlockAction, blocks: readonly TimeBlock[]): boolean {
+  const live = blocks.some((each) => each.id === action.block.id && !each.deleted)
+  return action.kind === 'added' ? live : !live
+}
+
 /** Итог дня — то, что видно сразу после записи. Окно — этого дня (Р-94); не задано — по умолчанию. */
 export function daySummary(
   blocks: readonly TimeBlock[],

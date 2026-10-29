@@ -120,6 +120,11 @@ export function addedLine(name: string, minutes: number, categoryTotal: number):
   return `Записано: ${name}, ${formatMinutes(minutes)}. По категории за день — ${formatMinutes(categoryTotal)}`
 }
 
+/** Отклик на «Убрать» блок: что снято — рядом с ним «Отменить» (Р-109). */
+export function removedLine(name: string, minutes: number): string {
+  return `Убрано: ${name} · ${formatMinutes(minutes)}`
+}
+
 export const BLOCK_PROBLEMS: Record<BlockProblem, string> = {
   category: 'Не выбрана категория',
   minutes: PRESET_PROBLEMS.range,
