@@ -4046,4 +4046,14 @@ console.log(
     : `\nПрогон прошёл: ${checks.length} проверок, ошибок нет`,
 )
 
+// Список проверок длинный, и его начало теряется в обрезанном выводе.
+// Несошедшееся повторяется в самом конце, где его видно сразу.
+if (bad) {
+  console.log('\nНе сошлось:')
+  for (const each of failed) {
+    console.log(`  ${each.what}${each.seen ? ` — ${each.seen}` : ''}`)
+  }
+  for (const problem of problems) console.log(`  ошибка браузера: ${problem}`)
+}
+
 process.exit(bad ? 1 : 0)
