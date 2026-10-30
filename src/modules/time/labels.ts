@@ -31,6 +31,14 @@ import {
 } from './period.ts'
 import type { BlockProblem } from './retro.ts'
 import type { WholeBasis } from './shares.ts'
+import {
+  WEEKDAY_MIN_DAYS,
+  WEEKDAY_RATIO,
+  WEEKDAY_SHARE,
+  WEEKDAY_TOP,
+  WEEKDAY_WEEKS,
+  type WeekdayRow,
+} from './weekdays.ts'
 import { datesText, specialTitle } from './specials.ts'
 import type { Sleep, SpecialDays } from '../../app/model.ts'
 
@@ -517,6 +525,48 @@ export function wholeBasisText(basis: WholeBasis): string {
 /** Пояснение под долями «от всего». */
 export const WHOLE_NOTE =
   'Доля — от суток прошедших дней. Сон — сутки минус окно дня (отметка дня, иначе распорядок); неучтено — окно минус учтённое в нём; учтённое сверх окна отнимается от сна. Фоновое не входит.'
+
+// ─── По дням недели (Р-110) ────────────────────────────────────────────────
+
+/** Дни недели коротко: пн — 0 … вс — 6. */
+export const WEEKDAY_SHORT: readonly string[] = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+
+/** «за 8 недель». */
+export function weekdayWeeksText(): string {
+  return `за ${WEEKDAY_WEEKS} ${plural(WEEKDAY_WEEKS, ['неделю', 'недели', 'недель'])}`
+}
+
+/** «половине» — после «хотя бы в». */
+export function weekdayShareText(): string {
+  const { part, of } = WEEKDAY_SHARE
+  return part === 1 && of === 2 ? 'половине' : `${part}/${of}`
+}
+
+/** «вдвое» — перед «чаще». */
+export function weekdayRatioText(): string {
+  return WEEKDAY_RATIO === 2 ? 'вдвое' : `в ${WEEKDAY_RATIO} раза`
+}
+
+/** Как считается блок — под строками. */
+export function weekdayBasis(): string {
+  return (
+    `Свойственно дню — категория была хотя бы в ${weekdayShareText()} таких дней учёта и ${weekdayRatioText()} чаще, ` +
+    `чем в остальные дни недели; до ${WEEKDAY_TOP} на день. День учёта — день с хоть одним блоком. ` +
+    'В среднем — минуты в те дни, когда категория была. Фоновое не считается.'
+  )
+}
+
+/** Строка дня: «вт: Спорт — в среднем 1 ч, 6 из 8 вт · …», «мало данных», «ничего особенного». */
+export function weekdayLine(row: WeekdayRow): string {
+  const day = WEEKDAY_SHORT[row.weekday] ?? ''
+  if (row.few) return `${day}: мало данных — дней учёта ${row.days}, нужно от ${WEEKDAY_MIN_DAYS}`
+  if (row.items.length === 0) return `${day}: ничего особенного — дней учёта ${row.days}`
+  const items = row.items.map(
+    (item) =>
+      `${item.name ?? UNKNOWN_CATEGORY} — в среднем ${formatMinutes(item.average)}, ${item.days} из ${row.days} ${day}`,
+  )
+  return `${day}: ${items.join(' · ')}`
+}
 
 /** Пояснение к блоку «Неделя» на экране учёта. */
 export function progressLead(from: DateStr): string {
