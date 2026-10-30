@@ -11,6 +11,7 @@ import { StaleReview } from '../modules/notes/StaleReview.tsx'
 import { useNotes } from '../modules/notes/useNotes.ts'
 import { PeriodTime } from '../modules/time/Period.tsx'
 import { WeekNorms } from '../modules/time/Week.tsx'
+import { WeekdayPattern } from '../modules/time/Weekdays.tsx'
 import { quoted } from '../ui/screenNames.ts'
 import { useScreenNames } from '../ui/useScreenNames.ts'
 import { useToday } from '../shared/ui/useToday.ts'
@@ -139,6 +140,12 @@ export function Review() {
           scope="review"
           compare={{ period: weekPeriod(addDays(week, -7)), label: 'Прошлая неделя', own: 'Неделя' }}
         />
+      </section>
+
+      {/* Что свойственно дню недели — за много недель, окно идёт за обозреваемой (Р-110). */}
+      <section className="block">
+        <h2>По дням недели</h2>
+        <WeekdayPattern week={week} today={today} />
       </section>
 
       <section className="block">

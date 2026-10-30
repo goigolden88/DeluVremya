@@ -10,8 +10,12 @@ import {
   SLEEP_ROW,
   SPECIAL_WEEK,
   UNACCOUNTED_ROW,
+  weekdayRatioText,
+  weekdayShareText,
+  weekdayWeeksText,
   windowText,
 } from '../modules/time/labels.ts'
+import { WEEKDAY_MIN_DAYS, WEEKDAY_TOP } from '../modules/time/weekdays.ts'
 import { dayWindow } from '../modules/time/sleep.ts'
 import { useSleep } from '../modules/time/useSleep.ts'
 import { NORM_HISTORY_WEEKS, NORM_MIN_WEEKS } from '../modules/time/period.ts'
@@ -247,7 +251,7 @@ export function Help() {
 
       <Fold id="help:review" title="Обзор недели" folded>
         <p>
-          Раз в неделю, минут на {REVIEW_MINUTES}, по шагам: время недели, план против факта, нормы, замыслы, висяки и замыслы без движения, возврат старых
+          Раз в неделю, минут на {REVIEW_MINUTES}, по шагам: время недели, по дням недели, план против факта, нормы, замыслы, висяки и замыслы без движения, возврат старых
           мыслей, наблюдение недели. В воскресенье и понедельник вверху экрана {quoted(names.today)} зовёт
           карточка, пока обзор не проведён. Пропущенная неделя в долг не встаёт.
         </p>
@@ -255,6 +259,14 @@ export function Help() {
           Время недели — рядом с прошлой неделей, у каждой своё основание, без пересчёта на день: столбец в
           таблице и строка под итогом. Прошлая — та, что перед открытой в обзоре: листаете обзор назад —
           сравнение сдвигается вместе с ним.
+        </p>
+        <p>
+          «По дням недели» — что обычно бывает в каждый день недели {weekdayWeeksText()}: полных, кончая
+          открытой неделей, если она закончилась, иначе — прошлой. Категория свойственна дню, если была хотя бы
+          в {weekdayShareText()} таких дней с учётом и {weekdayRatioText()} чаще, чем в остальные дни недели; на
+          день — до {WEEKDAY_TOP}, самые частые, с тем, сколько в среднем и в скольких днях. Пока дней с учётом
+          меньше {WEEKDAY_MIN_DAYS} — «мало данных». Архивные категории считаются, слитые — под той, в которую
+          слиты; фоновое не считается.
         </p>
         <p>
           Висяк — дело, которое лежит в неразобранном {days(DEFAULT_THRESHOLDS.stale)} и дольше. За обзор —
