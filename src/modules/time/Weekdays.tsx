@@ -1,5 +1,5 @@
-import { formatPeriod, type DateStr } from '../../shared/core/dates.ts'
-import { weekdayBasis, weekdayLine, weekdayWeeksText } from './labels.ts'
+import type { DateStr } from '../../shared/core/dates.ts'
+import { weekdayBasis, weekdayLine, weekdayWindowLine } from './labels.ts'
 import { ready, Unready } from './Period.tsx'
 import { useBlocks } from './useBlocks.ts'
 import { useCatalog } from './useCatalog.ts'
@@ -10,6 +10,7 @@ import { weekdayPattern } from './weekdays.ts'
  * «По дням недели» — блок обзора недели (Р-110): семь строк, пн…вс, что
  * свойственно каждому дню за окно в несколько полных недель. Окно идёт
  * за обозреваемой неделей. Строка без данных не прячется — «мало данных».
+ * Особые дни не считаются, их число — в строке окна (Р-111).
  */
 export function WeekdayPattern({ week, today }: { week: DateStr; today: DateStr }) {
   const catalog = useCatalog()
@@ -17,15 +18,13 @@ export function WeekdayPattern({ week, today }: { week: DateStr; today: DateStr 
   const specials = useSpecials()
   if (!ready(catalog, time, specials)) return <Unready catalog={catalog} time={time} specials={specials} />
 
-  const { window, rows } = weekdayPattern(time.blocks, catalog.categories, week, today)
+  const pattern = weekdayPattern(time.blocks, catalog.categories, week, today, specials.specials)
 
   return (
     <>
-      <p className="muted">
-        {weekdayWeeksText()} · {formatPeriod(window)}
-      </p>
+      <p className="muted">{weekdayWindowLine(pattern)}</p>
       <ul className="plain">
-        {rows.map((row) => (
+        {pattern.rows.map((row) => (
           <li key={row.weekday} className="tblock__main">
             <p>{weekdayLine(row)}</p>
           </li>

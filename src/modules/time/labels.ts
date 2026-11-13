@@ -3,7 +3,15 @@
  * (правило в CLAUDE.md).
  */
 
-import { formatDateLong, monthName, plural, type DateStr, type MonthStr, type Period } from '../../shared/core/dates.ts'
+import {
+  formatDateLong,
+  formatPeriod,
+  monthName,
+  plural,
+  type DateStr,
+  type MonthStr,
+  type Period,
+} from '../../shared/core/dates.ts'
 import { MINUTES_PER_DAY, type CategoryKind, type NameProblem, type PresetProblem } from './categories.ts'
 import { DAY_WINDOW, type DayWindow } from './day.ts'
 import {
@@ -37,6 +45,7 @@ import {
   WEEKDAY_SHARE,
   WEEKDAY_TOP,
   WEEKDAY_WEEKS,
+  type WeekdayPattern,
   type WeekdayRow,
 } from './weekdays.ts'
 import { datesText, specialTitle } from './specials.ts'
@@ -547,12 +556,18 @@ export function weekdayRatioText(): string {
   return WEEKDAY_RATIO === 2 ? 'вдвое' : `в ${WEEKDAY_RATIO} раза`
 }
 
+/** Окно над строками: «за 8 недель · <даты>», с особыми днями — «… · особые дни не считаются — 14» (Р-111). */
+export function weekdayWindowLine(pattern: Pick<WeekdayPattern, 'window' | 'specialDays'>): string {
+  const head = `${weekdayWeeksText()} · ${formatPeriod(pattern.window)}`
+  return pattern.specialDays === 0 ? head : `${head} · особые дни не считаются — ${pattern.specialDays}`
+}
+
 /** Как считается блок — под строками. */
 export function weekdayBasis(): string {
   return (
     `Свойственно дню — категория была хотя бы в ${weekdayShareText()} таких дней учёта и ${weekdayRatioText()} чаще, ` +
     `чем в остальные дни недели; до ${WEEKDAY_TOP} на день. День учёта — день с хоть одним блоком. ` +
-    'В среднем — минуты в те дни, когда категория была. Фоновое не считается.'
+    'В среднем — минуты в те дни, когда категория была. Фоновое и особые дни не считаются.'
   )
 }
 
