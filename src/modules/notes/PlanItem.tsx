@@ -3,7 +3,7 @@ import { addDays, isDateStr, type DateStr } from '../../shared/core/dates.ts'
 import { db } from '../../app/core.ts'
 import type { Note } from '../../app/model.ts'
 import { markDone, reopen, withText } from './inbox.ts'
-import { deleteConfirm, durationText, MOVE_TITLE, shortText, spanText, TO_UNSORTED } from './labels.ts'
+import { deleteConfirm, durationText, MOVE_TITLE, shortText, SPAN_ERROR, spanText, TO_UNSORTED } from './labels.ts'
 import { ESTIMATE_CHOICES, readEstimate, spanEnd, withEstimate, withPlan, withSpan } from './plan.ts'
 import { patternIdOf } from './repeat.ts'
 import { RepeatOrigin, RepeatSetup } from './Repeat.tsx'
@@ -224,6 +224,7 @@ function PlanCard({
   const [text, setText] = useState(note.text)
   const [estimate, setEstimate] = useState('')
   const [estimateError, setEstimateError] = useState('')
+  const [spanError, setSpanError] = useState('')
   const edited = withText(note, text)
   const isOpen = note.status === 'open'
   // Первый и последний день периода; у кривого дня плана периода не выбрать.
@@ -325,11 +326,15 @@ function PlanCard({
               value={to ?? ''}
               onChange={(event) => {
                 const day = event.target.value
+                // День не позже начала не пишется, но и не молчит: поле обходят ввод с клавиатуры и Safari.
+                const early = isDateStr(day) && day <= from
+                setSpanError(early ? SPAN_ERROR : '')
                 if (day === '') void save(withSpan(note, null))
                 else if (isDateStr(day) && day > from) void save(withSpan(note, day))
               }}
             />
           </label>
+          {spanError && <p className="error">{spanError}</p>}
           {to !== null && (
             <button type="button" className="link-btn" onClick={() => void save(withSpan(note, null))}>
               Один день — без периода

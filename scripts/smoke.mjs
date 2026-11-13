@@ -1933,6 +1933,7 @@ async function spanScenario() {
   const item = `[...document.querySelectorAll('li.plan-item')].find((el) => el.querySelector('button.plan-item__text')?.textContent.trim() === ${JSON.stringify(text)})`
   const itemMeta = () => run(`${item}?.querySelector(':scope > .note__meta')?.textContent ?? ''`)
   const cardTo = () => run(`${item}?.querySelector('.plan-card input[name=plan-to]')?.value ?? null`)
+  const cardError = () => run(`${item}?.querySelector('.plan-card p.error')?.textContent ?? ''`)
   const setCardTo = (day) => act(`set(${item}?.querySelector('.plan-card input[name=plan-to]'), ${JSON.stringify(day)})`)
 
   await go('/inbox')
@@ -1978,9 +1979,11 @@ async function spanScenario() {
   await sleep(700)
   const kept = await itemMeta()
   const keptTo = await cardTo()
+  const keptError = await cardError()
   await setCardTo(localDay(3))
   await sleep(700)
   const moved = await itemMeta()
+  const movedError = await cardError()
   check(
     '«По какой день» в карточке пункта плана: срок в поле; раньше начала — не пишется, позже — новый период в строке — Р-101',
     shownTo === tomorrow &&
@@ -1988,6 +1991,11 @@ async function spanScenario() {
       keptTo === tomorrow &&
       moved === `${short(today)}–${short(localDay(3))}`,
     `в поле «${shownTo}»; после дня раньше начала — «${kept}», поле «${keptTo}»; после третьего дня — «${moved}»`,
+  )
+  check(
+    '«По какой день» в карточке пункта плана: раньше начала — ошибка словами, верный день её убирает — Р-101',
+    keptError === '«По какой день» — позже дня начала' && movedError === '',
+    `после дня раньше начала — «${keptError}»; после третьего дня — «${movedError}»`,
   )
 
   await act(`
