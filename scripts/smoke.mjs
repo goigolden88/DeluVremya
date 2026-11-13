@@ -1399,6 +1399,8 @@ async function scenario() {
 
   await specialsScenario()
 
+  await weekdaysScenario()
+
   await routineScenario()
 
   await markScenario()
@@ -3810,6 +3812,77 @@ async function specialsScenario() {
       todayAfter === '',
     `поля ${editing}; после — «${removedPlate}», «${todayAfter}»`,
   )
+}
+
+/**
+ * «По дням недели» без особых дней (Р-110, Р-111): свои блоки — импортом
+ * в 2023 год, куда остальной сценарий не попадает: «Бассейн» по вторникам
+ * всех восьми недель окна обзора недели 20 марта, «Сплав» — в два из них.
+ * Без особых дней — «8 из 8 вт»; период 6–19 марта задевает два вторника —
+ * «6 из 6 вт», окно то же, особые дни названы числом. В конце период убран.
+ */
+async function weekdaysScenario() {
+  const week = '/review?week=2023-03-20'
+  const tuesdays = ['2023-01-31', '2023-02-07', '2023-02-14', '2023-02-21', '2023-02-28', '2023-03-07', '2023-03-14', '2023-03-21']
+  const block = () =>
+    run(`[...document.querySelectorAll('h2')].find((el) => el.textContent.trim() === 'По дням недели')?.closest('section')?.innerText ?? ''`)
+
+  const file = JSON.stringify({
+    format: 'deluvremya-import',
+    version: 1,
+    time: [
+      ...tuesdays.map((date) => ({ date, category: 'Бассейн', minutes: 60 })),
+      { date: '2023-03-07', category: 'Сплав', minutes: 300 },
+      { date: '2023-03-14', category: 'Сплав', minutes: 300 },
+    ],
+  })
+  await go('/settings')
+  await unfold('Экспорт и импорт')
+  await unfold('Импорт записей')
+  await act(`
+    set(document.querySelector('.import__text'), ${JSON.stringify(file)});
+    byText('button', 'Разобрать')?.click();
+  `)
+  await sleep(700)
+  await act(`startsWith('button', 'Загрузить')?.click()`)
+  await sleep(1000)
+  const imported = await screen()
+
+  await go(week)
+  const plain = await block()
+
+  // ─ Особый период 6–19 марта: два вторника окна внутри.
+  await go('/time?day=2023-03-06')
+  await act(`byText('button', 'Особый день')?.click()`)
+  await sleep(400)
+  await act(`
+    set(document.querySelector('input[name=special-title]'), 'Поход в горы');
+    set(document.querySelector('input[name=special-to]'), '2023-03-19');
+  `)
+  await sleep(200)
+  await act(`byText('button', 'Отметить')?.click()`)
+  await sleep(700)
+
+  await go(week)
+  const special = await block()
+  check(
+    '«По дням недели»: дни особого периода не считаются — ни дни учёта, ни категории; окно то же, особые дни названы числом — Р-111',
+    has(imported, 'Загружено') &&
+      has(plain, 'вт: Бассейн — в среднем 1 ч, 8 из 8 вт') &&
+      !has(plain, 'особые дни не считаются —') &&
+      has(special, 'вт: Бассейн — в среднем 1 ч, 6 из 6 вт') &&
+      has(special, 'особые дни не считаются — 14') &&
+      has(special, 'Фоновое и особые дни не считаются') &&
+      !has(special, 'Сплав'),
+    `до «${line(plain, 'вт:')}»; с периодом «${line(special, 'вт:')}», «${line(special, 'особые дни')}»`,
+  )
+
+  // Период убирается: сценарии после этого его не видят.
+  await go('/time?day=2023-03-06')
+  await act(`document.querySelector('button.special')?.click()`)
+  await sleep(400)
+  await act(`byText('button', 'Убрать')?.click()`)
+  await sleep(700)
 }
 
 /**

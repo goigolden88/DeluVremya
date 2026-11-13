@@ -11,13 +11,16 @@
  * архивная — считается; блок на надгробии — под живой, куда оно указывает
  * (Р-29, тем же расчётом, что слияние после обмена).
  *
+ * Особые дни (Р-91) не входят ни в дни учёта, ни в дни и минуты категорий
+ * (Р-111); окно из-за них не растягивается — их число идёт в основание.
+ *
  * Чистые функции, без React и без базы (02-Архитектура, «Структура кода»).
  */
 
 import { addDays, daysBetween, weekPeriod, weekStart, type DateStr, type Period } from '../../shared/core/dates.ts'
-import type { Category, TimeBlock } from '../../app/model.ts'
+import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
 import { reconcilePlan } from './categories.ts'
-import { blocksIn } from './period.ts'
+import { blocksIn, specialDaysIn } from './period.ts'
 
 /** Сколько полных недель в окне. */
 export const WEEKDAY_WEEKS = 8
@@ -57,7 +60,12 @@ export type WeekdayRow = {
   items: WeekdayItem[]
 }
 
-export type WeekdayPattern = { window: Period; rows: WeekdayRow[] }
+export type WeekdayPattern = {
+  window: Period
+  /** Сколько дней окна — особые (Р-91): их блоки не считаются (Р-111). */
+  specialDays: number
+  rows: WeekdayRow[]
+}
 
 /** День недели: пн — 0 … вс — 6. */
 export function weekdayIndex(day: DateStr): number {
@@ -88,15 +96,17 @@ function typical(own: number, ownDays: number, other: number, otherDays: number)
   return own * otherDays >= WEEKDAY_RATIO * other * ownDays
 }
 
-/** Что свойственно каждому дню недели в окне обзора недели `week`. */
+/** Что свойственно каждому дню недели в окне обзора недели `week`; особые дни — мимо (Р-111). */
 export function weekdayPattern(
   blocks: readonly TimeBlock[],
   categories: readonly Category[],
   week: DateStr,
   today: DateStr,
+  specials: readonly SpecialDays[],
 ): WeekdayPattern {
   const window = weekdayWindow(week, today)
-  const list = liveBlocks(blocks, categories, window)
+  const special = specialDaysIn(specials, window)
+  const list = liveBlocks(blocks, categories, window).filter((block) => !special.has(block.date))
   const known = new Map(categories.map((category) => [category.id, category]))
   const order = (id: string) => known.get(id)?.order ?? Number.POSITIVE_INFINITY
 
@@ -141,5 +151,5 @@ export function weekdayPattern(
     return { weekday, days: count, few: false, items: items.slice(0, WEEKDAY_TOP) }
   })
 
-  return { window, rows }
+  return { window, specialDays: special.size, rows }
 }

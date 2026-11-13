@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { addDays } from '../../shared/core/dates.ts'
-import type { Category, TimeBlock } from '../../app/model.ts'
-import { weekdayLine } from './labels.ts'
+import type { Category, SpecialDays, TimeBlock } from '../../app/model.ts'
+import { weekdayBasis, weekdayLine, weekdayWindowLine } from './labels.ts'
 import { weekdayIndex, weekdayPattern, weekdayWindow } from './weekdays.ts'
 
 const AT = '2026-09-13T10:00:00.000Z'
@@ -36,8 +36,13 @@ const ALL = [0, 1, 2, 3, 4, 5, 6, 7]
 const work = ALL.flatMap((week) => [0, 1, 2, 3, 4, 5, 6].map((weekday) => block('w', day(week, weekday), 480)))
 const categories = [cat('w', 'Работа', 0), cat('s', 'Спорт', 1), cat('r', 'Чтение', 2), cat('g', 'Игры', 3)]
 
-function row(blocks: readonly TimeBlock[], weekday: number, list: readonly Category[] = categories) {
-  const found = weekdayPattern(blocks, list, WEEK, TODAY).rows[weekday]
+function row(
+  blocks: readonly TimeBlock[],
+  weekday: number,
+  list: readonly Category[] = categories,
+  specials: readonly SpecialDays[] = [],
+) {
+  const found = weekdayPattern(blocks, list, WEEK, TODAY, specials).rows[weekday]
   if (!found) throw new Error('нет строки')
   return found
 }
@@ -102,7 +107,7 @@ describe('что свойственно дню недели — Р-110', () => {
     const sunday = row(blocks, 6)
     expect(sunday).toEqual({ weekday: 6, days: 2, few: true, items: [] })
     expect(weekdayLine(sunday)).toBe('вс: мало данных — дней учёта 2, нужно от 3')
-    expect(weekdayPattern(blocks, categories, WEEK, TODAY).rows).toHaveLength(7)
+    expect(weekdayPattern(blocks, categories, WEEK, TODAY, []).rows).toHaveLength(7)
     expect(row(on('s', 6, [0, 1, 2]), 6).few).toBe(false)
   })
 
@@ -144,5 +149,55 @@ describe('что свойственно дню недели — Р-110', () => {
       ...on('m', 5, ALL, 10),
     ]
     expect(row(blocks, 5, list).items.map((item) => item.name)).toEqual(['Музыка', 'Спорт', 'Чтение'])
+  })
+})
+
+function special(id: string, from: string, to: string, extra: Partial<SpecialDays> = {}): SpecialDays {
+  return { id, updatedAt: AT, from, to, title: 'Поездка', ...extra }
+}
+
+describe('по дням недели без особых дней — Р-111', () => {
+  // Поездка — две последние недели окна целиком.
+  const trip = special('t', day(6, 0), day(7, 6))
+
+  it('дни периода не входят ни в дни учёта, ни в дни и минуты категорий; окно то же', () => {
+    const blocks = [...work, ...on('s', 1, ALL), ...on('g', 1, [4, 5, 6, 7], 300)]
+    const before = row(blocks, 1)
+    expect(before).toMatchObject({ days: 8 })
+    expect(before.items.map((item) => item.categoryId)).toEqual(['s', 'g'])
+
+    const after = row(blocks, 1, categories, [trip])
+    expect(after.days).toBe(6)
+    expect(after.items).toEqual([{ categoryId: 's', name: 'Спорт', days: 6, minutes: 360, average: 60 }])
+    expect(weekdayLine(after)).toBe('вт: Спорт — в среднем 1 ч, 6 из 6 вт')
+
+    const pattern = weekdayPattern(blocks, categories, WEEK, TODAY, [trip])
+    expect(pattern.window).toEqual({ from: FIRST, to: '2026-09-13' })
+    expect(pattern.specialDays).toBe(14)
+    expect(weekdayPattern(blocks, categories, WEEK, TODAY, []).specialDays).toBe(0)
+  })
+
+  it('дней учёта из-за особых меньше порога — «мало данных»', () => {
+    const blocks = on('s', 6, [0, 1, 2])
+    expect(row(blocks, 6).few).toBe(false)
+    const sunday = row(blocks, 6, categories, [special('x', day(2, 6), day(2, 6))])
+    expect(sunday).toEqual({ weekday: 6, days: 2, few: true, items: [] })
+  })
+
+  it('период, начатый до окна, — только своей частью внутри; убранный — не в счёт', () => {
+    const early = special('e', '2026-07-01', day(0, 1))
+    const blocks = [...work, ...on('s', 1, ALL)]
+    expect(weekdayPattern(blocks, categories, WEEK, TODAY, [early]).specialDays).toBe(2)
+    expect(row(blocks, 1, categories, [early]).days).toBe(7)
+    expect(row(blocks, 1, categories, [{ ...trip, deleted: true }]).days).toBe(8)
+  })
+
+  it('строка окна называет особые дни числом; основание — правилом', () => {
+    const window = { from: FIRST, to: '2026-09-13' }
+    expect(weekdayWindowLine({ window, specialDays: 0 })).not.toContain('особые')
+    expect(weekdayWindowLine({ window, specialDays: 14 })).toBe(
+      `${weekdayWindowLine({ window, specialDays: 0 })} · особые дни не считаются — 14`,
+    )
+    expect(weekdayBasis()).toContain('особые дни не считаются')
   })
 })
